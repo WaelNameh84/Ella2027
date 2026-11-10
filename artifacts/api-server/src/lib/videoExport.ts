@@ -8,6 +8,8 @@ import { tmpdir } from "node:os";
 
 type ExportScene = {
   id: string;
+  title: string;
+  narration: string;
   assetUrl: string | null;
   assetType: string | null;
   durationSeconds: number;
@@ -94,25 +96,44 @@ function ffmpegFilter(width: number, height: number, fps: number): string {
   return `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps}`;
 }
 
+function formatSubtitleTime(milliseconds: number): string {
+  const hours = Math.floor(milliseconds / 3_600_000);
+  const minutes = Math.floor((milliseconds % 3_600_000) / 60_000);
+  const seconds = Math.floor((milliseconds % 60_000) / 1_000);
+  const ms = milliseconds % 1_000;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")},${String(ms).padStart(3, "0")}`;
+}
+
+function escapeFilterPath(path: string): string {
+  return path.replaceAll("\\", "\\\\").replaceAll(":", "\\:");
+}
+
 export async function renderMp4(
   userId: string,
   projectId: string,
   scenes: ExportScene[],
   resolution: number,
   fps: number,
+  aspectRatio: string,
+  includeSubtitles: boolean,
 ): Promise<string> {
   if (!scenes.length) throw new Error("Add scenes before exporting.");
   if (scenes.some((scene) => !scene.assetUrl || !["image", "video"].includes(scene.assetType ?? ""))) {
     throw new Error("Every scene needs an attached image or video before export.");
   }
 
-  const dimensions: Record<number, [number, number]> = {
+  const landscapeDimensions: Record<number, [number, number]> = {
     480: [854, 480],
     720: [1280, 720],
     1080: [1920, 1080],
     2160: [3840, 2160],
   };
-  const [width, height] = dimensions[resolution] ?? dimensions[720];
+  const baseDimensions = landscapeDimensions[resolution] ?? landscapeDimensions[720];
+  const [width, height] = aspectRatio === "9:16"
+    ? [baseDimensions[1], baseDimensions[0]]
+    : aspectRatio === "1:1"
+      ? [resolution, resolution]
+      : baseDimensions;
   const id = randomUUID();
   const workDir = join(tmpdir(), `studio-${id}`);
   const userDir = resolve("generated-artifacts/ai-video-studio/exports", userId.replace(/[^a-zA-Z0-9_-]/g, "_"));
@@ -133,12 +154,25 @@ export async function renderMp4(
       const sourcePath = join(workDir, `source-${index}.${extension}`);
       const segmentPath = join(workDir, `scene-${index}.mp4`);
       await writeFile(sourcePath, Buffer.from(await response.arrayBuffer()));
+      const narration = scene.narration.trim().replaceAll("-->", "—>").replace(/\r\n?/g, "\n");
+      const subtitlePath = join(workDir, `subtitle-${index}.srt`);
+      if (includeSubtitles && narration) {
+        const endTime = Math.max(1, Math.round(scene.durationSeconds * 1000));
+        await writeFile(
+          subtitlePath,
+          `1\n${formatSubtitleTime(0)} --> ${formatSubtitleTime(endTime)}\n${narration}\n`,
+          "utf8",
+        );
+      }
       const inputArgs = isVideo
         ? ["-i", sourcePath, "-t", String(scene.durationSeconds)]
         : ["-loop", "1", "-i", sourcePath, "-t", String(scene.durationSeconds)];
+      const videoFilter = includeSubtitles && narration
+        ? `${ffmpegFilter(width, height, fps)},subtitles=filename=${escapeFilterPath(subtitlePath)}:force_style='FontName=DejaVu Sans,FontSize=22,Outline=2,Shadow=1,Alignment=2,MarginV=36'`
+        : ffmpegFilter(width, height, fps);
       await runFfmpeg([
         ...inputArgs,
-        "-vf", ffmpegFilter(width, height, fps),
+        "-vf", videoFilter,
         "-an",
         "-c:v", "libx264",
         "-preset", "veryfast",

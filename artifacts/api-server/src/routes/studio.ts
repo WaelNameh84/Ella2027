@@ -770,7 +770,15 @@ router.post("/projects/:projectId/export", async (req, res): Promise<void> => {
   const scenes = await scenesForProject(project.id, userId);
   await db.update(projectsTable).set({ status: "exporting", progress: 80 }).where(eq(projectsTable.id, project.id));
   try {
-    const outputPath = await renderMp4(userId, project.id, scenes, parsed.data.resolution, parsed.data.fps);
+    const outputPath = await renderMp4(
+      userId,
+      project.id,
+      scenes,
+      parsed.data.resolution,
+      parsed.data.fps,
+      project.aspectRatio,
+      parsed.data.includeSubtitles,
+    );
     const downloadUrl = `/api/projects/${project.id}/export/file`;
     await db.update(projectsTable).set({
       exportPath: outputPath,
@@ -782,7 +790,9 @@ router.post("/projects/:projectId/export", async (req, res): Promise<void> => {
     res.json(ExportProjectResponse.parse({
       status: "completed",
       downloadUrl,
-      message: "MP4 export finished. The current exporter renders silent scene timelines.",
+      message: parsed.data.includeSubtitles
+        ? "MP4 export finished with scene narration subtitles. Audio mixing is not available yet."
+        : "MP4 export finished. Audio mixing is not available yet.",
     }));
   } catch (error) {
     const message = error instanceof Error ? error.message : "Video export failed.";
