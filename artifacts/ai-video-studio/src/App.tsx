@@ -1,6 +1,6 @@
 import { type ReactNode, createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
-import { ClerkProvider, Show, SignIn, SignUp, useClerk } from '@clerk/react';
+import { ClerkProvider, Show, SignIn, SignUp, UserProfile, useClerk } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
 import {
@@ -21,7 +21,7 @@ import { Route, Switch, Link, Redirect, useLocation, Router as WouterRouter } fr
 import {
   Aperture, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, ChevronDown, Clapperboard,
   Clock3, Copy, ExternalLink, Eye, EyeOff, Film, Globe2, Heart, ImagePlus, KeyRound, Languages,
-  LoaderCircle, LogOut, Mic, Moon, Pause, Plus, Search, Settings2, ShieldCheck, Sun, Trash2, WandSparkles, X,
+  LoaderCircle, LogOut, Mic, Moon, Pause, Plus, Search, Settings2, ShieldCheck, Sun, Trash2, UserRound, WandSparkles, X,
 } from 'lucide-react';
 import NotFound from '@/pages/not-found';
 import { ErrorBoundary } from '@/components/error-boundary';
@@ -92,6 +92,7 @@ const navItems = [
   { href: '/media', icon: ImagePlus, ar: 'مكتبة الوسائط', en: 'Media library' },
   { href: '/settings/providers', icon: KeyRound, ar: 'مفاتيح الخدمات', en: 'Provider keys' },
   { href: '/settings/tools', icon: Globe2, ar: 'موارد مجانية', en: 'Free resources' },
+  { href: '/settings/account', icon: UserRound, ar: 'إعدادات الحساب', en: 'Account settings' },
 ];
 
 function Brand({ compact = false }: { compact?: boolean }) {
@@ -115,7 +116,7 @@ function HeaderBar({ title, crumb }: { title: string; crumb?: string }) {
     <div className="flex shrink-0 items-center gap-2">
       <button className="btn btn-ghost top-icon" onClick={() => setLang(lang === 'ar' ? 'en' : 'ar')} aria-label="Toggle language" data-testid="button-language"><Languages size={17} /><span className="hidden sm:inline">{lang === 'ar' ? 'EN' : 'عربي'}</span></button>
       <button className="btn btn-ghost top-icon" onClick={() => setDark(!dark)} aria-label="Toggle theme" data-testid="button-theme">{dark ? <Sun size={17} /> : <Moon size={17} />}</button>
-      <span className="profile-dot" title="Studio account" aria-label="Studio account">م</span>
+      <Link href="/settings/account" className="profile-dot" title={tx(lang, 'إعدادات الحساب', 'Account settings')} aria-label={tx(lang, 'إعدادات الحساب', 'Account settings')}>م</Link>
     </div>
   </header>;
 }
@@ -747,6 +748,21 @@ function ToolsPage() {
   </AppFrame>;
 }
 
+function AccountSettingsPage() {
+  const { lang } = useApp();
+  return <AppFrame title={tx(lang, 'إعدادات الحساب', 'Account settings')} crumb={tx(lang, 'الملف الشخصي والأمان', 'PROFILE & SECURITY')}>
+    <div className="page-toolbar">
+      <div>
+        <span className="eyebrow">{tx(lang, 'حسابك في مشهد', 'YOUR MASHAHED ACCOUNT')}</span>
+        <h2>{tx(lang, 'أدر ملفك الشخصي وأمان حسابك.', 'Manage your profile and account security.')}</h2>
+        <p>{tx(lang, 'تُدار بيانات الدخول والأمان مباشرةً عبر خدمة تسجيل الدخول الآمنة.', 'Your sign-in details and account security are managed by the secure sign-in service.')}</p>
+      </div>
+    </div>
+    <section className="account-profile-wrap" aria-label={tx(lang, 'الملف الشخصي', 'User profile')}>
+      <UserProfile routing="path" path={`${basePath}/settings/account`} />
+    </section>
+  </AppFrame>;
+}
 function SettingsRedirect() { return <Redirect to="/settings/providers" />; }
 function SignInPage() { return <div className="auth-page"><div className="auth-decoration"><Brand/><span className="eyebrow">YOUR NEXT FRAME</span><h2>من الفكرة<br/>إلى المشهد.</h2><div className="auth-orbit"><Aperture size={46}/></div></div><div className="auth-form"><SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`}/></div></div>; }
 function SignUpPage() { return <div className="auth-page"><div className="auth-decoration"><Brand/><span className="eyebrow">MAKE ROOM FOR STORIES</span><h2>قصتك<br/>تبدأ هنا.</h2><div className="auth-orbit"><Aperture size={46}/></div></div><div className="auth-form"><SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`}/></div></div>; }
@@ -772,6 +788,7 @@ function Router() {
         <Route path="/media" component={MediaPage}/>
         <Route path="/settings/providers" component={ProvidersPage}/>
         <Route path="/settings/tools" component={ToolsPage}/>
+        <Route path="/settings/account/*?" component={AccountSettingsPage}/>
         <Route path="/settings" component={SettingsRedirect}/>
         <Route component={NotFound}/>
       </Switch>

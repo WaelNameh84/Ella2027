@@ -185,6 +185,8 @@ body { min-height: 100dvh; }
 .topbar h1 { font-size: 18px; }
 .top-icon { padding: 8px 10px; border: 0; }
 .profile-dot { display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid hsl(var(--border)); border-radius: 50%; background: hsl(var(--secondary)); color: hsl(var(--primary)); font-weight: 700; }
+.account-profile-wrap { display: flex; justify-content: center; min-width: 0; padding-block: 8px 28px; }
+.account-profile-wrap > * { width: 100%; max-width: 960px; }
 .page-content { padding: 32px clamp(18px, 4vw, 54px) 64px; max-width: 1500px; margin: 0 auto; }
 .welcome-row, .page-toolbar, .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
 .welcome-row { margin-bottom: 28px; }
