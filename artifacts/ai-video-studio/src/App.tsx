@@ -81,6 +81,48 @@ function providerSupports(provider: string, service: string) {
   return true;
 }
 
+function providerServicePurpose(service: string, lang: Lang) {
+  const purposes: Record<string, { label: string; description: string }> = {
+    text: {
+      label: tx(lang, 'الكتابة وتوليد السيناريو', 'Writing and script generation'),
+      description: tx(lang, 'يُستخدم لكتابة النصوص وإنشاء مسودات المشاهد.', 'Used to write text and generate scene drafts.'),
+    },
+    image: {
+      label: tx(lang, 'توليد الصور', 'Image generation'),
+      description: tx(lang, 'يُستخدم لإنشاء صور للمشاهد.', 'Used to generate still images for scenes.'),
+    },
+    video: {
+      label: tx(lang, 'توليد الفيديو', 'Video generation'),
+      description: tx(lang, 'يُستخدم لإنشاء مقاطع فيديو للمشاهد.', 'Used to generate video clips for scenes.'),
+    },
+    voice: {
+      label: tx(lang, 'التعليق الصوتي', 'Voice narration'),
+      description: tx(lang, 'يحوّل النص إلى كلام أو تعليق صوتي.', 'Turns text into speech or voice narration.'),
+    },
+    transcription: {
+      label: tx(lang, 'تفريغ الصوت والترجمة', 'Transcription and translation'),
+      description: tx(lang, 'يحوّل الصوت إلى نص أو يترجمه.', 'Transcribes audio or translates it.'),
+    },
+    music: {
+      label: tx(lang, 'الموسيقى', 'Music'),
+      description: tx(lang, 'توليد الموسيقى بمفتاح API غير موصول حاليًا.', 'Music generation through API keys is not connected yet.'),
+    },
+    media: {
+      label: tx(lang, 'البحث عن الوسائط', 'Media search'),
+      description: tx(lang, 'البحث يستخدم مصادر مفتوحة ولا يحتاج مفتاح API.', 'Media search uses open sources and does not need an API key.'),
+    },
+  };
+  return purposes[service] ?? {
+    label: tx(lang, 'خدمة غير معروفة', 'Unknown service'),
+    description: tx(lang, 'لم يُحدّد استخدام هذا المفتاح.', 'The purpose of this key is not defined.'),
+  };
+}
+
+function providerServiceIsConnected(provider: string, service: string) {
+  return ['text', 'image', 'video', 'voice', 'transcription'].includes(service)
+    && providerSupports(provider, service);
+}
+
 function ThemeLanguageProvider({ children }: { children: ReactNode }) {
   const [lang, setLang] = useState<Lang>(() => localStorage.getItem('studio-language') === 'en' ? 'en' : 'ar');
   const [dark, setDark] = useState(() => localStorage.getItem('studio-theme') === 'dark');
@@ -728,9 +770,11 @@ function ProvidersPage() {
 function ProviderRow({item,onEdit,onToggle,onPriority,onTest,onDelete,testing,lang}:{item:ProviderKey;onEdit:()=>void;onToggle:(v:boolean)=>void;onPriority:(v:number)=>void;onTest:()=>void;onDelete:()=>void;testing:boolean;lang:Lang}) {
   const officialUrl=providerOfficialUrls[item.provider];
   const testedAt=item.lastTestAt?new Date(item.lastTestAt).toLocaleString(lang==='ar'?'ar':'en') : tx(lang,'لم يُختبر بعد','Not tested yet');
+  const purpose=providerServicePurpose(item.serviceType,lang);
+  const serviceConnected=providerServiceIsConnected(item.provider,item.serviceType);
   return <div className="provider-row">
     <div className="provider-avatar">{item.provider.slice(0,2).toUpperCase()}</div>
-    <div className="provider-ident"><b>{item.label}</b><span>{item.provider} · {item.serviceType}</span></div>
+    <div className="provider-ident"><b>{item.label}</b><span>{item.provider}</span><span className={`provider-purpose ${serviceConnected?'':'is-unavailable'}`}>{tx(lang,'يُستخدم لـ:','Used for:')} {purpose.label}</span>{!serviceConnected&&<small className="provider-purpose-warning">{tx(lang,'هذا الاستخدام غير موصول حاليًا لهذا المزوّد.','This task is not currently connected for this provider.')}</small>}</div>
     <span className={`key-status ${item.status}`}>{item.status.replace('_',' ')}</span>
     <label className="priority-control"><span>{tx(lang,'الأولوية','Priority')}</span><input type="number" min="0" value={item.priority} aria-label={tx(lang,'أولوية المفتاح','Key priority')} onChange={e=>onPriority(Number(e.target.value))}/></label>
     <label className="switch-control" title={tx(lang,'مفعّل','Enabled')}><input type="checkbox" checked={item.enabled} onChange={e=>onToggle(e.target.checked)}/><span /></label>
@@ -751,12 +795,24 @@ function ProviderForm({initial,onClose,onSave,pending}:{initial:ProviderKey|null
     ['openai','OpenAI','https://platform.openai.com/api-keys','text'],['gemini','Google Gemini','https://aistudio.google.com/app/apikey','text'],['anthropic','Anthropic Claude','https://console.anthropic.com/settings/keys','text'],['groq','Groq','https://console.groq.com/keys','text'],['openrouter','OpenRouter','https://openrouter.ai/keys','text'],['huggingface','Hugging Face (open models; limits vary)','https://huggingface.co/settings/tokens','text'],['mistral','Mistral','https://console.mistral.ai/api-keys/','text'],['cerebras','Cerebras','https://cloud.cerebras.ai/','text'],['together','Together AI','https://api.together.ai/settings/api-keys','text'],['sambanova','SambaNova','https://cloud.sambanova.ai/','text'],['deepseek','DeepSeek','https://platform.deepseek.com/api_keys','text'],['stability','Stability AI','https://platform.stability.ai/account/keys','image'],['replicate','Replicate','https://replicate.com/account/api-tokens','image'],['fal','fal.ai','https://fal.ai/dashboard/keys','video'],['runway','Runway','https://dev.runwayml.com/','video'],['elevenlabs','ElevenLabs','https://elevenlabs.io/app/settings/api-keys','voice'],['google-tts','Google Cloud Text-to-Speech','https://console.cloud.google.com/apis/credentials','voice'],['azure-speech','Azure Speech','https://portal.azure.com/','voice'],['openai-audio','OpenAI Audio','https://platform.openai.com/api-keys','voice'],['whisper','Whisper','https://platform.openai.com/api-keys','transcription'],['deepgram','Deepgram','https://console.deepgram.com/','transcription'],['assemblyai','AssemblyAI','https://www.assemblyai.com/dashboard/signup','transcription'],['google-speech','Google Speech-to-Text','https://console.cloud.google.com/apis/credentials','transcription'],['musicgen','MusicGen','https://github.com/facebookresearch/audiocraft','music'],['openverse','Openverse','https://openverse.org/','media'],
   ] as const;
   const currentProvider=providerOptions.find(item=>item[0]===provider);
+  const serviceTypes=[
+    {value:'text',label:tx(lang,'الكتابة والسيناريو','Writing & scripts')},
+    {value:'image',label:tx(lang,'توليد الصور','Image generation')},
+    {value:'video',label:tx(lang,'توليد الفيديو','Video generation')},
+    {value:'voice',label:tx(lang,'التعليق الصوتي','Voice narration')},
+    {value:'transcription',label:tx(lang,'تفريغ الصوت والترجمة','Transcription & translation')},
+    {value:'music',label:tx(lang,'الموسيقى','Music')},
+    {value:'media',label:tx(lang,'البحث عن الوسائط','Media search')},
+  ];
+  const purpose=providerServicePurpose(serviceType,lang);
+  const serviceConnected=providerServiceIsConnected(provider,serviceType);
   return <Modal title={initial?tx(lang,'تعديل المفتاح','Edit provider key'):tx(lang,'إضافة مفتاح مزوّد','Add provider key')} subtitle={tx(lang,'لن يُعرض المفتاح بعد إرساله إلى الخادم.','The secret will not be displayed after it is sent to the server.')} onClose={onClose}><form className="form-stack" onSubmit={e=>{e.preventDefault();onSave({provider,label,apiKey,serviceType,enabled,priority})}}>
     <label><span className="field-label">{tx(lang,'اسم المزوّد','Provider')}</span><select className="studio-input" value={provider} onChange={e=>{const value=e.target.value;setProvider(value);const selected=providerOptions.find(item=>item[0]===value);if(selected)setServiceType(selected[3]);}}>{providerOptions.map(item=><option key={item[0]} value={item[0]}>{item[1]}</option>)}</select></label>
     {currentProvider && <a className="text-link provider-official-link" href={currentProvider[2]} target="_blank" rel="noopener noreferrer">{tx(lang,'زيارة الموقع الرسمي للحصول على المفتاح','Visit the official site to get a key')}<ExternalLink size={14}/></a>}
     <label><span className="field-label">{tx(lang,'تسمية المفتاح','Key label')}</span><input required className="studio-input" value={label} onChange={e=>setLabel(e.target.value)} placeholder={tx(lang,'مثال: مفتاح الإنتاج','e.g. Production key')} /></label>
     <label><span className="field-label">{tx(lang,'مفتاح API','API key')}</span><div className="secret-input-row"><input required={!initial} type={revealed?'text':'password'} autoComplete="new-password" className="studio-input" value={apiKey} onChange={e=>{setApiKey(e.target.value);setCopied(false);}} placeholder={initial?tx(lang,'اتركه فارغًا للإبقاء على المفتاح الحالي','Leave blank to keep the current key'):'API key'} data-testid="input-provider-secret" />{apiKey && <button type="button" className="btn btn-ghost !p-2" aria-label={revealed?tx(lang,'إخفاء المفتاح','Hide key'):tx(lang,'إظهار المفتاح','Show key')} onClick={()=>setRevealed(v=>!v)}>{revealed?<EyeOff size={16}/>:<Eye size={16}/>}</button>}{apiKey && <button type="button" className="btn btn-ghost !p-2" aria-label={tx(lang,'نسخ المفتاح غير المحفوظ','Copy unsaved key')} onClick={()=>{void navigator.clipboard.writeText(apiKey).then(()=>{setCopied(true);window.setTimeout(()=>setCopied(false),1500);});}}>{copied?<Check size={16}/>:<Copy size={16}/>}</button>}</div></label>
-    <div className="form-two"><label><span className="field-label">{tx(lang,'نوع الخدمة','Service type')}</span><select className="studio-input" value={serviceType} onChange={e=>setServiceType(e.target.value as typeof serviceType)}>{['text','image','video','voice','transcription','music','media'].map(x=><option key={x}>{x}</option>)}</select></label><label><span className="field-label">{tx(lang,'الأولوية','Priority')}</span><input type="number" min="0" className="studio-input" value={priority} onChange={e=>setPriority(Number(e.target.value))}/></label></div>
+    <div className="form-two"><label><span className="field-label">{tx(lang,'وظيفة المفتاح','Key purpose')}</span><select className="studio-input" value={serviceType} onChange={e=>setServiceType(e.target.value as typeof serviceType)}>{serviceTypes.map(item=><option key={item.value} value={item.value}>{item.label}</option>)}</select></label><label><span className="field-label">{tx(lang,'الأولوية','Priority')}</span><input type="number" min="0" className="studio-input" value={priority} onChange={e=>setPriority(Number(e.target.value))}/></label></div>
+    <div className={`service-purpose-hint ${serviceConnected?'':'is-unavailable'}`} aria-live="polite"><b>{tx(lang,'هذا المفتاح مخصّص لـ','This key is for')}: {purpose.label}</b><span>{purpose.description}</span>{!serviceConnected&&<small>{tx(lang,'لن يعمل هذا المفتاح لهذه المهمة حتى يتصل بها المزوّد داخل التطبيق.','This key will not work for this task until the provider is connected in the app.')}</small>}</div>
     <label className="checkline"><input type="checkbox" checked={enabled} onChange={e=>setEnabled(e.target.checked)}/>{tx(lang,'تفعيل هذا المفتاح','Enable this key')}</label><div className="modal-actions"><button className="btn btn-quiet" type="button" onClick={onClose}>{tx(lang,'إلغاء','Cancel')}</button><button className="btn btn-primary" disabled={pending}>{pending?<LoaderCircle size={16} className="animate-spin"/>:<KeyRound size={16}/ >}{tx(lang,'حفظ المفتاح','Save key')}</button></div>
   </form></Modal>;
 }
@@ -859,7 +915,7 @@ function AdminDashboard() {
           </div>
           {keys.isLoading ? <div className="admin-skeleton-list">{[1,2,3].map(n=><SkeletonBlock key={n} className="h-16"/>)}</div>
             : keys.isError ? <div className="admin-inline-error">{t('تعذر تحميل حالة المزودين.', 'Provider status could not be loaded.')}</div>
-            : keys.data?.length ? <div className="admin-provider-list">{keys.data.map(key => <article className="admin-provider-row" key={key.id} data-testid={`provider-health-${key.id}`}><div className="provider-avatar">{key.provider.slice(0,2).toUpperCase()}</div><div className="admin-provider-name"><b>{key.label || key.provider}</b><span>{key.provider} · {key.serviceType} · {key.userEmail || t('حساب غير متاح','Account unavailable')}</span></div><span className={`key-status ${key.status}`}>{key.status.replaceAll('_',' ')}</span><span className={`admin-enabled ${key.enabled ? 'on' : ''}`}>{key.enabled ? t('مفعّل','Enabled') : t('متوقف','Disabled')}</span><small>{t('آخر اختبار','Last test')}: {date(key.lastTestAt)}</small></article>)}</div>
+            : keys.data?.length ? <div className="admin-provider-list">{keys.data.map(key => <article className="admin-provider-row" key={key.id} data-testid={`provider-health-${key.id}`}><div className="provider-avatar">{key.provider.slice(0,2).toUpperCase()}</div><div className="admin-provider-name"><b>{key.label || key.provider}</b><span>{key.provider} · {providerServicePurpose(key.serviceType,lang).label} · {key.userEmail || t('حساب غير متاح','Account unavailable')}</span></div><span className={`key-status ${key.status}`}>{key.status.replaceAll('_',' ')}</span><span className={`admin-enabled ${key.enabled ? 'on' : ''}`}>{key.enabled ? t('مفعّل','Enabled') : t('متوقف','Disabled')}</span><small>{t('آخر اختبار','Last test')}: {date(key.lastTestAt)}</small></article>)}</div>
             : <div className="admin-empty"><KeyRound size={19}/><b>{t('لا توجد مفاتيح مزودين مسجلة.', 'No provider keys are registered.')}</b><span>{t('ستظهر هنا مؤشرات الصحة عند توفرها.', 'Health metadata will appear here when available.')}</span></div>}
         </section>
 

@@ -498,6 +498,13 @@ body { min-height: 100dvh; }
 .provider-ident { display: grid; gap: 3px; }
 .provider-ident b { font-size: 12px; }
 .provider-ident span { color: hsl(var(--muted-foreground)); font-size: 10px; text-transform: capitalize; }
+.provider-ident .provider-purpose { width: fit-content; border-radius: 999px; padding: 3px 7px; color: hsl(var(--primary)); background: hsl(var(--primary) / .09); font-size: 9px; line-height: 1.5; text-transform: none; }
+.provider-ident .provider-purpose.is-unavailable { color: hsl(var(--destructive)); background: hsl(var(--destructive) / .09); }
+.provider-ident .provider-purpose-warning { color: hsl(var(--destructive)); font-size: 9px; line-height: 1.5; }
+.service-purpose-hint { display: grid; gap: 4px; margin-top: -5px; padding: 10px 12px; border: 1px solid hsl(var(--primary) / .18); border-radius: 9px; color: hsl(var(--foreground)); background: hsl(var(--primary) / .045); font-size: 11px; line-height: 1.55; }
+.service-purpose-hint span { color: hsl(var(--muted-foreground)); }
+.service-purpose-hint small { color: hsl(var(--destructive)); font-size: 10px; }
+.service-purpose-hint.is-unavailable { border-color: hsl(var(--destructive) / .2); background: hsl(var(--destructive) / .045); }
 .key-status { border-radius: 100px; padding: 5px 8px; background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); font: 9px var(--app-font-mono); text-transform: uppercase; }
 .key-status.valid { color: hsl(var(--primary)); background: hsl(var(--primary) / .1); }
 .key-status.invalid, .key-status.rate_limited, .key-status.quota_limited { color: hsl(var(--destructive)); background: hsl(var(--destructive) / .1); }
