@@ -1,22 +1,25 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
+  # Do not change the title; it controls generated import paths.
   title: Api
   version: 0.1.0
-  description: API specification
+  description: AI Video Studio API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
-    description: Health operations
+  - name: studio
+  - name: projects
+  - name: providers
+  - name: media
+  - name: exports
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +27,382 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /studio/summary:
+    get:
+      operationId: getStudioSummary
+      tags: [studio]
+      summary: Get dashboard summary
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudioSummary"
+  /projects:
+    get:
+      operationId: listProjects
+      tags: [projects]
+      summary: List the current user's projects
+      responses:
+        "200":
+          description: Project list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Project"
+    post:
+      operationId: createProject
+      tags: [projects]
+      summary: Create a project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectInput"
+      responses:
+        "201":
+          description: Created project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+  /projects/{projectId}:
+    parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getProject
+      tags: [projects]
+      summary: Get a project and its scenes
+      responses:
+        "200":
+          description: Project detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectDetail"
+    patch:
+      operationId: updateProject
+      tags: [projects]
+      summary: Update project details
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectUpdate"
+      responses:
+        "200":
+          description: Updated project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+    delete:
+      operationId: deleteProject
+      tags: [projects]
+      summary: Delete a project
+      responses:
+        "204":
+          description: Deleted
+  /projects/{projectId}/scenes:
+    parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: createScene
+      tags: [projects]
+      summary: Add a scene
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SceneInput"
+      responses:
+        "201":
+          description: Created scene
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Scene"
+  /projects/{projectId}/scenes/{sceneId}:
+    parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: sceneId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    patch:
+      operationId: updateScene
+      tags: [projects]
+      summary: Update a scene
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SceneUpdate"
+      responses:
+        "200":
+          description: Updated scene
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Scene"
+    delete:
+      operationId: deleteScene
+      tags: [projects]
+      summary: Delete a scene
+      responses:
+        "204":
+          description: Deleted
+  /projects/{projectId}/generate-script:
+    parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: generateProjectScript
+      tags: [projects]
+      summary: Generate a script and storyboard using a configured provider
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScriptGenerationInput"
+      responses:
+        "200":
+          description: Generated script and scenes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectDetail"
+  /provider-keys:
+    get:
+      operationId: listProviderKeys
+      tags: [providers]
+      summary: List provider key metadata without secret values
+      responses:
+        "200":
+          description: Provider key metadata
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProviderKey"
+    post:
+      operationId: createProviderKey
+      tags: [providers]
+      summary: Save a provider key securely
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProviderKeyInput"
+      responses:
+        "201":
+          description: Saved metadata only
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderKey"
+  /provider-keys/{keyId}:
+    parameters:
+      - name: keyId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    patch:
+      operationId: updateProviderKey
+      tags: [providers]
+      summary: Update provider key metadata or replace its secret
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProviderKeyUpdate"
+      responses:
+        "200":
+          description: Updated metadata only
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderKey"
+    delete:
+      operationId: deleteProviderKey
+      tags: [providers]
+      summary: Delete a provider key
+      responses:
+        "204":
+          description: Deleted
+  /provider-keys/{keyId}/test:
+    post:
+      operationId: testProviderKey
+      tags: [providers]
+      summary: Test one provider key with a minimal request
+      parameters:
+        - name: keyId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Test result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderTestResult"
+  /provider-settings:
+    get:
+      operationId: getProviderSettings
+      tags: [providers]
+      summary: Get key rotation preferences
+      responses:
+        "200":
+          description: Provider preferences
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderSettings"
+    put:
+      operationId: updateProviderSettings
+      tags: [providers]
+      summary: Update key rotation preferences
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProviderSettings"
+      responses:
+        "200":
+          description: Saved preferences
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderSettings"
+  /media/search:
+    get:
+      operationId: searchFreeMedia
+      tags: [media]
+      summary: Search real openly licensed media
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: mediaType
+          in: query
+          schema:
+            type: string
+            enum: [image, video]
+            default: image
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+      responses:
+        "200":
+          description: Search results from Openverse
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MediaSearchResponse"
+  /free-tools:
+    get:
+      operationId: listFreeTools
+      tags: [media]
+      summary: List service setup and pricing notes
+      responses:
+        "200":
+          description: Service reference list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FreeTool"
+  /projects/{projectId}/export:
+    post:
+      operationId: exportProject
+      tags: [exports]
+      summary: Render a project timeline to a downloadable video
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExportInput"
+      responses:
+        "200":
+          description: Rendered video
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExportResult"
+  /projects/{projectId}/export/file:
+    get:
+      operationId: downloadProjectExport
+      tags: [exports]
+      summary: Download the latest completed project video
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Video file
+          content:
+            video/mp4:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: No completed export found
 components:
   schemas:
     HealthStatus:
@@ -31,6 +410,211 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
-
+      required: [status]
+    StudioSummary:
+      type: object
+      properties:
+        projectCount: { type: integer }
+        activeCount: { type: integer }
+        sceneCount: { type: integer }
+        providerCount: { type: integer }
+        recentProjects:
+          type: array
+          items: { $ref: "#/components/schemas/Project" }
+      required: [projectCount, activeCount, sceneCount, providerCount, recentProjects]
+    Project:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        idea: { type: string }
+        videoType: { type: string }
+        language: { type: string }
+        durationSeconds: { type: integer }
+        audience: { type: string }
+        visualStyle: { type: string }
+        aspectRatio: { type: string }
+        status: { type: string, enum: [draft, scripting, editing, exporting, completed, failed] }
+        progress: { type: integer }
+        sceneCount: { type: integer }
+        exportUrl: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, title, idea, videoType, language, durationSeconds, audience, visualStyle, aspectRatio, status, progress, sceneCount, exportUrl, createdAt, updatedAt]
+    ProjectDetail:
+      allOf:
+        - $ref: "#/components/schemas/Project"
+        - type: object
+          properties:
+            scenes:
+              type: array
+              items: { $ref: "#/components/schemas/Scene" }
+          required: [scenes]
+    ProjectInput:
+      type: object
+      properties:
+        title: { type: string, minLength: 1, maxLength: 160 }
+        idea: { type: string, minLength: 1, maxLength: 12000 }
+        videoType: { type: string }
+        language: { type: string }
+        durationSeconds: { type: integer, minimum: 5, maximum: 3600 }
+        audience: { type: string }
+        visualStyle: { type: string }
+        aspectRatio: { type: string, enum: ["16:9", "9:16", "1:1"] }
+      required: [title, idea, videoType, language, durationSeconds, audience, visualStyle, aspectRatio]
+    ProjectUpdate:
+      type: object
+      properties:
+        title: { type: string, minLength: 1, maxLength: 160 }
+        idea: { type: string, maxLength: 12000 }
+        videoType: { type: string }
+        language: { type: string }
+        durationSeconds: { type: integer, minimum: 5, maximum: 3600 }
+        audience: { type: string }
+        visualStyle: { type: string }
+        aspectRatio: { type: string, enum: ["16:9", "9:16", "1:1"] }
+    Scene:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        sortOrder: { type: integer }
+        title: { type: string }
+        description: { type: string }
+        imagePrompt: { type: string }
+        narration: { type: string }
+        durationSeconds: { type: integer }
+        assetUrl: { type: ["string", "null"] }
+        assetType: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, projectId, sortOrder, title, description, imagePrompt, narration, durationSeconds, assetUrl, assetType, createdAt, updatedAt]
+    SceneInput:
+      type: object
+      properties:
+        sortOrder: { type: integer, minimum: 0 }
+        title: { type: string, minLength: 1, maxLength: 160 }
+        description: { type: string }
+        imagePrompt: { type: string }
+        narration: { type: string }
+        durationSeconds: { type: integer, minimum: 1, maximum: 600 }
+        assetUrl: { type: ["string", "null"], format: uri }
+        assetType: { type: ["string", "null"], enum: [image, video, audio, null] }
+      required: [sortOrder, title, description, imagePrompt, narration, durationSeconds]
+    SceneUpdate:
+      type: object
+      properties:
+        sortOrder: { type: integer, minimum: 0 }
+        title: { type: string, minLength: 1, maxLength: 160 }
+        description: { type: string }
+        imagePrompt: { type: string }
+        narration: { type: string }
+        durationSeconds: { type: integer, minimum: 1, maximum: 600 }
+        assetUrl: { type: ["string", "null"], format: uri }
+        assetType: { type: ["string", "null"], enum: [image, video, audio, null] }
+    ScriptGenerationInput:
+      type: object
+      properties:
+        providerKeyId: { type: ["string", "null"], format: uuid }
+        allowRotation: { type: boolean, default: true }
+      required: [allowRotation]
+    ProviderKey:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        provider: { type: string }
+        label: { type: string }
+        serviceType: { type: string, enum: [text, image, video, voice, transcription, music] }
+        enabled: { type: boolean }
+        priority: { type: integer }
+        status: { type: string, enum: [untested, valid, invalid, rate_limited, quota_limited, unavailable] }
+        lastTestAt: { type: ["string", "null"], format: date-time }
+        testMessage: { type: ["string", "null"] }
+        usedCount: { type: integer }
+        cooldownUntil: { type: ["string", "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+      required: [id, provider, label, serviceType, enabled, priority, status, lastTestAt, testMessage, usedCount, cooldownUntil, createdAt]
+    ProviderKeyInput:
+      type: object
+      properties:
+        provider: { type: string }
+        label: { type: string, minLength: 1, maxLength: 120 }
+        apiKey: { type: string, minLength: 1 }
+        serviceType: { type: string, enum: [text, image, video, voice, transcription, music] }
+        enabled: { type: boolean }
+        priority: { type: integer, minimum: 0 }
+      required: [provider, label, apiKey, serviceType, enabled, priority]
+    ProviderKeyUpdate:
+      type: object
+      properties:
+        label: { type: string, minLength: 1, maxLength: 120 }
+        apiKey: { type: string, minLength: 1 }
+        serviceType: { type: string, enum: [text, image, video, voice, transcription, music] }
+        enabled: { type: boolean }
+        priority: { type: integer, minimum: 0 }
+    ProviderTestResult:
+      type: object
+      properties:
+        success: { type: boolean }
+        status: { type: string }
+        message: { type: string }
+        checkedAt: { type: string, format: date-time }
+      required: [success, status, message, checkedAt]
+    ProviderSettings:
+      type: object
+      properties:
+        autoRotate: { type: boolean }
+        rotateOnQuota: { type: boolean }
+        rotateOnRateLimit: { type: boolean }
+        rotateOnConnectionFailure: { type: boolean }
+        maxAttempts: { type: integer, minimum: 1, maximum: 10 }
+        retryDelaySeconds: { type: integer, minimum: 0, maximum: 300 }
+        fallbackProvider: { type: ["string", "null"] }
+      required: [autoRotate, rotateOnQuota, rotateOnRateLimit, rotateOnConnectionFailure, maxAttempts, retryDelaySeconds, fallbackProvider]
+    MediaSearchResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items: { $ref: "#/components/schemas/MediaResult" }
+        page: { type: integer }
+        total: { type: integer }
+        source: { type: string }
+      required: [results, page, total, source]
+    MediaResult:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        description: { type: string }
+        url: { type: string, format: uri }
+        thumbnailUrl: { type: ["string", "null"], format: uri }
+        source: { type: string }
+        license: { type: string }
+        licenseUrl: { type: ["string", "null"], format: uri }
+        creator: { type: ["string", "null"] }
+        mediaType: { type: string, enum: [image, video] }
+      required: [id, title, description, url, thumbnailUrl, source, license, licenseUrl, creator, mediaType]
+    FreeTool:
+      type: object
+      properties:
+        name: { type: string }
+        category: { type: string }
+        access: { type: string }
+        pricingNote: { type: string }
+        officialUrl: { type: string, format: uri }
+      required: [name, category, access, pricingNote, officialUrl]
+    ExportInput:
+      type: object
+      properties:
+        resolution: { type: integer, enum: [480, 720, 1080, 2160] }
+        fps: { type: integer, enum: [24, 25, 30, 60] }
+        includeSubtitles: { type: boolean }
+      required: [resolution, fps, includeSubtitles]
+    ExportResult:
+      type: object
+      properties:
+        status: { type: string }
+        downloadUrl: { type: string }
+        message: { type: string }
+      required: [status, downloadUrl, message]

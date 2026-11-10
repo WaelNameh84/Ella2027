@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "AI Video Studio"
+description = "A responsive, Arabic-first workspace for planning AI videos, organizing scenes and media, managing provider keys securely, and exporting completed projects."
+version = "1.0.0"
+id = "artifacts/ai-video-studio"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21370
+
+[services.development]
+run = "pnpm --filter @workspace/ai-video-studio run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/ai-video-studio", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/ai-video-studio/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21370"
+BASE_PATH = "/"
