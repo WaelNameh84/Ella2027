@@ -381,6 +381,9 @@ body { min-height: 100dvh; }
 .rotation-advanced { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 13px; padding-top: 14px; border-top: 1px solid hsl(var(--border)); }
 .checkline { display: flex; align-items: center; gap: 9px; font-size: 12px; color: hsl(var(--muted-foreground)); }
 .tools-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 14px; }
+.resource-notice { display: flex; align-items: flex-start; gap: 12px; margin: 0 0 16px; padding: 14px 16px; color: hsl(var(--primary)); }
+.resource-notice > svg { flex: 0 0 auto; margin-top: 2px; }
+.resource-notice p { color: hsl(var(--muted-foreground)); font-size: 11px; line-height: 1.65; margin: 0; }
 .tool-card { display: flex; flex-direction: column; min-height: 205px; padding: 18px; }
 .tool-head { display: flex; justify-content: space-between; align-items: center; }
 .tool-index { color: hsl(var(--primary)); font: 12px var(--app-font-mono); }

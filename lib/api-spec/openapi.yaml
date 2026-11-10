@@ -698,7 +698,7 @@ components:
         durationSeconds: { type: integer, minimum: 5, maximum: 3600 }
         audience: { type: string }
         visualStyle: { type: string }
-        aspectRatio: { type: string, enum: ["16:9", "9:16", "1:1"] }
+        aspectRatio: { type: string, enum: ["16:9", "9:16", "1:1", "4:5", "4:3", "3:2"] }
         characters:
           type: array
           maxItems: 24
@@ -716,7 +716,7 @@ components:
         durationSeconds: { type: integer, minimum: 5, maximum: 3600 }
         audience: { type: string }
         visualStyle: { type: string }
-        aspectRatio: { type: string, enum: ["16:9", "9:16", "1:1"] }
+        aspectRatio: { type: string, enum: ["16:9", "9:16", "1:1", "4:5", "4:3", "3:2"] }
         characters:
           type: array
           maxItems: 24

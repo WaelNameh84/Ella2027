@@ -122,8 +122,71 @@ const mediaProviders = [
     name: "FFmpeg",
     category: "Video export",
     access: "Available locally",
-    pricingNote: "This app uses the local FFmpeg encoder; export currently creates silent MP4 timelines.",
+    pricingNote: "Used locally to export MP4 with scene voice tracks, soundtrack, and optional burned-in narration subtitles. Advanced effects and independent tracks are not yet available.",
     officialUrl: "https://ffmpeg.org/",
+  },
+  {
+    name: "Ollama",
+    category: "Open-source language models",
+    access: "Free software; self-hosted runtime not installed here",
+    pricingNote: "Runs open-weight models on a machine you control. Model downloads need disk space and inference needs CPU/GPU; this server currently has no Ollama runtime.",
+    officialUrl: "https://ollama.com/",
+  },
+  {
+    name: "llama.cpp",
+    category: "Open-source language models",
+    access: "Free software; self-hosted",
+    pricingNote: "Runs quantized models locally. Performance depends on available memory and CPU/GPU; this app does not start a llama.cpp server automatically.",
+    officialUrl: "https://github.com/ggml-org/llama.cpp",
+  },
+  {
+    name: "ComfyUI",
+    category: "Open-source image and video generation",
+    access: "Free software; self-hosted runtime not installed here",
+    pricingNote: "Workflow-based generation with open models. Video models can require substantial GPU memory and storage; no local ComfyUI service is connected here.",
+    officialUrl: "https://github.com/Comfy-Org/ComfyUI",
+  },
+  {
+    name: "Whisper.cpp",
+    category: "Open-source transcription",
+    access: "Free software; self-hosted runtime not installed here",
+    pricingNote: "Local speech transcription without a hosted API; model files and CPU/GPU resources are required. It is listed as a resource, not yet connected to scene uploads.",
+    officialUrl: "https://github.com/ggml-org/whisper.cpp",
+  },
+  {
+    name: "Piper TTS",
+    category: "Open-source speech",
+    access: "Free software; self-hosted runtime not installed here",
+    pricingNote: "Local text-to-speech with downloadable voices. Voice licenses vary, and a Piper runtime is not currently connected to this app.",
+    officialUrl: "https://github.com/OHF-Voice/piper1-gpl",
+  },
+  {
+    name: "faster-whisper",
+    category: "Open-source transcription",
+    access: "Free software; self-hosted",
+    pricingNote: "Whisper inference optimized for local CPU/GPU use. It needs a Python runtime and model files; not installed on this server.",
+    officialUrl: "https://github.com/SYSTRAN/faster-whisper",
+  },
+  {
+    name: "Freesound",
+    category: "Sound effects and audio",
+    access: "Free account and API key; licenses vary by asset",
+    pricingNote: "Search downloadable community audio. Check each sound's license and attribution requirements; the app does not currently import Freesound results.",
+    officialUrl: "https://freesound.org/",
+  },
+  {
+    name: "Pixabay audio library",
+    category: "Music and sound effects",
+    access: "Free library; review the current content license",
+    pricingNote: "Music, sound effects, images, and video are available under Pixabay's content license. API quotas and license terms may change; assets are not automatically imported.",
+    officialUrl: "https://pixabay.com/music/",
+  },
+  {
+    name: "YouTube Audio Library",
+    category: "Music and sound effects",
+    access: "Free library; attribution varies by track",
+    pricingNote: "Music and sound effects provided in YouTube Studio. Review each track's attribution requirement and permitted use before adding it to a film.",
+    officialUrl: "https://www.youtube.com/audiolibrary",
   },
   ...providerCatalog.map((provider) => ({
     name: provider.name,
@@ -299,9 +362,31 @@ function parseGeneratedJson(text: string): Array<{
 }
 
 function isRotationEligible(status: string, settings: Awaited<ReturnType<typeof settingsForUser>>) {
+  if (status === "invalid") return true;
   if (status === "rate_limited") return settings.rotateOnRateLimit;
   if (status === "quota_limited") return settings.rotateOnQuota;
   return settings.rotateOnConnectionFailure;
+}
+
+function orderProviderFallback<T extends { provider: string }>(rows: T[], fallbackProvider: string | null) {
+  if (!fallbackProvider) return rows;
+  return [
+    ...rows.filter((row) => row.provider !== fallbackProvider),
+    ...rows.filter((row) => row.provider === fallbackProvider),
+  ];
+}
+
+function orderSelectedProvider<T extends { id: string; provider: string }>(
+  rows: T[],
+  selected: T,
+  fallbackProvider: string | null,
+) {
+  return [
+    selected,
+    ...rows.filter((row) => row.id !== selected.id && row.provider === selected.provider),
+    ...rows.filter((row) => row.provider !== selected.provider && row.provider === fallbackProvider),
+    ...rows.filter((row) => row.id !== selected.id && row.provider !== selected.provider && row.provider !== fallbackProvider),
+  ];
 }
 
 router.get("/studio/summary", async (_req, res): Promise<void> => {
@@ -788,16 +873,30 @@ router.post("/projects/:projectId/generate-script", async (req, res): Promise<vo
   const candidates = eligible.filter((key) =>
     key.status !== "invalid" && (!key.cooldownUntil || key.cooldownUntil.getTime() <= now),
   );
-  let ordered = candidates;
+  const fallbackProvider = settings?.fallbackProvider?.trim() || null;
+  const rotate = parsed.data.allowRotation && settings?.autoRotate !== false;
+  let ordered = orderProviderFallback(candidates, fallbackProvider);
   if (parsed.data.providerKeyId) {
-    const selected = candidates.find((key) => key.id === parsed.data.providerKeyId);
-    if (!selected) {
+    const requested = eligible.find((key) => key.id === parsed.data.providerKeyId);
+    if (!requested) {
       res.status(400).json({ error: "Selected key is not enabled, is cooling down, or is not a text provider." });
       return;
     }
-    ordered = [selected, ...candidates.filter((key) => key.id !== selected.id)];
+    const selected = candidates.find((key) => key.id === parsed.data.providerKeyId);
+    if (selected) {
+      ordered = orderSelectedProvider(candidates, selected, fallbackProvider);
+    } else {
+      const coolingDown = Boolean(requested.cooldownUntil && requested.cooldownUntil.getTime() > now);
+      const canFailOver = requested.status === "invalid"
+        || (coolingDown && requested.status === "rate_limited" && settings?.rotateOnRateLimit)
+        || (coolingDown && requested.status === "quota_limited" && settings?.rotateOnQuota);
+      if (!rotate || !canFailOver) {
+        res.status(409).json({ error: "Selected key is cooling down and automatic failover is disabled for this limit." });
+        return;
+      }
+      ordered = orderProviderFallback(candidates, fallbackProvider);
+    }
   }
-  const rotate = parsed.data.allowRotation && settings?.autoRotate !== false;
   if (!rotate) ordered = ordered.slice(0, 1);
   if (!ordered.length) {
     res.status(409).json({ error: "No usable text provider is configured. Add and test a provider key in Settings." });
@@ -1006,8 +1105,8 @@ router.post("/projects/:projectId/export", async (req, res): Promise<void> => {
       status: "completed",
       downloadUrl,
       message: parsed.data.includeSubtitles
-        ? "MP4 export finished with scene narration subtitles. Audio mixing is not available yet."
-        : "MP4 export finished. Audio mixing is not available yet.",
+        ? "MP4 export finished with scene narration subtitles and the selected audio tracks."
+        : "MP4 export finished with the selected scene voice and soundtrack tracks.",
     }));
   } catch (error) {
     const message = error instanceof Error ? error.message : "Video export failed.";

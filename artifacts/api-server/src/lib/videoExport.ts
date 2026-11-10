@@ -154,11 +154,19 @@ export async function renderMp4(
     2160: [3840, 2160],
   };
   const baseDimensions = landscapeDimensions[resolution] ?? landscapeDimensions[720];
+  const even = (value: number) => Math.max(2, Math.round(value / 2) * 2);
+  const baseHeight = baseDimensions[1];
   const [width, height] = aspectRatio === "9:16"
-    ? [baseDimensions[1], baseDimensions[0]]
+    ? [baseHeight, baseDimensions[0]]
     : aspectRatio === "1:1"
-      ? [resolution, resolution]
-      : baseDimensions;
+      ? [baseHeight, baseHeight]
+      : aspectRatio === "4:5"
+        ? [even(baseHeight * 4 / 5), baseHeight]
+        : aspectRatio === "4:3"
+          ? [even(baseHeight * 4 / 3), baseHeight]
+          : aspectRatio === "3:2"
+            ? [even(baseHeight * 3 / 2), baseHeight]
+            : baseDimensions;
   const id = randomUUID();
   const workDir = join(tmpdir(), `studio-${id}`);
   const userDir = resolve("generated-artifacts/ai-video-studio/exports", userId.replace(/[^a-zA-Z0-9_-]/g, "_"));
@@ -221,7 +229,7 @@ export async function renderMp4(
       await runFfmpeg([
         ...inputArgs,
         ...audioInput,
-        "-filter_complex", `[0:v]${videoFilter}[v];[1:a]volume=${voiceVolume},apad,atrim=duration=${duration}[a]`,
+       "-filter_complex", `[0:v]${videoFilter}[v];[1:a]volume=${voiceVolume},apad,atrim=duration=${duration}[a]`,
         "-map", "[v]",
         "-map", "[a]",
         "-t", String(duration),

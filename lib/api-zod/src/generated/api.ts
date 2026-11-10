@@ -152,7 +152,7 @@ export const CreateProjectBody = zod.object({
   "durationSeconds": zod.number().int().min(createProjectBodyDurationSecondsMin).max(createProjectBodyDurationSecondsMax),
   "audience": zod.string(),
   "visualStyle": zod.string(),
-  "aspectRatio": zod.enum(['16:9', '9:16', '1:1']),
+  "aspectRatio": zod.enum(['16:9', '9:16', '1:1', '4:5', '4:3', '3:2']),
   "characters": zod.array(zod.object({
   "id": zod.string().min(1).max(createProjectBodyCharactersItemIdMax),
   "name": zod.string().min(1).max(createProjectBodyCharactersItemNameMax),
@@ -342,7 +342,7 @@ export const UpdateProjectBody = zod.object({
   "durationSeconds": zod.number().int().min(updateProjectBodyDurationSecondsMin).max(updateProjectBodyDurationSecondsMax).optional(),
   "audience": zod.string().optional(),
   "visualStyle": zod.string().optional(),
-  "aspectRatio": zod.enum(['16:9', '9:16', '1:1']).optional(),
+  "aspectRatio": zod.enum(['16:9', '9:16', '1:1', '4:5', '4:3', '3:2']).optional(),
   "characters": zod.array(zod.object({
   "id": zod.string().min(1).max(updateProjectBodyCharactersItemIdMax),
   "name": zod.string().min(1).max(updateProjectBodyCharactersItemNameMax),
@@ -351,7 +351,7 @@ export const UpdateProjectBody = zod.object({
   "voiceDescription": zod.string().max(updateProjectBodyCharactersItemVoiceDescriptionMax),
   "referenceImageUrl": zod.string().url().nullable()
 })).max(updateProjectBodyCharactersMax).optional(),
-  "musicUrl": zod.string().url().nullish(),
+  "musicUrl": zod.string().nullish(),
   "musicVolume": zod.number().int().min(updateProjectBodyMusicVolumeMin).max(updateProjectBodyMusicVolumeMax).optional()
 })
 

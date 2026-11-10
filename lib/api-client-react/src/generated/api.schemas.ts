@@ -147,6 +147,9 @@ export const ProjectInputAspectRatio = {
   '16:9': '16:9',
   '9:16': '9:16',
   '1:1': '1:1',
+  '4:5': '4:5',
+  '4:3': '4:3',
+  '3:2': '3:2',
 } as const;
 
 export interface ProjectInput {
@@ -188,6 +191,9 @@ export const ProjectUpdateAspectRatio = {
   '16:9': '16:9',
   '9:16': '9:16',
   '1:1': '1:1',
+  '4:5': '4:5',
+  '4:3': '4:3',
+  '3:2': '3:2',
 } as const;
 
 export interface ProjectUpdate {

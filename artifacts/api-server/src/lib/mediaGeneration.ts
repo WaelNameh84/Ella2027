@@ -202,7 +202,42 @@ export async function generateStill(
     return downloadPublicHttps(firstOutput(output), 25 * 1024 * 1024);
   }
 
-  throw new Error("Image generation is currently supported for OpenAI, Stability AI, and Replicate keys.");
+  if (provider === "huggingface") {
+    const modelId = model || "black-forest-labs/FLUX.1-schnell";
+    if (!/^[a-z0-9._-]+\/[a-z0-9._-]+$/i.test(modelId)) {
+      throw new Error("Enter a Hugging Face model as owner/model.");
+    }
+    const response = await fetch(
+      `https://router.huggingface.co/hf-inference/models/${modelId}`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${key}`,
+          "Content-Type": "application/json",
+          Accept: "image/*",
+        },
+        body: JSON.stringify({ inputs: prompt, parameters: { width: resolution, height: resolution } }),
+        signal: AbortSignal.timeout(120_000),
+        redirect: "error",
+      },
+    );
+    if (!response.ok) {
+      const text = await response.text();
+      throw new ProviderCallError(
+        `Hugging Face Inference returned HTTP ${response.status}.`,
+        response.status,
+        text.slice(0, 4000),
+      );
+    }
+    const contentType = response.headers.get("content-type") ?? "";
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (!contentType.startsWith("image/") || !bytes.length || bytes.byteLength > 25 * 1024 * 1024) {
+      throw new Error("Hugging Face did not return a supported image file.");
+    }
+    return bytes;
+  }
+
+  throw new Error("Image generation is currently supported for OpenAI, Stability AI, Replicate, and Hugging Face Inference.");
 }
 
 export async function generateVideo(

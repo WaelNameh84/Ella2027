@@ -45,7 +45,6 @@ type JobInput = {
   model?: string;
   mode?: "text" | "image";
   outputs?: number;
-  resolution?: 512 | 768 | 1024;
   voiceId?: string;
 };
 
@@ -120,13 +119,46 @@ function safeJobError(error: unknown): string {
 }
 
 function supportsJob(provider: string, jobType: JobKind): boolean {
-  if (jobType === "image") return ["openai", "stability", "replicate"].includes(provider);
+  if (jobType === "image") return ["openai", "stability", "replicate", "huggingface"].includes(provider);
   if (jobType === "video") return provider === "replicate";
   if (jobType === "voice") return ["elevenlabs", "openai", "openai-audio"].includes(provider);
   return false;
 }
 
 type JobKind = "image" | "video" | "voice";
+
+function orderedWithFallback<T extends { provider: string }>(rows: T[], fallbackProvider: string | null) {
+  if (!fallbackProvider) return rows;
+  return [
+    ...rows.filter((row) => row.provider !== fallbackProvider),
+    ...rows.filter((row) => row.provider === fallbackProvider),
+  ];
+}
+
+function orderedWithSelected<T extends { id: string; provider: string }>(
+  rows: T[],
+  selected: T,
+  fallbackProvider: string | null,
+) {
+  return [
+    selected,
+    ...rows.filter((row) => row.id !== selected.id && row.provider === selected.provider),
+    ...rows.filter((row) => row.provider !== selected.provider && row.provider === fallbackProvider),
+    ...rows.filter((row) => row.id !== selected.id && row.provider !== selected.provider && row.provider !== fallbackProvider),
+  ];
+}
+
+function selectedCanFailOver(
+  row: { status: string; cooldownUntil: Date | null },
+  settings: Awaited<ReturnType<typeof providerSettingsFor>> | undefined,
+  now: number,
+) {
+  if (row.status === "invalid") return true;
+  if (!row.cooldownUntil || row.cooldownUntil.getTime() <= now) return false;
+  if (row.status === "rate_limited") return Boolean(settings?.rotateOnRateLimit);
+  if (row.status === "quota_limited") return Boolean(settings?.rotateOnQuota);
+  return false;
+}
 
 async function providerSettingsFor(userId: string) {
   await db.insert(providerSettingsTable)
@@ -157,11 +189,20 @@ async function callMediaProvider<T>(
     && row.status !== "invalid"
     && (!row.cooldownUntil || row.cooldownUntil.getTime() <= now),
   );
-  let ordered = candidates;
+  const fallbackProvider = settings?.fallbackProvider?.trim() || null;
+  let ordered = orderedWithFallback(candidates, fallbackProvider);
   if (selectedKeyId) {
+    const requested = eligible.find((row) => row.id === selectedKeyId);
+    if (!requested || !supportsJob(requested.provider, job.jobType as JobKind)) {
+      throw new Error("The selected provider key is disabled or incompatible.");
+    }
     const selected = candidates.find((row) => row.id === selectedKeyId);
-    if (!selected) throw new Error("The selected provider key is disabled, incompatible, or cooling down.");
-    ordered = [selected, ...candidates.filter((row) => row.provider === selected.provider && row.id !== selected.id)];
+    if (selected) ordered = orderedWithSelected(candidates, selected, fallbackProvider);
+    else if (settings?.autoRotate && selectedCanFailOver(requested, settings, now)) {
+      ordered = orderedWithFallback(candidates, fallbackProvider);
+    } else {
+      throw new Error("The selected provider key is cooling down; automatic failover is disabled for this limit.");
+    }
   }
   if (!settings?.autoRotate) ordered = ordered.slice(0, 1);
   const maxAttempts = Math.max(1, Math.min(settings?.maxAttempts ?? 3, ordered.length));
@@ -195,7 +236,9 @@ async function callMediaProvider<T>(
         testMessage: classification.message,
         cooldownUntil,
       }).where(eq(providerKeysTable.id, row.id));
-      const canRotate = classification.status === "rate_limited"
+      const canRotate = classification.status === "invalid"
+        ? true
+        : classification.status === "rate_limited"
         ? settings?.rotateOnRateLimit
         : classification.status === "quota_limited"
           ? settings?.rotateOnQuota
@@ -293,13 +336,20 @@ async function processScriptJob(job: typeof studioJobsTable.$inferSelect): Promi
     const candidates = eligible.filter((key) =>
       key.status !== "invalid" && (!key.cooldownUntil || key.cooldownUntil.getTime() <= now),
     );
-    let ordered = candidates;
-    if (input.providerKeyId) {
-      const selected = candidates.find((key) => key.id === input.providerKeyId);
-      if (!selected) throw new Error("The selected text key is disabled, unavailable, or cooling down.");
-      ordered = [selected, ...candidates.filter((key) => key.id !== selected.id)];
-    }
+    const fallbackProvider = userSettings?.fallbackProvider?.trim() || null;
     const rotate = input.allowRotation !== false && userSettings?.autoRotate !== false;
+    let ordered = orderedWithFallback(candidates, fallbackProvider);
+    if (input.providerKeyId) {
+      const requested = eligible.find((key) => key.id === input.providerKeyId);
+      if (!requested) throw new Error("The selected text key is disabled or unavailable.");
+      const selected = candidates.find((key) => key.id === input.providerKeyId);
+      if (selected) ordered = orderedWithSelected(candidates, selected, fallbackProvider);
+      else if (rotate && selectedCanFailOver(requested, userSettings, now)) {
+        ordered = orderedWithFallback(candidates, fallbackProvider);
+      } else {
+        throw new Error("The selected text key is cooling down; automatic failover is disabled for this limit.");
+      }
+    }
     if (!rotate) ordered = ordered.slice(0, 1);
     if (!ordered.length) throw new Error("No usable text provider is configured. Add and test a provider key.");
 
@@ -376,7 +426,9 @@ async function processScriptJob(job: typeof studioJobsTable.$inferSelect): Promi
             ? new Date(Date.now() + Math.max(60, userSettings?.retryDelaySeconds ?? 60) * 1000)
             : null,
         }).where(eq(providerKeysTable.id, keyRow.id));
-        const canRotate = classification.status === "rate_limited"
+        const canRotate = classification.status === "invalid"
+          ? true
+          : classification.status === "rate_limited"
           ? userSettings?.rotateOnRateLimit
           : classification.status === "quota_limited"
             ? userSettings?.rotateOnQuota
@@ -554,13 +606,16 @@ async function processImageJob(job: typeof studioJobsTable.$inferSelect): Promis
         ? (requestedModel.includes("/") ? requestedModel : "black-forest-labs/flux-schnell")
         : provider === "openai"
           ? (requestedModel.startsWith("gpt-") ? requestedModel : "gpt-image-1")
-          : requestedModel;
+          : provider === "huggingface"
+            ? (input.model || "black-forest-labs/FLUX.1-schnell")
+            : requestedModel;
+      const imageResolution = ([512, 768, 1024] as const).find((value) => value === input.resolution) ?? 1024;
       const bytes = await generateStill(
         provider,
         key,
         prompt,
         providerModel,
-        input.resolution ?? 1024,
+        imageResolution,
       );
       return bytes;
     });
