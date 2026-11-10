@@ -278,8 +278,25 @@ body { min-height: 100dvh; }
 .script-bar { display: flex; align-items: center; gap: 13px; padding: 15px; }
 .script-symbol { display: grid; place-items: center; width: 38px; height: 38px; flex: 0 0 38px; border-radius: 11px; color: hsl(var(--primary)); background: hsl(var(--primary) / .1); }
 .script-bar > div:nth-child(2) { flex: 1; min-width: 0; }
+.script-copy { display: grid; gap: 3px; }
 .script-bar b { font-size: 12px; }
 .script-bar p { color: hsl(var(--muted-foreground)); font-size: 10px; margin-top: 3px; }
+.charge-consent { margin-top: 6px; font-size: 10px; }
+.job-list { display: grid; gap: 12px; }
+.job-card { padding: 16px; }
+.job-progress { display: grid; gap: 9px; padding: 13px 15px; }
+.job-progress-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.job-progress-head > div { display: flex; align-items: center; gap: 10px; }
+.job-progress-head b { font-size: 12px; }
+.job-state { border-radius: 100px; padding: 4px 8px; background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); font-size: 9px; text-transform: capitalize; }
+.job-completed { color: hsl(var(--primary)); background: hsl(var(--primary) / .1); }
+.job-failed { color: hsl(var(--destructive)); background: hsl(var(--destructive) / .1); }
+.job-progress-track { height: 5px; overflow: hidden; border-radius: 99px; background: hsl(var(--muted)); }
+.job-progress-track span { display: block; height: 100%; border-radius: inherit; background: hsl(var(--primary)); transition: width .25s ease; }
+.job-progress > p, .job-card-meta, .job-error { color: hsl(var(--muted-foreground)); font-size: 10px; line-height: 1.6; }
+.job-error { color: hsl(var(--destructive)); margin-top: 4px; }
+.job-card-meta { display: flex; justify-content: space-between; gap: 12px; }
+.job-card-meta time { flex: 0 0 auto; font-variant-numeric: tabular-nums; }
 .scene-inspector { position: sticky; top: 96px; padding: 17px; }
 .inspector-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 5px; border-bottom: 1px solid hsl(var(--border)); padding-bottom: 13px; }
 .inspector-heading h3 { margin-top: 5px; font-size: 16px; }

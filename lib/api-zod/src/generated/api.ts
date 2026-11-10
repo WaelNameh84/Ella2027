@@ -313,7 +313,8 @@ export const generateProjectScriptBodyAllowRotationDefault = true;
 
 export const GenerateProjectScriptBody = zod.object({
   "providerKeyId": zod.string().uuid().nullish(),
-  "allowRotation": zod.boolean().default(generateProjectScriptBodyAllowRotationDefault)
+  "allowRotation": zod.boolean().default(generateProjectScriptBodyAllowRotationDefault),
+  "approvePotentialCharges": zod.boolean()
 })
 
 export const GenerateProjectScriptResponse = zod.object({
@@ -348,6 +349,151 @@ export const GenerateProjectScriptResponse = zod.object({
   "updatedAt": zod.coerce.date()
 }))
 }))
+
+
+/**
+ * @summary Queue script and storyboard generation
+ */
+export const QueueProjectScriptParams = zod.object({
+  "projectId": zod.coerce.string().uuid()
+})
+
+export const queueProjectScriptBodyAllowRotationDefault = true;
+
+export const QueueProjectScriptBody = zod.object({
+  "providerKeyId": zod.string().uuid().nullish(),
+  "allowRotation": zod.boolean().default(queueProjectScriptBodyAllowRotationDefault),
+  "approvePotentialCharges": zod.boolean()
+})
+
+export const queueProjectScriptResponseProgressMin = 0;
+export const queueProjectScriptResponseProgressMax = 100;
+
+export const queueProjectScriptResponseAttemptsMin = 0;
+
+
+
+export const QueueProjectScriptResponse = zod.object({
+  "id": zod.string().uuid(),
+  "projectId": zod.string().uuid(),
+  "jobType": zod.enum(['script', 'export']),
+  "status": zod.enum(['queued', 'running', 'completed', 'failed']),
+  "stage": zod.string(),
+  "progress": zod.number().int().min(queueProjectScriptResponseProgressMin).max(queueProjectScriptResponseProgressMax),
+  "message": zod.string(),
+  "error": zod.string().nullable(),
+  "attempts": zod.number().int().min(queueProjectScriptResponseAttemptsMin),
+  "startedAt": zod.coerce.date().nullable(),
+  "completedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Queue project video export
+ */
+export const QueueProjectExportParams = zod.object({
+  "projectId": zod.coerce.string().uuid()
+})
+
+export const QueueProjectExportBody = zod.object({
+  "resolution": zod.union([zod.literal(480),zod.literal(720),zod.literal(1080),zod.literal(2160)]),
+  "fps": zod.union([zod.literal(24),zod.literal(25),zod.literal(30),zod.literal(60)]),
+  "includeSubtitles": zod.boolean()
+})
+
+export const queueProjectExportResponseProgressMin = 0;
+export const queueProjectExportResponseProgressMax = 100;
+
+export const queueProjectExportResponseAttemptsMin = 0;
+
+
+
+export const QueueProjectExportResponse = zod.object({
+  "id": zod.string().uuid(),
+  "projectId": zod.string().uuid(),
+  "jobType": zod.enum(['script', 'export']),
+  "status": zod.enum(['queued', 'running', 'completed', 'failed']),
+  "stage": zod.string(),
+  "progress": zod.number().int().min(queueProjectExportResponseProgressMin).max(queueProjectExportResponseProgressMax),
+  "message": zod.string(),
+  "error": zod.string().nullable(),
+  "attempts": zod.number().int().min(queueProjectExportResponseAttemptsMin),
+  "startedAt": zod.coerce.date().nullable(),
+  "completedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary List the current user's processing jobs
+ */
+export const ListStudioJobsQueryParams = zod.object({
+  "projectId": zod.coerce.string().uuid().optional()
+})
+
+export const listStudioJobsResponseProgressMin = 0;
+export const listStudioJobsResponseProgressMax = 100;
+
+export const listStudioJobsResponseAttemptsMin = 0;
+
+
+
+export const ListStudioJobsResponseItem = zod.object({
+  "id": zod.string().uuid(),
+  "projectId": zod.string().uuid(),
+  "jobType": zod.enum(['script', 'export']),
+  "status": zod.enum(['queued', 'running', 'completed', 'failed']),
+  "stage": zod.string(),
+  "progress": zod.number().int().min(listStudioJobsResponseProgressMin).max(listStudioJobsResponseProgressMax),
+  "message": zod.string(),
+  "error": zod.string().nullable(),
+  "attempts": zod.number().int().min(listStudioJobsResponseAttemptsMin),
+  "startedAt": zod.coerce.date().nullable(),
+  "completedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListStudioJobsResponse = zod.array(ListStudioJobsResponseItem)
+
+
+/**
+ * @summary Retry a failed processing job
+ */
+export const RetryStudioJobParams = zod.object({
+  "jobId": zod.coerce.string().uuid()
+})
+
+export const retryStudioJobBodyApprovePotentialChargesDefault = false;
+
+export const RetryStudioJobBody = zod.object({
+  "approvePotentialCharges": zod.boolean().default(retryStudioJobBodyApprovePotentialChargesDefault)
+})
+
+export const retryStudioJobResponseProgressMin = 0;
+export const retryStudioJobResponseProgressMax = 100;
+
+export const retryStudioJobResponseAttemptsMin = 0;
+
+
+
+export const RetryStudioJobResponse = zod.object({
+  "id": zod.string().uuid(),
+  "projectId": zod.string().uuid(),
+  "jobType": zod.enum(['script', 'export']),
+  "status": zod.enum(['queued', 'running', 'completed', 'failed']),
+  "stage": zod.string(),
+  "progress": zod.number().int().min(retryStudioJobResponseProgressMin).max(retryStudioJobResponseProgressMax),
+  "message": zod.string(),
+  "error": zod.string().nullable(),
+  "attempts": zod.number().int().min(retryStudioJobResponseAttemptsMin),
+  "startedAt": zod.coerce.date().nullable(),
+  "completedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
 
 
 /**

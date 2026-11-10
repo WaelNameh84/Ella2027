@@ -23,6 +23,17 @@ import {
   ListFreeToolsResponse,
   ListProjectsResponse,
   ListProviderKeysResponse,
+  ListStudioJobsQueryParams,
+  ListStudioJobsResponse,
+  QueueProjectExportBody,
+  QueueProjectExportParams,
+  QueueProjectExportResponse,
+  QueueProjectScriptBody,
+  QueueProjectScriptParams,
+  QueueProjectScriptResponse,
+  RetryStudioJobBody,
+  RetryStudioJobParams,
+  RetryStudioJobResponse,
   SearchFreeMediaQueryParams,
   SearchFreeMediaResponse,
   TestProviderKeyParams,
@@ -45,6 +56,7 @@ import {
   providerKeysTable,
   providerSettingsTable,
   scenesTable,
+  studioJobsTable,
 } from "@workspace/db";
 import { decryptProviderKey, encryptProviderKey } from "../lib/secretVault";
 import {
@@ -201,6 +213,24 @@ function safeKeyMetadata(row: typeof providerKeysTable.$inferSelect) {
     usedCount: row.usedCount,
     cooldownUntil: row.cooldownUntil,
     createdAt: row.createdAt,
+  };
+}
+
+function studioJobDto(row: typeof studioJobsTable.$inferSelect) {
+  return {
+    id: row.id,
+    projectId: row.projectId,
+    jobType: row.jobType,
+    status: row.status,
+    stage: row.stage,
+    progress: row.progress,
+    message: row.message,
+    error: row.error,
+    attempts: row.attempts,
+    startedAt: row.startedAt,
+    completedAt: row.completedAt,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
   };
 }
 
@@ -566,11 +596,154 @@ router.put("/provider-settings", async (req, res): Promise<void> => {
   res.json(UpdateProviderSettingsResponse.parse(settings));
 });
 
+router.post("/projects/:projectId/jobs/script", async (req, res): Promise<void> => {
+  const params = QueueProjectScriptParams.safeParse(req.params);
+  const parsed = QueueProjectScriptBody.safeParse(req.body);
+  if (!params.success || !parsed.success) {
+    res.status(400).json({ error: params.error?.message ?? parsed.error?.message ?? "Invalid request." });
+    return;
+  }
+  if (!parsed.data.approvePotentialCharges) {
+    res.status(400).json({ error: "Confirm possible provider charges before starting script generation." });
+    return;
+  }
+  const userId = userIdOf(res);
+  const project = await projectForUser(params.data.projectId, userId);
+  if (!project) {
+    res.status(404).json({ error: "Project not found." });
+    return;
+  }
+  const existingScenes = await scenesForProject(project.id, userId);
+  if (existingScenes.length) {
+    res.status(409).json({ error: "This project already has scenes. Edit them or remove them before generating a new storyboard." });
+    return;
+  }
+  const activeJobs = await db.select().from(studioJobsTable).where(and(
+    eq(studioJobsTable.userId, userId),
+    eq(studioJobsTable.projectId, project.id),
+  ));
+  if (activeJobs.some((job) => ["queued", "running"].includes(job.status) && job.jobType === "script")) {
+    res.status(409).json({ error: "A script generation job is already active for this project." });
+    return;
+  }
+  const [job] = await db.insert(studioJobsTable).values({
+    userId,
+    projectId: project.id,
+    jobType: "script",
+    input: parsed.data,
+    message: "Waiting in the queue.",
+  }).returning();
+  await db.update(projectsTable).set({ status: "scripting", progress: 5 })
+    .where(and(eq(projectsTable.id, project.id), eq(projectsTable.userId, userId)));
+  res.status(202).json(QueueProjectScriptResponse.parse(studioJobDto(job)));
+});
+
+router.post("/projects/:projectId/jobs/export", async (req, res): Promise<void> => {
+  const params = QueueProjectExportParams.safeParse(req.params);
+  const parsed = QueueProjectExportBody.safeParse(req.body);
+  if (!params.success || !parsed.success) {
+    res.status(400).json({ error: params.error?.message ?? parsed.error?.message ?? "Invalid request." });
+    return;
+  }
+  const userId = userIdOf(res);
+  const project = await projectForUser(params.data.projectId, userId);
+  if (!project) {
+    res.status(404).json({ error: "Project not found." });
+    return;
+  }
+  if (!(await scenesForProject(project.id, userId)).length) {
+    res.status(409).json({ error: "Add at least one scene before exporting." });
+    return;
+  }
+  const existingJobs = await db.select().from(studioJobsTable).where(and(
+    eq(studioJobsTable.userId, userId),
+    eq(studioJobsTable.projectId, project.id),
+  ));
+  if (existingJobs.some((job) => ["queued", "running"].includes(job.status) && job.jobType === "export")) {
+    res.status(409).json({ error: "An export job is already active for this project." });
+    return;
+  }
+  const [job] = await db.insert(studioJobsTable).values({
+    userId,
+    projectId: project.id,
+    jobType: "export",
+    input: parsed.data,
+    message: "Waiting in the queue.",
+  }).returning();
+  res.status(202).json(QueueProjectExportResponse.parse(studioJobDto(job)));
+});
+
+router.get("/jobs", async (req, res): Promise<void> => {
+  const parsed = ListStudioJobsQueryParams.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const userId = userIdOf(res);
+  const rows = parsed.data.projectId
+    ? await db.select().from(studioJobsTable).where(and(
+      eq(studioJobsTable.userId, userId),
+      eq(studioJobsTable.projectId, parsed.data.projectId),
+    )).orderBy(desc(studioJobsTable.createdAt)).limit(100)
+    : await db.select().from(studioJobsTable).where(eq(studioJobsTable.userId, userId))
+      .orderBy(desc(studioJobsTable.createdAt)).limit(100);
+  res.json(ListStudioJobsResponse.parse(rows.map(studioJobDto)));
+});
+
+router.post("/jobs/:jobId/retry", async (req, res): Promise<void> => {
+  const params = RetryStudioJobParams.safeParse(req.params);
+  const parsed = RetryStudioJobBody.safeParse(req.body);
+  if (!params.success || !parsed.success) {
+    res.status(400).json({ error: params.error?.message ?? parsed.error?.message ?? "Invalid request." });
+    return;
+  }
+  const userId = userIdOf(res);
+  const [job] = await db.select().from(studioJobsTable).where(and(
+    eq(studioJobsTable.id, params.data.jobId),
+    eq(studioJobsTable.userId, userId),
+  )).limit(1);
+  if (!job) {
+    res.status(404).json({ error: "Job not found." });
+    return;
+  }
+  if (job.status !== "failed") {
+    res.status(409).json({ error: "Only failed jobs can be retried." });
+    return;
+  }
+  if (job.jobType === "script" && !parsed.data.approvePotentialCharges) {
+    res.status(400).json({ error: "Confirm possible provider charges before retrying script generation." });
+    return;
+  }
+  const retryInput = job.jobType === "script"
+    ? { ...job.input, approvePotentialCharges: true }
+    : job.input;
+  const [updated] = await db.update(studioJobsTable).set({
+    input: retryInput,
+    status: "queued",
+    stage: job.jobType === "script" && !job.result ? "starting" : job.stage,
+    progress: 0,
+    message: "Waiting in the queue.",
+    error: null,
+    completedAt: null,
+    startedAt: null,
+    updatedAt: new Date(),
+  }).where(eq(studioJobsTable.id, job.id)).returning();
+  await db.update(projectsTable).set({
+    status: job.jobType === "script" ? "scripting" : "editing",
+    progress: job.jobType === "script" ? 5 : 45,
+  }).where(and(eq(projectsTable.id, job.projectId), eq(projectsTable.userId, userId)));
+  res.status(202).json(RetryStudioJobResponse.parse(studioJobDto(updated)));
+});
+
 router.post("/projects/:projectId/generate-script", async (req, res): Promise<void> => {
   const params = GenerateProjectScriptParams.safeParse(req.params);
   const parsed = GenerateProjectScriptBody.safeParse(req.body);
   if (!params.success || !parsed.success) {
     res.status(400).json({ error: params.error?.message ?? parsed.error?.message ?? "Invalid request." });
+    return;
+  }
+  if (!parsed.data.approvePotentialCharges) {
+    res.status(400).json({ error: "Confirm possible provider charges before starting script generation." });
     return;
   }
   const userId = userIdOf(res);

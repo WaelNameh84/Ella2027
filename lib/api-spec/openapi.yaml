@@ -14,6 +14,7 @@ tags:
   - name: providers
   - name: media
   - name: exports
+  - name: jobs
 paths:
   /healthz:
     get:
@@ -201,6 +202,101 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ProjectDetail"
+  /projects/{projectId}/jobs/script:
+    parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: queueProjectScript
+      tags: [jobs]
+      summary: Queue script and storyboard generation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScriptGenerationInput"
+      responses:
+        "202":
+          description: Script generation queued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudioJob"
+  /projects/{projectId}/jobs/export:
+    parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: queueProjectExport
+      tags: [jobs]
+      summary: Queue project video export
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExportInput"
+      responses:
+        "202":
+          description: Video export queued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudioJob"
+  /jobs:
+    get:
+      operationId: listStudioJobs
+      tags: [jobs]
+      summary: List the current user's processing jobs
+      parameters:
+        - name: projectId
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Processing job history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StudioJob"
+  /jobs/{jobId}/retry:
+    parameters:
+      - name: jobId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: retryStudioJob
+      tags: [jobs]
+      summary: Retry a failed processing job
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudioJobRetryInput"
+      responses:
+        "202":
+          description: Job queued again
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudioJob"
   /provider-keys:
     get:
       operationId: listProviderKeys
@@ -517,7 +613,30 @@ components:
       properties:
         providerKeyId: { type: ["string", "null"], format: uuid }
         allowRotation: { type: boolean, default: true }
-      required: [allowRotation]
+        approvePotentialCharges: { type: boolean }
+      required: [allowRotation, approvePotentialCharges]
+    StudioJobRetryInput:
+      type: object
+      properties:
+        approvePotentialCharges: { type: boolean, default: false }
+      required: [approvePotentialCharges]
+    StudioJob:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        jobType: { type: string, enum: [script, export] }
+        status: { type: string, enum: [queued, running, completed, failed] }
+        stage: { type: string }
+        progress: { type: integer, minimum: 0, maximum: 100 }
+        message: { type: string }
+        error: { type: ["string", "null"] }
+        attempts: { type: integer, minimum: 0 }
+        startedAt: { type: ["string", "null"], format: date-time }
+        completedAt: { type: ["string", "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, projectId, jobType, status, stage, progress, message, error, attempts, startedAt, completedAt, createdAt, updatedAt]
     ProviderKey:
       type: object
       properties:

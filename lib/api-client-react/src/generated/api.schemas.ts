@@ -202,6 +202,53 @@ export interface ScriptGenerationInput {
   /** @nullable */
   providerKeyId?: string | null;
   allowRotation: boolean;
+  approvePotentialCharges: boolean;
+}
+
+export interface StudioJobRetryInput {
+  approvePotentialCharges: boolean;
+}
+
+export type StudioJobJobType = typeof StudioJobJobType[keyof typeof StudioJobJobType];
+
+
+export const StudioJobJobType = {
+  script: 'script',
+  export: 'export',
+} as const;
+
+export type StudioJobStatus = typeof StudioJobStatus[keyof typeof StudioJobStatus];
+
+
+export const StudioJobStatus = {
+  queued: 'queued',
+  running: 'running',
+  completed: 'completed',
+  failed: 'failed',
+} as const;
+
+export interface StudioJob {
+  id: string;
+  projectId: string;
+  jobType: StudioJobJobType;
+  status: StudioJobStatus;
+  stage: string;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  progress: number;
+  message: string;
+  /** @nullable */
+  error: string | null;
+  /** @minimum 0 */
+  attempts: number;
+  /** @nullable */
+  startedAt: string | null;
+  /** @nullable */
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export type ProviderKeyServiceType = typeof ProviderKeyServiceType[keyof typeof ProviderKeyServiceType];
@@ -395,6 +442,10 @@ export interface ExportResult {
   downloadUrl: string;
   message: string;
 }
+
+export type ListStudioJobsParams = {
+projectId?: string;
+};
 
 export type SearchFreeMediaParams = {
 q: string;

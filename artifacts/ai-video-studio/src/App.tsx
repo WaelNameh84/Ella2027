@@ -7,13 +7,14 @@ import {
   useCreateProject, useListProjects, getListProjectsQueryKey, useGetStudioSummary,
   getGetStudioSummaryQueryKey, useDeleteProject, useGetProject, getGetProjectQueryKey,
   useUpdateProject, useCreateScene, useUpdateScene, useDeleteScene,
-  useGenerateProjectScript, useListProviderKeys, getListProviderKeysQueryKey,
+  useListProviderKeys, getListProviderKeysQueryKey,
   useCreateProviderKey, useUpdateProviderKey, useDeleteProviderKey, useTestProviderKey,
   useGetProviderSettings, getGetProviderSettingsQueryKey, useUpdateProviderSettings,
   useSearchFreeMedia, getSearchFreeMediaQueryKey, useListFreeTools, getListFreeToolsQueryKey,
-  useExportProject,
+  useQueueProjectScript, useQueueProjectExport, useListStudioJobs,
+  getListStudioJobsQueryKey, useRetryStudioJob,
 } from '@workspace/api-client-react';
-import type { Project, ProjectInput, Scene, SceneUpdate, ProviderKey, ProviderSettings, MediaResult } from '@workspace/api-client-react';
+import type { Project, ProjectInput, Scene, SceneUpdate, ProviderKey, ProviderSettings, MediaResult, StudioJob } from '@workspace/api-client-react';
 import { Route, Switch, Link, Redirect, useLocation, Router as WouterRouter } from 'wouter';
 import {
   Aperture, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, ChevronDown, Clapperboard,
@@ -75,6 +76,7 @@ function ThemeLanguageProvider({ children }: { children: ReactNode }) {
 const navItems = [
   { href: '/dashboard', icon: Aperture, ar: 'نظرة عامة', en: 'Overview' },
   { href: '/projects', icon: Clapperboard, ar: 'المشاريع', en: 'Projects' },
+  { href: '/jobs', icon: Clock3, ar: 'المهام', en: 'Jobs' },
   { href: '/media', icon: ImagePlus, ar: 'مكتبة الوسائط', en: 'Media library' },
   { href: '/settings/providers', icon: KeyRound, ar: 'مفاتيح الخدمات', en: 'Provider keys' },
   { href: '/settings/tools', icon: Globe2, ar: 'أدوات مفتوحة', en: 'Open tools' },
@@ -265,17 +267,28 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
   const projectQuery = useGetProject(projectId);
   const keysQuery = useListProviderKeys();
   const qc = useQueryClient();
-  const createScene = useCreateScene(), updateScene = useUpdateScene(), deleteScene = useDeleteScene(), generate = useGenerateProjectScript(), updateProject = useUpdateProject(), exportProject = useExportProject();
+  const projectJobsQuery = useListStudioJobs({ projectId }, { query: { refetchInterval: query => query.state.data?.some(job => job.status === 'queued' || job.status === 'running') ? 1500 : false } });
+  const createScene = useCreateScene(), updateScene = useUpdateScene(), deleteScene = useDeleteScene(), generate = useQueueProjectScript(), updateProject = useUpdateProject(), exportProject = useQueueProjectExport();
   const project = projectQuery.data;
   const [selected, setSelected] = useState<string | null>(null);
-  const [exportInfo, setExportInfo] = useState('');
+  const [chargeApproved, setChargeApproved] = useState(false);
   const [editProjectOpen, setEditProjectOpen] = useState(false);
   const [exportSettings,setExportSettings]=useState<{resolution:480|720|1080|2160;fps:24|25|30|60;includeSubtitles:boolean}>({resolution:1080,fps:30,includeSubtitles:true});
   const [draggedScene,setDraggedScene]=useState<string|null>(null);
+  const completedScriptRef = useRef('');
   useEffect(() => { if (project?.scenes?.length && !selected) setSelected(project.scenes[0].id); }, [project, selected]);
   const scenes = [...(project?.scenes || [])].sort((a,b) => a.sortOrder-b.sortOrder);
   const activeScene = scenes.find(s => s.id === selected) || scenes[0];
-  const refresh = () => { qc.invalidateQueries({queryKey:getGetProjectQueryKey(projectId)}); qc.invalidateQueries({queryKey:getListProjectsQueryKey()}); qc.invalidateQueries({queryKey:getGetStudioSummaryQueryKey()}); };
+  const refresh = () => { qc.invalidateQueries({queryKey:getGetProjectQueryKey(projectId)}); qc.invalidateQueries({queryKey:getListProjectsQueryKey()}); qc.invalidateQueries({queryKey:getGetStudioSummaryQueryKey()}); qc.invalidateQueries({queryKey:getListStudioJobsQueryKey()}); };
+  useEffect(() => {
+    const finished = projectJobsQuery.data?.find(job => job.jobType === 'script' && job.status === 'completed');
+    if (finished && completedScriptRef.current !== finished.id) {
+      completedScriptRef.current = finished.id;
+      refresh();
+    }
+  }, [projectJobsQuery.data]);
+  const currentJob = projectJobsQuery.data?.find(job => job.status === 'queued' || job.status === 'running') ?? projectJobsQuery.data?.[0];
+  const latestExportJob = projectJobsQuery.data?.find(job => job.jobType === 'export');
   const duration = scenes.reduce((sum,s)=>sum+s.durationSeconds,0);
   if (projectQuery.isLoading) return <AppFrame title={tx(lang,'تحميل المشروع','Loading project')}><div className="workspace-skeleton"><SkeletonBlock className="h-20"/><SkeletonBlock className="h-72"/><SkeletonBlock className="h-48"/></div></AppFrame>;
   if (projectQuery.isError || !project) return <AppFrame title={tx(lang,'المشروع','Project')}><StateError lang={lang} retry={()=>projectQuery.refetch()} /></AppFrame>;
@@ -314,19 +327,48 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
            {scenes.length === 0 ? <div className="timeline-empty"><span className="timeline-empty-line"/><span>{tx(lang,'لم تُنشأ مشاهد بعد','No scenes yet')}</span><button className="text-link" onClick={()=>createScene.mutate({projectId,data:{sortOrder:0,title:tx(lang,'المشهد الأول','Scene one'),description:'',imagePrompt:'',narration:'',durationSeconds:6}},{onSuccess:s=>{refresh();setSelected(s.id)}})}>{tx(lang,'أضف أول مشهد','Add the first scene')}</button></div> : <div className="timeline-track">{scenes.map((s,i)=><button key={s.id} draggable onDragStart={()=>setDraggedScene(s.id)} onDragEnd={()=>setDraggedScene(null)} onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();if(draggedScene)void reorderDrop(draggedScene,s.id);setDraggedScene(null);}} className={`timeline-scene ${activeScene?.id===s.id?'selected':''} ${draggedScene===s.id?'opacity-50':''}`} onClick={()=>setSelected(s.id)} data-testid={`timeline-scene-${s.id}`}><span className="timeline-number">{String(i+1).padStart(2,'0')}</span><span className="timeline-preview">{s.assetUrl ? <img src={s.assetUrl} alt="" /> : <span className="mini-landscape"><i/><b/></span>}</span><span className="timeline-title">{s.title}</span><span className="timeline-duration">{s.durationSeconds}s</span></button>)}</div>}
           {scenes.length > 0 && <div className="timeline-ruler"><span>00:00</span><span>{formatTime(duration / 2)}</span><span>{formatTime(duration)}</span></div>}
         </div>
-        <div className="script-bar panel"><div className="script-symbol"><WandSparkles size={18}/></div><div><b>{tx(lang,'حوّل الفكرة إلى سيناريو','Turn the idea into a storyboard')}</b><p>{keysQuery.data?.length ? tx(lang,'أنشئ مسودة مشاهد باستخدام مزوّد مضبوط.','Generate a scene draft using a configured provider.') : tx(lang,'لا يوجد مفتاح خدمة بعد؛ أضف مفتاحًا قبل توليد السيناريو.','No provider key is configured. Add one before generating a script.')}</p></div><button disabled={!keysQuery.data?.length || generate.isPending} className="btn btn-primary" onClick={()=>generate.mutate({projectId,data:{providerKeyId:null,allowRotation:true}},{onSuccess:refresh})} data-testid="button-generate-script">{generate.isPending ? <LoaderCircle size={16} className="animate-spin"/> : <WandSparkles size={16}/ >}{tx(lang,'توليد المشاهد','Generate scenes')}</button></div>
-        {generate.isError && <div className="inline-error">{tx(lang,'لم ينجح التوليد. تحقق من مفاتيح الخدمة وإعدادات التدوير.','Generation failed. Check your provider keys and rotation settings.')}</div>}
-        {exportInfo && <div className="export-confirm"><Check size={16}/><span>{exportInfo}</span><a className="btn btn-primary" href={`${basePath}/api/projects/${projectId}/export/file`} download>{tx(lang,'تنزيل الملف','Download file')}<ArrowDown size={15}/></a></div>}
+        <div className="script-bar panel"><div className="script-symbol"><WandSparkles size={18}/></div><div className="script-copy"><b>{tx(lang,'حوّل الفكرة إلى سيناريو','Turn the idea into a storyboard')}</b><p>{keysQuery.data?.length ? tx(lang,'أنشئ مسودة مشاهد باستخدام مزوّد مضبوط.','Generate a scene draft using a configured provider.') : tx(lang,'لا يوجد مفتاح خدمة بعد؛ أضف مفتاحًا قبل توليد السيناريو.','No provider key is configured. Add one before generating a script.')}</p><label className="checkline charge-consent"><input type="checkbox" checked={chargeApproved} onChange={e=>setChargeApproved(e.target.checked)}/>{tx(lang,'أوافق على احتمال احتساب رسوم من مزوّد الخدمة.','I approve possible charges from the selected provider.')}</label></div><button disabled={!keysQuery.data?.length || generate.isPending || !chargeApproved || Boolean(currentJob?.status === 'running' || currentJob?.status === 'queued')} className="btn btn-primary" onClick={()=>generate.mutate({projectId,data:{providerKeyId:null,allowRotation:true,approvePotentialCharges:chargeApproved}},{onSuccess:refresh})} data-testid="button-generate-script">{generate.isPending ? <LoaderCircle size={16} className="animate-spin"/> : <WandSparkles size={16}/ >}{tx(lang,'توليد المشاهد','Generate scenes')}</button></div>
+        {generate.isError && <div className="inline-error">{tx(lang,'تعذر بدء التوليد. تحقق من مفاتيح الخدمة وإعدادات التدوير.','Could not start generation. Check provider keys and rotation settings.')}</div>}
+        {currentJob && <div className="job-progress panel" role="status"><div className="job-progress-head"><div><b>{tx(lang,currentJob.jobType==='script'?'توليد السيناريو':'تصدير الفيديو',currentJob.jobType==='script'?'Script generation':'Video export')}</b><span className={`job-state job-${currentJob.status}`}>{tx(lang,currentJob.status==='queued'?'في الانتظار':currentJob.status==='running'?'قيد التنفيذ':currentJob.status==='completed'?'مكتملة':'فشلت',currentJob.status)}</span></div><Link href="/jobs" className="text-link">{tx(lang,'عرض المهام','View jobs')}</Link></div>{(currentJob.status==='queued'||currentJob.status==='running')&&<div className="job-progress-track"><span style={{width:`${currentJob.progress}%`}}/></div>}<p>{currentJob.error || currentJob.message}</p>{latestExportJob?.status==='completed'&&<a className="btn btn-primary" href={`${basePath}/api/projects/${projectId}/export/file`} download>{tx(lang,'تنزيل فيديو MP4','Download MP4')}<ArrowDown size={15}/></a>}</div>}
       </section>
       <aside className="scene-inspector panel">
         <div className="inspector-heading"><div><span className="eyebrow">{tx(lang,'محرر اللقطة','SHOT EDITOR')}</span><h3>{activeScene?.title || tx(lang,'اختر مشهدًا','Select a scene')}</h3></div>{activeScene && <div className="flex gap-1"><button className="btn btn-ghost !p-2" onClick={()=>reorder(activeScene,-1)} title={tx(lang,'تحريك للأعلى','Move up')}><ArrowUp size={15}/></button><button className="btn btn-ghost !p-2" onClick={()=>reorder(activeScene,1)} title={tx(lang,'تحريك للأسفل','Move down')}><ArrowDown size={15}/></button><button className="btn btn-ghost !p-2 text-destructive" onClick={()=>{if(window.confirm(tx(lang,'حذف هذا المشهد؟','Delete this scene?')))deleteScene.mutate({projectId,sceneId:activeScene.id},{onSuccess:()=>{setSelected(null);refresh()}})}} title={tx(lang,'حذف','Delete')}><Trash2 size={15}/></button></div>}</div>
         {activeScene ? <SceneFields key={activeScene.id} scene={activeScene} lang={lang} onSave={(field,value)=>updateCurrent(field,value)} pending={updateScene.isPending}/> : <div className="inspector-blank"><Film size={22}/><span>{tx(lang,'اختر مشهدًا من الخط الزمني أو أنشئ واحدًا.','Select a scene from the timeline or create one.')}</span></div>}
-        <div className="inspector-footer"><div className="export-settings"><label><span className="field-label">{tx(lang,'الدقة','Resolution')}</span><select className="studio-input" value={exportSettings.resolution} onChange={e=>setExportSettings(v=>({...v,resolution:Number(e.target.value) as 480|720|1080|2160}))}><option value={480}>480p</option><option value={720}>720p</option><option value={1080}>1080p</option><option value={2160}>4K</option></select></label><label><span className="field-label">{tx(lang,'معدل الإطارات','Frame rate')}</span><select className="studio-input" value={exportSettings.fps} onChange={e=>setExportSettings(v=>({...v,fps:Number(e.target.value) as 24|25|30|60}))}><option value={24}>24 fps</option><option value={25}>25 fps</option><option value={30}>30 fps</option><option value={60}>60 fps</option></select></label></div><label className="checkline export-subtitles"><input type="checkbox" checked={exportSettings.includeSubtitles} onChange={e=>setExportSettings(v=>({...v,includeSubtitles:e.target.checked}))}/>{tx(lang,'إضافة التعليق كنصوص ترجمة لكل مشهد','Include scene narration as subtitles')}</label><button onClick={()=>exportProject.mutate({projectId,data:exportSettings},{onSuccess:r=>{setExportInfo(r.message || `${r.status}: ${tx(lang,'الملف جاهز للتنزيل.','Your render is ready to download.')}`);refresh();}})} className="btn btn-primary w-full" disabled={exportProject.isPending || scenes.length===0} data-testid="button-export"><Clapperboard size={16}/>{exportProject.isPending ? tx(lang,'جارٍ تجهيز الرندر...','Rendering...') : tx(lang,'تصدير الفيديو','Export video')}</button><p>{tx(lang,'يُصدّر MP4 بنسبة أبعاد المشروع. الصوت غير متاح في هذا الإصدار.','Exports MP4 using the project aspect ratio. Audio is not available yet.')}</p>{exportProject.isError && <span className="inline-error">{tx(lang,'تعذر التصدير. تحقق من أن كل مشهد يحتوي صورة أو فيديو.','Export failed. Make sure each scene has an image or video.')}</span>}</div>
+        <div className="inspector-footer"><div className="export-settings"><label><span className="field-label">{tx(lang,'الدقة','Resolution')}</span><select className="studio-input" value={exportSettings.resolution} onChange={e=>setExportSettings(v=>({...v,resolution:Number(e.target.value) as 480|720|1080|2160}))}><option value={480}>480p</option><option value={720}>720p</option><option value={1080}>1080p</option><option value={2160}>4K</option></select></label><label><span className="field-label">{tx(lang,'معدل الإطارات','Frame rate')}</span><select className="studio-input" value={exportSettings.fps} onChange={e=>setExportSettings(v=>({...v,fps:Number(e.target.value) as 24|25|30|60}))}><option value={24}>24 fps</option><option value={25}>25 fps</option><option value={30}>30 fps</option><option value={60}>60 fps</option></select></label></div><label className="checkline export-subtitles"><input type="checkbox" checked={exportSettings.includeSubtitles} onChange={e=>setExportSettings(v=>({...v,includeSubtitles:e.target.checked}))}/>{tx(lang,'إضافة التعليق كنصوص ترجمة لكل مشهد','Include scene narration as subtitles')}</label><button onClick={()=>exportProject.mutate({projectId,data:exportSettings},{onSuccess:refresh})} className="btn btn-primary w-full" disabled={exportProject.isPending || scenes.length===0 || Boolean(currentJob?.status === 'running' || currentJob?.status === 'queued')} data-testid="button-export"><Clapperboard size={16}/>{exportProject.isPending ? tx(lang,'جارٍ تجهيز التصدير...','Queueing export...') : tx(lang,'تصدير الفيديو','Export video')}</button><p>{tx(lang,'يُصدّر MP4 بنسبة أبعاد المشروع. الصوت غير متاح بعد.','Exports MP4 using the project aspect ratio. Audio is not available yet.')}</p>{exportProject.isError && <span className="inline-error">{tx(lang,'تعذر بدء التصدير. تحقق من أن كل مشهد يحتوي صورة أو فيديو.','Could not start export. Make sure each scene has an image or video.')}</span>}</div>
       </aside>
     </div>
     {editProjectOpen && <ProjectForm initial={{title:project.title,idea:project.idea,videoType:project.videoType,language:project.language,durationSeconds:project.durationSeconds,audience:project.audience,visualStyle:project.visualStyle,aspectRatio:project.aspectRatio as ProjectInput['aspectRatio']}} onClose={()=>setEditProjectOpen(false)} pending={updateProject.isPending} onSave={data=>updateProject.mutate({projectId,data},{onSuccess:()=>{refresh();setEditProjectOpen(false)}})} />}
   </AppFrame>;
 }
+
+function JobsPage() {
+  const { lang } = useApp();
+  const qc = useQueryClient();
+  const jobsQuery = useListStudioJobs(undefined, { query: { refetchInterval: query => query.state.data?.some(job => job.status === 'queued' || job.status === 'running') ? 1500 : false } });
+  const retry = useRetryStudioJob();
+  const jobs = jobsQuery.data ?? [];
+  return <AppFrame title={tx(lang,'المهام','Jobs')} crumb={tx(lang,'طابور المعالجة','PROCESSING QUEUE')}>
+    <div className="page-toolbar"><div><span className="eyebrow">{tx(lang,'حالة المعالجة','JOB STATUS')}</span><h2>{tx(lang,'مهامك المحفوظة.','Your saved jobs.')}</h2><p>{tx(lang,'تستأنف المهام من آخر مرحلة محفوظة بعد إعادة تشغيل الخادم.','Jobs resume from the last saved stage after a server restart.')}</p></div><button className="btn btn-quiet" onClick={()=>jobsQuery.refetch()}><Clock3 size={16}/>{tx(lang,'تحديث','Refresh')}</button></div>
+    {jobsQuery.isLoading ? <div className="workspace-skeleton"><SkeletonBlock className="h-24"/><SkeletonBlock className="h-24"/></div> : jobsQuery.isError ? <StateError lang={lang} retry={()=>jobsQuery.refetch()} /> : jobs.length ? <div className="job-list">{jobs.map(job=><JobCard key={job.id} job={job} lang={lang} retrying={retry.isPending} onRetry={()=>{
+      if(job.jobType==='script'&&!window.confirm(tx(lang,'قد تُحتسب رسوم عند إعادة إرسال الطلب إلى مزوّد الذكاء الاصطناعي. هل تريد المتابعة؟','Retrying sends another request to the AI provider, which may incur charges. Continue?')))return;
+      retry.mutate({jobId:job.id,data:{approvePotentialCharges:job.jobType==='script'}},{onSuccess:()=>qc.invalidateQueries({queryKey:getListStudioJobsQueryKey()})});
+    }} />)}</div> : <Empty title={tx(lang,'لا توجد مهام بعد','No jobs yet')} body={tx(lang,'ستظهر هنا مهام إنشاء السيناريو وتصدير الفيديو مع تقدمها وأي أخطاء.','Script and video export jobs will appear here with their progress and any errors.')} />}
+    {retry.isError&&<div className="inline-error">{tx(lang,'تعذرت إعادة المهمة. حدّث الصفحة وحاول مجددًا.','Could not retry this job. Refresh and try again.')}</div>}
+  </AppFrame>;
+}
+
+function JobCard({ job, lang, retrying, onRetry }: { job: StudioJob; lang: Lang; retrying: boolean; onRetry: () => void }) {
+  const typeLabel = job.jobType === 'script' ? tx(lang,'سيناريو وStoryboard','Script and storyboard') : tx(lang,'تصدير MP4','MP4 export');
+  const statusLabel = tx(lang,job.status==='queued'?'في الانتظار':job.status==='running'?'قيد التنفيذ':job.status==='completed'?'مكتملة':'فشلت',job.status);
+  return <article className="job-card panel"><div className="job-progress-head"><div><b>{typeLabel}</b><span className={`job-state job-${job.status}`}>{statusLabel}</span></div><Link className="text-link" href={`/projects/${job.projectId}`}>{tx(lang,'فتح المشروع','Open project')}<ArrowLeft size={14}/></Link></div>
+    {(job.status==='queued'||job.status==='running')&&<div className="job-progress-track"><span style={{width:`${job.progress}%`}}/></div>}
+    <div className="job-card-meta"><span>{job.message}</span><time>{new Date(job.createdAt).toLocaleString(lang==='ar'?'ar':'en')}</time></div>
+    {job.error&&<p className="job-error">{job.error}</p>}
+    {job.status==='completed'&&job.jobType==='export'&&<a className="btn btn-primary mt-3" href={`${basePath}/api/projects/${job.projectId}/export/file`} download>{tx(lang,'تنزيل MP4','Download MP4')}<ArrowDown size={15}/></a>}
+    {job.status==='failed'&&<button className="btn btn-quiet mt-3" onClick={onRetry} disabled={retrying}><Clock3 size={15}/>{retrying?tx(lang,'جارٍ الإرسال...','Retrying...'):tx(lang,'إعادة المحاولة','Retry')}</button>}
+  </article>;
+}
+
 function SceneFields({ scene, lang, onSave, pending }: { scene: Scene; lang: Lang; onSave: (field: keyof Scene, value: string | number) => void; pending: boolean }) {
   const [form,setForm] = useState({title:scene.title,description:scene.description,imagePrompt:scene.imagePrompt,narration:scene.narration,durationSeconds:scene.durationSeconds});
   useEffect(()=>setForm({title:scene.title,description:scene.description,imagePrompt:scene.imagePrompt,narration:scene.narration,durationSeconds:scene.durationSeconds}),[scene.id]);
@@ -373,7 +415,7 @@ function ProvidersPage() {
   return <AppFrame title={tx(lang,'مزوّدو الخدمة','Provider settings')} crumb="CREDENTIALS & ROTATION">
     <div className="page-toolbar"><div><span className="eyebrow">{tx(lang,'المفاتيح والاعتمادية','KEYS & RELIABILITY')}</span><h2>{tx(lang,'أدواتك، تحت سيطرتك.', 'Your tools, on your terms.')}</h2><p>{tx(lang,'المفاتيح لا تظهر مجددًا بعد حفظها؛ تُرسل للخادم مباشرة ولا تُخزّن في المتصفح.', 'Keys are never shown again after saving. They are sent directly to the server and never stored in browser storage.')}</p></div><button className="btn btn-primary" onClick={()=>{setEditing(null);setDialog(true)}} data-testid="button-add-provider"><Plus size={16}/>{tx(lang,'إضافة مفتاح','Add a key')}</button></div>
     <section className="panel provider-list"><div className="section-heading"><div><span className="eyebrow">{tx(lang,'مفاتيح API','API KEYS')}</span><h3>{tx(lang,'المزوّدون المتصلون','Connected providers')}</h3></div><span className="result-count">{keys.data?.length ?? '—'} {tx(lang,'مفاتيح','keys')}</span></div>
-      {keys.isLoading ? <div className="provider-rows">{[1,2].map(n=><SkeletonBlock key={n} className="h-20"/>)}</div> : keys.isError ? <StateError lang={lang} retry={()=>keys.refetch()} /> : keys.data?.length ? <div className="provider-rows">{keys.data.map(key=><ProviderRow key={key.id} item={key} onEdit={()=>{setEditing(key);setDialog(true)}} onToggle={enabled=>update.mutate({keyId:key.id,data:{enabled}},{onSuccess:invalidate})} onPriority={priority=>update.mutate({keyId:key.id,data:{priority}},{onSuccess:invalidate})} onTest={()=>test.mutate({keyId:key.id},{onSuccess:invalidate})} testing={test.isPending} onDelete={()=>{if(window.confirm(tx(lang,'حذف هذا المفتاح؟','Delete this key?')))remove.mutate({keyId:key.id},{onSuccess:invalidate})}} lang={lang}/>)}</div> : <Empty title={tx(lang,'لا توجد مفاتيح محفوظة','No keys configured')} body={tx(lang,'أضف مفتاح مزوّد قبل استخدام توليد السيناريو أو الخدمات المتصلة.','Add a provider key to enable script generation and connected services.')} action={<button className="btn btn-primary" onClick={()=>setDialog(true)}><Plus size={15}/>{tx(lang,'إضافة أول مفتاح','Add your first key')}</button>} />}
+       {keys.isLoading ? <div className="provider-rows">{[1,2].map(n=><SkeletonBlock key={n} className="h-20"/>)}</div> : keys.isError ? <StateError lang={lang} retry={()=>keys.refetch()} /> : keys.data?.length ? <div className="provider-rows">{keys.data.map(key=><ProviderRow key={key.id} item={key} onEdit={()=>{setEditing(key);setDialog(true)}} onToggle={enabled=>update.mutate({keyId:key.id,data:{enabled}},{onSuccess:invalidate})} onPriority={priority=>update.mutate({keyId:key.id,data:{priority}},{onSuccess:invalidate})} onTest={()=>{if(!window.confirm(tx(lang,'قد يرسل الاختبار طلباً إلى المزوّد وقد يترتب عليه رسم. هل تريد المتابعة؟','Testing sends a request to the provider and may incur a charge. Continue?')))return;test.mutate({keyId:key.id},{onSuccess:invalidate})}} testing={test.isPending} onDelete={()=>{if(window.confirm(tx(lang,'حذف هذا المفتاح؟','Delete this key?')))remove.mutate({keyId:key.id},{onSuccess:invalidate})}} lang={lang}/>)}</div> : <Empty title={tx(lang,'لا توجد مفاتيح محفوظة','No keys configured')} body={tx(lang,'أضف مفتاح مزوّد قبل استخدام توليد السيناريو أو الخدمات المتصلة.','Add a provider key to enable script generation and connected services.')} action={<button className="btn btn-primary" onClick={()=>setDialog(true)}><Plus size={15}/>{tx(lang,'إضافة أول مفتاح','Add your first key')}</button>} />}
     </section>
     <section className="panel rotation-panel"><div className="section-heading"><div><span className="eyebrow">{tx(lang,'التعامل مع التعطّل','FAILOVER BEHAVIOR')}</span><h3>{tx(lang,'تدوير المفاتيح وإعادة المحاولة','Key rotation & retries')}</h3></div><ShieldCheck size={20} className="text-primary"/></div>
       {settingsQ.isLoading ? <SkeletonBlock className="h-48"/> : settingsQ.isError ? <StateError lang={lang} retry={()=>settingsQ.refetch()}/> : prefs && <><div className="rotation-options">{[
@@ -437,6 +479,7 @@ function Router() {
         <Route path="/dashboard" component={Dashboard}/>
         <Route path="/projects" component={Projects}/>
         <Route path="/projects/:projectId">{params=><ProjectWorkspace projectId={params.projectId}/>}</Route>
+        <Route path="/jobs" component={JobsPage}/>
         <Route path="/media" component={MediaPage}/>
         <Route path="/settings/providers" component={ProvidersPage}/>
         <Route path="/settings/tools" component={ToolsPage}/>

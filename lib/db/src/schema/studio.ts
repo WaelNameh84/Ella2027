@@ -1,5 +1,6 @@
 import {
   boolean,
+  index,
   integer,
   jsonb,
   pgTable,
@@ -100,3 +101,32 @@ export const toolMetadataTable = pgTable("studio_tool_metadata", {
   officialUrl: text("official_url").notNull(),
   metadata: jsonb("metadata").$type<Record<string, unknown>>(),
 });
+
+export const studioJobsTable = pgTable("studio_jobs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: text("user_id").notNull(),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => projectsTable.id, { onDelete: "cascade" }),
+  jobType: text("job_type").notNull(),
+  status: text("status").notNull().default("queued"),
+  stage: text("stage").notNull().default("queued"),
+  progress: integer("progress").notNull().default(0),
+  message: text("message").notNull().default("Waiting in the queue."),
+  error: text("error"),
+  input: jsonb("input").$type<Record<string, unknown>>().notNull(),
+  result: jsonb("result").$type<Record<string, unknown> | null>(),
+  attempts: integer("attempts").notNull().default(0),
+  startedAt: timestamp("started_at", { withTimezone: true }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+}, (table) => [
+  index("studio_jobs_queue_idx").on(table.status, table.createdAt),
+  index("studio_jobs_user_created_idx").on(table.userId, table.createdAt),
+]);

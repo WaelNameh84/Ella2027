@@ -10,4 +10,5 @@ export interface ScriptGenerationInput {
   /** @nullable */
   providerKeyId?: string | null;
   allowRotation: boolean;
+  approvePotentialCharges: boolean;
 }
