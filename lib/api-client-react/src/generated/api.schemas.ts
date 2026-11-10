@@ -9,6 +9,143 @@ export interface HealthStatus {
   status: string;
 }
 
+export type AdminAccessRole = typeof AdminAccessRole[keyof typeof AdminAccessRole];
+
+
+export const AdminAccessRole = {
+  member: 'member',
+  admin: 'admin',
+} as const;
+
+export interface AdminAccess {
+  isAdmin: boolean;
+  role: AdminAccessRole;
+}
+
+export interface AdminOverview {
+  userCount: number;
+  projectCount: number;
+  sceneCount: number;
+  jobCount: number;
+  queuedJobs: number;
+  failedJobs: number;
+  enabledProviderKeys: number;
+  rateLimitedKeys: number;
+  quotaLimitedKeys: number;
+}
+
+export type AdminUserRole = typeof AdminUserRole[keyof typeof AdminUserRole];
+
+
+export const AdminUserRole = {
+  member: 'member',
+  admin: 'admin',
+} as const;
+
+export interface AdminUser {
+  id: string;
+  /** @nullable */
+  email: string | null;
+  /** @nullable */
+  displayName: string | null;
+  role: AdminUserRole;
+  banned: boolean;
+  createdAt: string;
+  /** @nullable */
+  lastSignInAt: string | null;
+  projectCount: number;
+  jobCount: number;
+  providerKeyCount: number;
+}
+
+export type AdminUserUpdateRole = typeof AdminUserUpdateRole[keyof typeof AdminUserUpdateRole];
+
+
+export const AdminUserUpdateRole = {
+  member: 'member',
+  admin: 'admin',
+} as const;
+
+export interface AdminUserUpdate {
+  role?: AdminUserUpdateRole;
+  banned?: boolean;
+}
+
+export type AdminJobJobType = typeof AdminJobJobType[keyof typeof AdminJobJobType];
+
+
+export const AdminJobJobType = {
+  script: 'script',
+  export: 'export',
+  image: 'image',
+  video: 'video',
+  voice: 'voice',
+} as const;
+
+export type AdminJobStatus = typeof AdminJobStatus[keyof typeof AdminJobStatus];
+
+
+export const AdminJobStatus = {
+  queued: 'queued',
+  running: 'running',
+  completed: 'completed',
+  failed: 'failed',
+} as const;
+
+export interface AdminJob {
+  id: string;
+  userId: string;
+  /** @nullable */
+  userEmail: string | null;
+  projectId: string;
+  projectTitle: string;
+  jobType: AdminJobJobType;
+  status: AdminJobStatus;
+  stage: string;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  progress: number;
+  message: string;
+  /** @nullable */
+  error: string | null;
+  attempts: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type AdminProviderKeyStatus = typeof AdminProviderKeyStatus[keyof typeof AdminProviderKeyStatus];
+
+
+export const AdminProviderKeyStatus = {
+  untested: 'untested',
+  valid: 'valid',
+  invalid: 'invalid',
+  rate_limited: 'rate_limited',
+  quota_limited: 'quota_limited',
+  unavailable: 'unavailable',
+} as const;
+
+export interface AdminProviderKey {
+  id: string;
+  userId: string;
+  /** @nullable */
+  userEmail: string | null;
+  provider: string;
+  label: string;
+  serviceType: string;
+  enabled: boolean;
+  priority: number;
+  status: AdminProviderKeyStatus;
+  /** @nullable */
+  lastTestAt: string | null;
+  usedCount: number;
+  /** @nullable */
+  cooldownUntil: string | null;
+  createdAt: string;
+}
+
 export interface CharacterProfile {
   /**
      * @minLength 1

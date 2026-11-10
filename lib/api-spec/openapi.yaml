@@ -15,6 +15,7 @@ tags:
   - name: media
   - name: exports
   - name: jobs
+  - name: admin
 paths:
   /healthz:
     get:
@@ -420,6 +421,90 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/StudioJob"
+  /admin/access:
+    get:
+      operationId: getAdminAccess
+      tags: [admin]
+      summary: Check administrator access and apply the approved first-admin bootstrap
+      responses:
+        "200":
+          description: Current user's administrator access
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminAccess" }
+  /admin/overview:
+    get:
+      operationId: getAdminOverview
+      tags: [admin]
+      summary: Get cross-user studio totals and recent activity
+      responses:
+        "200":
+          description: Administrator overview
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminOverview" }
+  /admin/users:
+    get:
+      operationId: listAdminUsers
+      tags: [admin]
+      summary: List user accounts and their studio activity
+      responses:
+        "200":
+          description: User accounts
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AdminUser" }
+  /admin/users/{userId}:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema: { type: string, minLength: 1, maxLength: 255 }
+    patch:
+      operationId: updateAdminUser
+      tags: [admin]
+      summary: Change an account's role or sign-in status
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminUserUpdate" }
+      responses:
+        "200":
+          description: Updated account
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminUser" }
+        "409":
+          description: Change would remove the last active administrator
+  /admin/jobs:
+    get:
+      operationId: listAdminJobs
+      tags: [admin]
+      summary: List recent jobs and sanitized error details
+      responses:
+        "200":
+          description: Recent jobs
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AdminJob" }
+  /admin/provider-keys:
+    get:
+      operationId: listAdminProviderKeys
+      tags: [admin]
+      summary: List provider health metadata without credentials
+      responses:
+        "200":
+          description: Provider status metadata
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AdminProviderKey" }
   /provider-keys:
     get:
       operationId: listProviderKeys
@@ -682,6 +767,79 @@ components:
         status:
           type: string
       required: [status]
+    AdminAccess:
+      type: object
+      properties:
+        isAdmin: { type: boolean }
+        role: { type: string, enum: [member, admin] }
+      required: [isAdmin, role]
+    AdminOverview:
+      type: object
+      properties:
+        userCount: { type: integer }
+        projectCount: { type: integer }
+        sceneCount: { type: integer }
+        jobCount: { type: integer }
+        queuedJobs: { type: integer }
+        failedJobs: { type: integer }
+        enabledProviderKeys: { type: integer }
+        rateLimitedKeys: { type: integer }
+        quotaLimitedKeys: { type: integer }
+      required: [userCount, projectCount, sceneCount, jobCount, queuedJobs, failedJobs, enabledProviderKeys, rateLimitedKeys, quotaLimitedKeys]
+    AdminUser:
+      type: object
+      properties:
+        id: { type: string }
+        email: { type: ["string", "null"] }
+        displayName: { type: ["string", "null"] }
+        role: { type: string, enum: [member, admin] }
+        banned: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        lastSignInAt: { type: ["string", "null"], format: date-time }
+        projectCount: { type: integer }
+        jobCount: { type: integer }
+        providerKeyCount: { type: integer }
+      required: [id, email, displayName, role, banned, createdAt, lastSignInAt, projectCount, jobCount, providerKeyCount]
+    AdminUserUpdate:
+      type: object
+      properties:
+        role: { type: string, enum: [member, admin] }
+        banned: { type: boolean }
+    AdminJob:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string }
+        userEmail: { type: ["string", "null"] }
+        projectId: { type: string, format: uuid }
+        projectTitle: { type: string }
+        jobType: { type: string, enum: [script, export, image, video, voice] }
+        status: { type: string, enum: [queued, running, completed, failed] }
+        stage: { type: string }
+        progress: { type: integer, minimum: 0, maximum: 100 }
+        message: { type: string }
+        error: { type: ["string", "null"] }
+        attempts: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, userId, userEmail, projectId, projectTitle, jobType, status, stage, progress, message, error, attempts, createdAt, updatedAt]
+    AdminProviderKey:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string }
+        userEmail: { type: ["string", "null"] }
+        provider: { type: string }
+        label: { type: string }
+        serviceType: { type: string }
+        enabled: { type: boolean }
+        priority: { type: integer }
+        status: { type: string, enum: [untested, valid, invalid, rate_limited, quota_limited, unavailable] }
+        lastTestAt: { type: ["string", "null"], format: date-time }
+        usedCount: { type: integer }
+        cooldownUntil: { type: ["string", "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+      required: [id, userId, userEmail, provider, label, serviceType, enabled, priority, status, lastTestAt, usedCount, cooldownUntil, createdAt]
     StudioSummary:
       type: object
       properties:

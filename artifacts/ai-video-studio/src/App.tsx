@@ -15,13 +15,17 @@ import {
   getListStudioJobsQueryKey, useRetryStudioJob,
   useQueueSceneImageGeneration, useQueueSceneVideoGeneration, useQueueSceneVoiceGeneration,
   useListFavoriteMedia, getListFavoriteMediaQueryKey, useCreateFavoriteMedia, useDeleteFavoriteMedia,
+  useGetAdminAccess, getGetAdminAccessQueryKey, useGetAdminOverview, getGetAdminOverviewQueryKey,
+  useListAdminUsers, getListAdminUsersQueryKey, useListAdminJobs, getListAdminJobsQueryKey,
+  useListAdminProviderKeys, getListAdminProviderKeysQueryKey, useUpdateAdminUser,
 } from '@workspace/api-client-react';
-import type { Project, ProjectInput, Scene, SceneUpdate, ProviderKey, ProviderSettings, MediaResult, MediaFavorite, StudioJob, CharacterProfile } from '@workspace/api-client-react';
+import type { Project, ProjectInput, Scene, SceneUpdate, ProviderKey, ProviderSettings, MediaResult, MediaFavorite, StudioJob, CharacterProfile, AdminUser, AdminUserUpdate } from '@workspace/api-client-react';
 import { Route, Switch, Link, Redirect, useLocation, Router as WouterRouter } from 'wouter';
 import {
   Aperture, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, ChevronDown, Clapperboard,
   Clock3, Copy, ExternalLink, Eye, EyeOff, Film, Globe2, Heart, ImagePlus, KeyRound, Languages,
   LoaderCircle, LogOut, Mic, Moon, Pause, Plus, Search, Settings2, ShieldCheck, Sun, Trash2, UserRound, WandSparkles, X,
+  Activity, AlertTriangle, Ban, CheckCircle2, CircleUserRound, RefreshCw, Shield, Users,
 } from 'lucide-react';
 import NotFound from '@/pages/not-found';
 import { ErrorBoundary } from '@/components/error-boundary';
@@ -93,6 +97,7 @@ const navItems = [
   { href: '/settings/providers', icon: KeyRound, ar: 'مفاتيح الخدمات', en: 'Provider keys' },
   { href: '/settings/tools', icon: Globe2, ar: 'موارد مجانية', en: 'Free resources' },
   { href: '/settings/account', icon: UserRound, ar: 'إعدادات الحساب', en: 'Account settings' },
+  { href: '/admin', icon: Shield, ar: 'إدارة الاستوديو', en: 'Studio admin' },
 ];
 
 function Brand({ compact = false }: { compact?: boolean }) {
@@ -428,6 +433,7 @@ function SceneFields({ scene, characters, lang, onSave, pending }: { scene: Scen
   const [form,setForm] = useState({title:scene.title,description:scene.description,imagePrompt:scene.imagePrompt,narration:scene.narration,durationSeconds:scene.durationSeconds,shotType:scene.shotType,cameraMovement:scene.cameraMovement,location:scene.location,lighting:scene.lighting,clipStartSeconds:scene.clipStartSeconds,clipEndSeconds:scene.clipEndSeconds,playbackSpeed:scene.playbackSpeed,transition:scene.transition,voiceUrl:scene.voiceUrl||'',voiceVolume:scene.voiceVolume});
   const [characterIds,setCharacterIds]=useState(scene.characterIds);
   const [saveState,setSaveState]=useState<'saved'|'saving'|'error'>('saved');
+  const [trimError,setTrimError]=useState(false);
   const pendingFields=useRef<Partial<Record<keyof Scene,string|number|string[]|null>>>({});
   const saveTimer=useRef<number|null>(null);
   const saveInFlight=useRef(false);
@@ -437,6 +443,7 @@ function SceneFields({ scene, characters, lang, onSave, pending }: { scene: Scen
     setForm({title:scene.title,description:scene.description,imagePrompt:scene.imagePrompt,narration:scene.narration,durationSeconds:scene.durationSeconds,shotType:scene.shotType,cameraMovement:scene.cameraMovement,location:scene.location,lighting:scene.lighting,clipStartSeconds:scene.clipStartSeconds,clipEndSeconds:scene.clipEndSeconds,playbackSpeed:scene.playbackSpeed,transition:scene.transition,voiceUrl:scene.voiceUrl||'',voiceVolume:scene.voiceVolume});
     setCharacterIds(scene.characterIds);
     setSaveState('saved');
+     setTrimError(false);
   },[scene.id]);
   const flushSave=async()=>{
     if(saveTimer.current!==null){window.clearTimeout(saveTimer.current);saveTimer.current=null}
@@ -468,12 +475,26 @@ function SceneFields({ scene, characters, lang, onSave, pending }: { scene: Scen
   };
   useEffect(()=>()=>{if(saveTimer.current!==null)window.clearTimeout(saveTimer.current);if(Object.keys(pendingFields.current).length)void flushSave()},[]);
   const field = (key: keyof typeof form, label: string, multiline = false) => <label className="inspector-field"><span className="field-label">{label}</span>{multiline ? <textarea className="studio-input" rows={key==='narration'?3:2} value={form[key] as string} onChange={e=>{setForm(v=>({...v,[key]:e.target.value}));queueSave(key as keyof Scene,e.target.value)}} onBlur={()=>void flushSave()} data-testid={`input-scene-${key}`} /> : <input className="studio-input" value={form[key] as string} onChange={e=>{setForm(v=>({...v,[key]:e.target.value}));queueSave(key as keyof Scene,e.target.value)}} onBlur={()=>void flushSave()} data-testid={`input-scene-${key}`} />}</label>;
-  const numberField=(key:'durationSeconds'|'clipStartSeconds'|'clipEndSeconds'|'playbackSpeed'|'voiceVolume',label:string,min:number,max?:number,step=1)=><label className="inspector-field"><span className="field-label">{label}</span><input type="number" min={min} max={max} step={step} className="studio-input" value={form[key]??''} onChange={e=>{const value=e.target.value===''&&key==='clipEndSeconds'?null:Number(e.target.value);setForm(v=>({...v,[key]:value}));queueSave(key,value)}} onBlur={()=>void flushSave()} /></label>;
+  const numberField=(key:'durationSeconds'|'clipStartSeconds'|'clipEndSeconds'|'playbackSpeed'|'voiceVolume',label:string,min:number,max?:number,step=1)=>{
+    const isTrimField=key==='clipStartSeconds'||key==='clipEndSeconds';
+    const inputMin=key==='clipEndSeconds'?form.clipStartSeconds+1:min;
+    const inputMax=key==='clipStartSeconds'&&form.clipEndSeconds!==null?form.clipEndSeconds-1:max;
+    return <label className="inspector-field"><span className="field-label">{label}</span><input type="number" min={inputMin} max={inputMax} step={isTrimField?1:step} className="studio-input" value={form[key]??''} onChange={e=>{
+      const value=e.target.value===''&&key==='clipEndSeconds'?null:Number(e.target.value);
+      const invalidPrecision=isTrimField&&value!==null&&!Number.isInteger(value);
+      const invalidRange=key==='clipStartSeconds'&&form.clipEndSeconds!==null&&typeof value==='number'&&value>=form.clipEndSeconds
+        ||key==='clipEndSeconds'&&typeof value==='number'&&value<=form.clipStartSeconds;
+      if(invalidPrecision||invalidRange){setTrimError(true);return}
+      if(isTrimField)setTrimError(false);
+      setForm(v=>({...v,[key]:value}));
+      queueSave(key,value);
+    }} onBlur={()=>void flushSave()} /></label>;
+  };
   return <div className="inspector-fields">{field('title',tx(lang,'اسم المشهد','Scene title'))}{numberField('durationSeconds',tx(lang,'المدة بالثواني','Duration (seconds)'),1,600)}{field('description',tx(lang,'وصف المشهد','Scene description'),true)}{field('imagePrompt',tx(lang,'موجّه الصورة','Visual prompt'),true)}{field('narration',tx(lang,'التعليق الصوتي','Narration'),true)}
     <div className="form-two"><label><span className="field-label">{tx(lang,'نوع اللقطة','Shot type')}</span><select className="studio-input" value={form.shotType} onChange={e=>{setForm(v=>({...v,shotType:e.target.value}));queueSave('shotType',e.target.value)}} onBlur={()=>void flushSave()}><option value="">{tx(lang,'غير محدد','Unspecified')}</option>{['establishing','wide','medium','close-up','extreme-close-up','over-the-shoulder','POV','aerial'].map(x=><option key={x}>{x}</option>)}</select></label><label><span className="field-label">{tx(lang,'حركة الكاميرا','Camera movement')}</span><select className="studio-input" value={form.cameraMovement} onChange={e=>{setForm(v=>({...v,cameraMovement:e.target.value}));queueSave('cameraMovement',e.target.value)}} onBlur={()=>void flushSave()}><option value="">{tx(lang,'ثابتة','Static')}</option>{['pan','tilt','dolly-in','dolly-out','tracking','handheld','crane','orbit','zoom'].map(x=><option key={x}>{x}</option>)}</select></label></div>
     {field('location',tx(lang,'الموقع','Location'))}{field('lighting',tx(lang,'الإضاءة','Lighting'))}
     {characters.length>0&&<fieldset className="character-assign"><legend className="field-label">{tx(lang,'الشخصيات في المشهد','Characters in scene')}</legend><div>{characters.map(c=><label className="checkline" key={c.id}><input type="checkbox" checked={characterIds.includes(c.id)} onChange={e=>{const next=e.target.checked?[...characterIds,c.id]:characterIds.filter(id=>id!==c.id);setCharacterIds(next);queueSave('characterIds',next)}}/>{c.name||tx(lang,'شخصية بلا اسم','Unnamed character')}</label>)}</div></fieldset>}
-    <div className="form-two">{numberField('clipStartSeconds',tx(lang,'بداية المقطع','Clip in (s)'),0,undefined,.1)}{numberField('clipEndSeconds',tx(lang,'نهاية المقطع','Clip out (s)'),0,undefined,.1)}{numberField('playbackSpeed',tx(lang,'سرعة التشغيل','Playback speed'),.25,4,.05)}{numberField('voiceVolume',tx(lang,'مستوى الصوت','Voice volume %'),0,100)}</div>
+    <div className="form-two">{numberField('clipStartSeconds',tx(lang,'بداية المقطع','Clip in (s)'),0)}{numberField('clipEndSeconds',tx(lang,'نهاية المقطع','Clip out (s)'),0)}{numberField('playbackSpeed',tx(lang,'سرعة التشغيل','Playback speed'),.25,4,.05)}{numberField('voiceVolume',tx(lang,'مستوى الصوت','Voice volume %'),0,100)}</div>{trimError&&<p className="inline-error" role="alert">{tx(lang,'استخدم أرقامًا صحيحة بالثواني، واجعل نهاية المقطع بعد بدايته.','Use whole seconds and set clip out after clip in.')}</p>}
     <label className="inspector-field"><span className="field-label">{tx(lang,'الانتقال','Transition')}</span><select className="studio-input" value={form.transition||'cut'} onChange={e=>{setForm(v=>({...v,transition:e.target.value}));queueSave('transition',e.target.value)}} onBlur={()=>void flushSave()}><option value="cut">{tx(lang,'قطع مباشر','Cut')}</option><option value="fade">{tx(lang,'تلاشي','Fade')}</option><option value="dissolve">{tx(lang,'تداخل','Dissolve')}</option><option value="wipe">{tx(lang,'مسح جانبي','Wipe')}</option><option value="slide">{tx(lang,'انزلاق','Slide')}</option></select></label>{field('voiceUrl',tx(lang,'رابط التعليق الصوتي','Voice asset URL'))}{scene.voiceUrl&&<audio className="audio-preview" src={scene.voiceUrl} controls aria-label={tx(lang,'معاينة التعليق الصوتي','Voice narration preview')}/>}
     <div className={`save-state ${saveState==='error'?'text-destructive':''}`}>{pending||saveState==='saving' ? <Busy text={tx(lang,'جارٍ الحفظ','Saving')} /> : saveState==='error' ? <><span>{tx(lang,'تعذر الحفظ تلقائيًا.','Auto-save failed.')}</span><button className="text-link" onClick={()=>void flushSave()}>{tx(lang,'أعد المحاولة','Retry')}</button></> : <><span className="signal-dot"/>{tx(lang,'تم الحفظ تلقائيًا','Saved automatically')}</>}</div></div>;
 }
@@ -764,6 +785,104 @@ function AccountSettingsPage() {
   </AppFrame>;
 }
 function SettingsRedirect() { return <Redirect to="/settings/providers" />; }
+function AdminDashboard() {
+  const { lang } = useApp();
+  const qc = useQueryClient();
+  const access = useGetAdminAccess();
+  const isAdmin = access.data?.isAdmin === true;
+  const overview = useGetAdminOverview({ query: { enabled: isAdmin, queryKey: getGetAdminOverviewQueryKey() } });
+  const users = useListAdminUsers({ query: { enabled: isAdmin, queryKey: getListAdminUsersQueryKey() } });
+  const jobs = useListAdminJobs({ query: { enabled: isAdmin, queryKey: getListAdminJobsQueryKey() } });
+  const keys = useListAdminProviderKeys({ query: { enabled: isAdmin, queryKey: getListAdminProviderKeysQueryKey() } });
+  const updateUser = useUpdateAdminUser();
+  const [search, setSearch] = useState('');
+  const [jobFilter, setJobFilter] = useState('all');
+  const [confirmation, setConfirmation] = useState<{ user: AdminUser; update: AdminUserUpdate; action: string } | null>(null);
+  const [feedback, setFeedback] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
+  const t = (ar: string, en: string) => tx(lang, ar, en);
+  const date = (value: string | null) => value
+    ? new Date(value).toLocaleString(lang === 'ar' ? 'ar' : 'en', { dateStyle: 'medium', timeStyle: 'short' })
+    : t('لم يسجل بعد', 'Not recorded');
+  const refresh = () => {
+    void access.refetch();
+    void overview.refetch();
+    void users.refetch();
+    void jobs.refetch();
+    void keys.refetch();
+  };
+  const submitUserUpdate = () => {
+    if (!confirmation) return;
+    updateUser.mutate({ userId: confirmation.user.id, data: confirmation.update }, {
+      onSuccess: () => {
+        setFeedback({ kind: 'success', text: t('تم تحديث الحساب بنجاح.', 'Account updated successfully.') });
+        setConfirmation(null);
+        void qc.invalidateQueries({ queryKey: getListAdminUsersQueryKey() });
+        void qc.invalidateQueries({ queryKey: getGetAdminOverviewQueryKey() });
+      },
+      onError: () => {
+        setFeedback({ kind: 'error', text: t('تعذر تحديث الحساب. حاول مرة أخرى.', 'Could not update this account. Try again.') });
+      },
+    });
+  };
+  const queryFailed = overview.isError || users.isError || jobs.isError || keys.isError;
+  const filteredUsers = (users.data ?? []).filter(user => `${user.displayName ?? ''} ${user.email ?? ''}`.toLowerCase().includes(search.toLowerCase()));
+  const filteredJobs = (jobs.data ?? []).filter(job => jobFilter === 'all' || job.status === jobFilter);
+  const statItems = [
+    { label: t('الحسابات', 'Accounts'), value: overview.data?.userCount, icon: Users, note: t('إجمالي المستخدمين', 'Total studio users') },
+    { label: t('المشاريع', 'Projects'), value: overview.data?.projectCount, icon: Clapperboard, note: `${overview.data?.sceneCount ?? '—'} ${t('مشهدًا', 'scenes')}` },
+    { label: t('المهام في الانتظار', 'Queued jobs'), value: overview.data?.queuedJobs, icon: Clock3, note: `${overview.data?.jobCount ?? '—'} ${t('مهمة إجمالًا', 'jobs total')}` },
+    { label: t('المهام الفاشلة', 'Failed jobs'), value: overview.data?.failedJobs, icon: AlertTriangle, note: t('تحتاج إلى مراجعة', 'Require attention') },
+  ];
+
+  return <AppFrame title={t('إدارة الاستوديو', 'Studio administration')} crumb={t('مساحة المالك', 'OWNER WORKSPACE')}>
+    {access.isLoading ? <div className="admin-loading"><SkeletonBlock className="h-28" /><SkeletonBlock className="h-48" /><SkeletonBlock className="h-64" /></div>
+      : access.isError ? <StateError lang={lang} retry={() => void access.refetch()} />
+      : !isAdmin ? <section className="admin-denied panel" data-testid="status-admin-denied"><div className="admin-denied-mark"><Shield size={22}/></div><span className="eyebrow">{t('الوصول مقيّد', 'RESTRICTED AREA')}</span><h2>{t('هذه المساحة للمسؤولين فقط.', 'This workspace is for administrators only.')}</h2><p>{t('لم يتم عرض أي بيانات إدارية. إذا كنت تعتقد أن هذا خطأ، تواصل مع مالك الاستوديو.', 'No administrative data was loaded. If you believe this is a mistake, contact the studio owner.')}</p></section>
+      : <div className="admin-page">
+        <div className="admin-intro">
+          <div><span className="eyebrow"><span className="signal-dot" />{t('مركز المراقبة', 'STUDIO CONTROL ROOM')}</span><h2>{t('كل شيء في مكانه.', 'A clear view of the studio.')}</h2><p>{t('راقب الوصول، استقرار الخدمات، وسير المعالجة من لوحة واحدة.', 'Monitor access, provider health, and processing reliability from one place.')}</p></div>
+          <button className="btn btn-quiet admin-refresh" onClick={refresh} disabled={overview.isFetching || users.isFetching || jobs.isFetching || keys.isFetching} data-testid="button-admin-refresh"><RefreshCw size={15} className={(overview.isFetching || users.isFetching || jobs.isFetching || keys.isFetching) ? 'animate-spin' : ''}/>{t('تحديث البيانات', 'Refresh data')}</button>
+        </div>
+        {feedback && <div className={`admin-feedback ${feedback.kind}`} role="status" data-testid="status-admin-feedback"><span>{feedback.kind === 'success' ? <CheckCircle2 size={17}/> : <AlertTriangle size={17}/>}</span><p>{feedback.text}</p><button className="btn btn-ghost !p-1" onClick={() => setFeedback(null)} aria-label={t('إغلاق','Dismiss')}><X size={15}/></button></div>}
+        {queryFailed && <div className="admin-query-error" role="alert"><AlertTriangle size={16}/><span>{t('تعذر تحميل جزء من بيانات الإدارة.', 'Some administration data could not be loaded.')}</span><button className="text-link" onClick={refresh}>{t('إعادة المحاولة', 'Retry')}</button></div>}
+
+        <div className="admin-stats">
+          {statItems.map(({ label, value, icon: Icon, note }) => <article className="admin-stat panel" key={label} data-testid={`admin-stat-${label}`}><div className="admin-stat-icon"><Icon size={17}/></div><span className="eyebrow">{label}</span>{overview.isLoading ? <SkeletonBlock className="h-8 w-20 mt-3"/> : overview.isError ? <strong className="admin-stat-unavailable">—</strong> : <strong>{value ?? 0}</strong>}<small>{note}</small></article>)}
+        </div>
+
+        <section className="admin-section" id="provider-health">
+          <div className="admin-section-head"><div><span className="eyebrow">{t('استقرار الخدمات', 'SERVICE RELIABILITY')}</span><h3>{t('صحة مفاتيح المزودين', 'Provider health')}</h3><p>{t('بيانات وصفية فقط؛ لا تُعرض مفاتيح أو بيانات اعتماد محفوظة.', 'Metadata only. Saved credentials are never displayed.')}</p></div><div className="provider-health-count"><Activity size={16}/><b>{overview.data?.enabledProviderKeys ?? '—'}</b><span>{t('مفتاح مفعّل', 'enabled keys')}</span></div></div>
+          <div className="health-summary">
+            <div><span className="health-led limited"/><span>{t('تحديد المعدل', 'Rate limited')}</span><b>{overview.data?.rateLimitedKeys ?? '—'}</b></div>
+            <div><span className="health-led quota"/><span>{t('حد الحصة', 'Quota limited')}</span><b>{overview.data?.quotaLimitedKeys ?? '—'}</b></div>
+            <div><span className="health-led healthy"/><span>{t('مفاتيح مرصودة', 'Keys monitored')}</span><b>{keys.data?.length ?? (keys.isLoading ? '—' : 0)}</b></div>
+          </div>
+          {keys.isLoading ? <div className="admin-skeleton-list">{[1,2,3].map(n=><SkeletonBlock key={n} className="h-16"/>)}</div>
+            : keys.isError ? <div className="admin-inline-error">{t('تعذر تحميل حالة المزودين.', 'Provider status could not be loaded.')}</div>
+            : keys.data?.length ? <div className="admin-provider-list">{keys.data.map(key => <article className="admin-provider-row" key={key.id} data-testid={`provider-health-${key.id}`}><div className="provider-avatar">{key.provider.slice(0,2).toUpperCase()}</div><div className="admin-provider-name"><b>{key.label || key.provider}</b><span>{key.provider} · {key.serviceType} · {key.userEmail || t('حساب غير متاح','Account unavailable')}</span></div><span className={`key-status ${key.status}`}>{key.status.replaceAll('_',' ')}</span><span className={`admin-enabled ${key.enabled ? 'on' : ''}`}>{key.enabled ? t('مفعّل','Enabled') : t('متوقف','Disabled')}</span><small>{t('آخر اختبار','Last test')}: {date(key.lastTestAt)}</small></article>)}</div>
+            : <div className="admin-empty"><KeyRound size={19}/><b>{t('لا توجد مفاتيح مزودين مسجلة.', 'No provider keys are registered.')}</b><span>{t('ستظهر هنا مؤشرات الصحة عند توفرها.', 'Health metadata will appear here when available.')}</span></div>}
+        </section>
+
+        <section className="admin-section" id="accounts">
+          <div className="admin-section-head admin-users-head"><div><span className="eyebrow">{t('الوصول والحسابات', 'ACCESS & ACCOUNTS')}</span><h3>{t('المستخدمون', 'Users')}</h3><p>{t('إدارة الدور وإمكانية تسجيل الدخول. كل تغيير يتطلب تأكيدًا.', 'Manage roles and sign-in access. Every change requires confirmation.')}</p></div><label className="searchbox admin-search"><Search size={16}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder={t('ابحث بالاسم أو البريد','Search name or email')} aria-label={t('ابحث عن مستخدم','Search users')} data-testid="input-admin-user-search"/></label></div>
+          {users.isLoading ? <div className="admin-skeleton-list">{[1,2,3].map(n=><SkeletonBlock key={n} className="h-20"/>)}</div>
+            : users.isError ? <div className="admin-inline-error">{t('تعذر تحميل المستخدمين.', 'Users could not be loaded.')}</div>
+            : filteredUsers.length ? <div className="admin-user-list">{filteredUsers.map(user => <article className={`admin-user-row ${user.banned ? 'is-banned' : ''}`} key={user.id} data-testid={`admin-user-${user.id}`}><div className="admin-user-avatar">{(user.displayName || user.email || '?').slice(0,1).toLocaleUpperCase()}</div><div className="admin-user-main"><div className="admin-user-title"><b>{user.displayName || t('اسم غير متاح','Name unavailable')}</b><span className={`admin-role ${user.role}`}>{user.role === 'admin' ? t('مسؤول','Admin') : t('عضو','Member')}</span>{user.banned && <span className="admin-banned">{t('محظور','Blocked')}</span>}</div><span>{user.email || t('بريد غير متاح','Email unavailable')}</span><small>{t('آخر دخول','Last sign-in')}: {date(user.lastSignInAt)}</small></div><div className="admin-user-metrics"><span><b>{user.projectCount}</b>{t('مشروع','projects')}</span><span><b>{user.jobCount}</b>{t('مهمة','jobs')}</span><span><b>{user.providerKeyCount}</b>{t('مفتاح','keys')}</span></div><div className="admin-user-actions"><button className="btn btn-quiet" disabled={updateUser.isPending} onClick={()=>{setFeedback(null);setConfirmation({ user, update:{ role:user.role === 'admin' ? 'member' : 'admin' }, action:user.role === 'admin' ? t('إزالة صلاحية المسؤول','remove administrator access') : t('ترقية الحساب إلى مسؤول','grant administrator access') });}} data-testid={`button-role-${user.id}`}>{user.role === 'admin' ? t('إزالة المسؤول','Remove admin') : t('ترقية','Make admin')}</button><button className={`btn ${user.banned ? 'btn-quiet' : 'btn-danger'}`} disabled={updateUser.isPending} onClick={()=>{setFeedback(null);setConfirmation({ user, update:{ banned:!user.banned }, action:user.banned ? t('استعادة إمكانية الدخول','restore sign-in access') : t('حظر تسجيل الدخول','block sign-in access') });}} data-testid={`button-block-${user.id}`}>{user.banned ? <CheckCircle2 size={14}/> : <Ban size={14}/>} {user.banned ? t('رفع الحظر','Unblock') : t('حظر','Block')}</button></div></article>)}</div>
+            : <div className="admin-empty"><CircleUserRound size={20}/><b>{search ? t('لا توجد نتائج مطابقة.', 'No matching accounts.') : t('لا يوجد مستخدمون بعد.', 'No users yet.')}</b><span>{search ? t('جرّب اسمًا أو بريدًا آخر.', 'Try another name or email.') : t('ستظهر الحسابات هنا عند إنشائها.', 'Accounts will appear here when created.')}</span></div>}
+        </section>
+
+        <section className="admin-section" id="jobs">
+          <div className="admin-section-head admin-jobs-head"><div><span className="eyebrow">{t('المعالجة', 'PROCESSING')}</span><h3>{t('المهام الأخيرة', 'Recent jobs')}</h3><p>{t('حالة التنفيذ ومؤشرات الخطأ للمراجعة.', 'Execution status and error details for review.')}</p></div><select className="studio-input admin-filter" value={jobFilter} onChange={e=>setJobFilter(e.target.value)} aria-label={t('تصفية المهام','Filter jobs')} data-testid="select-admin-job-filter"><option value="all">{t('كل الحالات','All statuses')}</option><option value="queued">{t('في الانتظار','Queued')}</option><option value="running">{t('قيد التنفيذ','Running')}</option><option value="completed">{t('مكتملة','Completed')}</option><option value="failed">{t('فاشلة','Failed')}</option></select></div>
+          {jobs.isLoading ? <div className="admin-skeleton-list">{[1,2,3].map(n=><SkeletonBlock key={n} className="h-24"/>)}</div>
+            : jobs.isError ? <div className="admin-inline-error">{t('تعذر تحميل المهام.', 'Jobs could not be loaded.')}</div>
+            : filteredJobs.length ? <div className="admin-job-list">{filteredJobs.map(job=><article className="admin-job-row" key={job.id} data-testid={`admin-job-${job.id}`}><div className="admin-job-symbol"><Film size={16}/></div><div className="admin-job-detail"><div className="admin-job-title"><b>{job.projectTitle}</b><span className={`job-state job-${job.status}`}>{job.status}</span></div><span>{job.jobType} · {job.stage} · {job.userEmail || t('حساب غير متاح','Account unavailable')}</span><p>{job.message}</p>{job.error && <p className="admin-job-error"><AlertTriangle size={13}/>{job.error}</p>}</div><div className="admin-job-progress"><div><span>{t('التقدم','Progress')}</span><b>{job.progress}%</b></div><div className="job-progress-track"><span style={{width:`${Math.max(0,Math.min(100,job.progress))}%`}}/></div><small>{t('المحاولات','Attempts')}: {job.attempts} · {date(job.updatedAt)}</small></div></article>)}</div>
+            : <div className="admin-empty"><Activity size={20}/><b>{t('لا توجد مهام لهذه الحالة.', 'No jobs in this status.')}</b><span>{t('ستظهر هنا آخر عمليات الإنتاج عند توفرها.', 'Recent production runs will appear here when available.')}</span></div>}
+        </section>
+        <div className="admin-security-note"><ShieldCheck size={16}/><span>{t('بيانات المفاتيح الحساسة لا تُرسل إلى هذه الواجهة ولا تُخزّن في حالة الصفحة.', 'Credential secrets are never returned to this interface or stored in page state.')}</span></div>
+      </div>}
+    {confirmation && <div className="modal-backdrop admin-confirm-backdrop" role="presentation"><section className="modal panel admin-confirm" role="dialog" aria-modal="true" aria-labelledby="admin-confirm-title"><div className="modal-head"><div><span className="eyebrow">{t('تأكيد الإجراء','CONFIRM CHANGE')}</span><h2 id="admin-confirm-title">{t('هل تريد المتابعة؟','Proceed with this change?')}</h2><p>{confirmation.user.displayName || confirmation.user.email || confirmation.user.id}</p></div><button className="btn btn-ghost !p-1" onClick={()=>setConfirmation(null)} aria-label={t('إغلاق','Close')}><X size={18}/></button></div><div className="admin-confirm-copy"><AlertTriangle size={18}/><p>{t('سيتم', 'You are about to')} <b>{confirmation.action}</b> {t('لهذا الحساب. سيُحفظ التغيير فور التأكيد.', 'for this account. The change takes effect when confirmed.')}</p></div>{updateUser.isError && <p className="inline-error">{t('فشل التحديث. يمكنك إعادة المحاولة.', 'The update failed. You can try again.')}</p>}<div className="modal-actions"><button className="btn btn-quiet" onClick={()=>setConfirmation(null)} disabled={updateUser.isPending}>{t('إلغاء','Cancel')}</button><button className="btn btn-primary" onClick={submitUserUpdate} disabled={updateUser.isPending} data-testid="button-confirm-admin-change">{updateUser.isPending && <LoaderCircle size={15} className="animate-spin"/>}{updateUser.isPending ? t('جارٍ الحفظ','Saving') : t('تأكيد التغيير','Confirm change')}</button></div></section></div>}
+  </AppFrame>;
+}
 function SignInPage() { return <div className="auth-page"><div className="auth-decoration"><Brand/><span className="eyebrow">YOUR NEXT FRAME</span><h2>من الفكرة<br/>إلى المشهد.</h2><div className="auth-orbit"><Aperture size={46}/></div></div><div className="auth-form"><SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`}/></div></div>; }
 function SignUpPage() { return <div className="auth-page"><div className="auth-decoration"><Brand/><span className="eyebrow">MAKE ROOM FOR STORIES</span><h2>قصتك<br/>تبدأ هنا.</h2><div className="auth-orbit"><Aperture size={46}/></div></div><div className="auth-form"><SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`}/></div></div>; }
 function ClerkCacheInvalidator() {
@@ -789,6 +908,7 @@ function Router() {
         <Route path="/settings/providers" component={ProvidersPage}/>
         <Route path="/settings/tools" component={ToolsPage}/>
         <Route path="/settings/account/*?" component={AccountSettingsPage}/>
+        <Route path="/admin" component={AdminDashboard}/>
         <Route path="/settings" component={SettingsRedirect}/>
         <Route component={NotFound}/>
       </Switch>

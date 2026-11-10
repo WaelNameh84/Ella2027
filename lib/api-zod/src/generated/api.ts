@@ -1030,6 +1030,127 @@ export const RetryStudioJobResponse = zod.object({
 
 
 /**
+ * @summary Check administrator access and apply the approved first-admin bootstrap
+ */
+export const GetAdminAccessResponse = zod.object({
+  "isAdmin": zod.boolean(),
+  "role": zod.enum(['member', 'admin'])
+})
+
+
+/**
+ * @summary Get cross-user studio totals and recent activity
+ */
+export const GetAdminOverviewResponse = zod.object({
+  "userCount": zod.number().int(),
+  "projectCount": zod.number().int(),
+  "sceneCount": zod.number().int(),
+  "jobCount": zod.number().int(),
+  "queuedJobs": zod.number().int(),
+  "failedJobs": zod.number().int(),
+  "enabledProviderKeys": zod.number().int(),
+  "rateLimitedKeys": zod.number().int(),
+  "quotaLimitedKeys": zod.number().int()
+})
+
+
+/**
+ * @summary List user accounts and their studio activity
+ */
+export const ListAdminUsersResponseItem = zod.object({
+  "id": zod.string(),
+  "email": zod.string().nullable(),
+  "displayName": zod.string().nullable(),
+  "role": zod.enum(['member', 'admin']),
+  "banned": zod.boolean(),
+  "createdAt": zod.coerce.date(),
+  "lastSignInAt": zod.coerce.date().nullable(),
+  "projectCount": zod.number().int(),
+  "jobCount": zod.number().int(),
+  "providerKeyCount": zod.number().int()
+})
+export const ListAdminUsersResponse = zod.array(ListAdminUsersResponseItem)
+
+
+/**
+ * @summary Change an account's role or sign-in status
+ */
+export const updateAdminUserPathUserIdMax = 255;
+
+
+
+export const UpdateAdminUserParams = zod.object({
+  "userId": zod.coerce.string().min(1).max(updateAdminUserPathUserIdMax)
+})
+
+export const UpdateAdminUserBody = zod.object({
+  "role": zod.enum(['member', 'admin']).optional(),
+  "banned": zod.boolean().optional()
+})
+
+export const UpdateAdminUserResponse = zod.object({
+  "id": zod.string(),
+  "email": zod.string().nullable(),
+  "displayName": zod.string().nullable(),
+  "role": zod.enum(['member', 'admin']),
+  "banned": zod.boolean(),
+  "createdAt": zod.coerce.date(),
+  "lastSignInAt": zod.coerce.date().nullable(),
+  "projectCount": zod.number().int(),
+  "jobCount": zod.number().int(),
+  "providerKeyCount": zod.number().int()
+})
+
+
+/**
+ * @summary List recent jobs and sanitized error details
+ */
+export const listAdminJobsResponseProgressMin = 0;
+export const listAdminJobsResponseProgressMax = 100;
+
+
+
+export const ListAdminJobsResponseItem = zod.object({
+  "id": zod.string().uuid(),
+  "userId": zod.string(),
+  "userEmail": zod.string().nullable(),
+  "projectId": zod.string().uuid(),
+  "projectTitle": zod.string(),
+  "jobType": zod.enum(['script', 'export', 'image', 'video', 'voice']),
+  "status": zod.enum(['queued', 'running', 'completed', 'failed']),
+  "stage": zod.string(),
+  "progress": zod.number().int().min(listAdminJobsResponseProgressMin).max(listAdminJobsResponseProgressMax),
+  "message": zod.string(),
+  "error": zod.string().nullable(),
+  "attempts": zod.number().int(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListAdminJobsResponse = zod.array(ListAdminJobsResponseItem)
+
+
+/**
+ * @summary List provider health metadata without credentials
+ */
+export const ListAdminProviderKeysResponseItem = zod.object({
+  "id": zod.string().uuid(),
+  "userId": zod.string(),
+  "userEmail": zod.string().nullable(),
+  "provider": zod.string(),
+  "label": zod.string(),
+  "serviceType": zod.string(),
+  "enabled": zod.boolean(),
+  "priority": zod.number().int(),
+  "status": zod.enum(['untested', 'valid', 'invalid', 'rate_limited', 'quota_limited', 'unavailable']),
+  "lastTestAt": zod.coerce.date().nullable(),
+  "usedCount": zod.number().int(),
+  "cooldownUntil": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date()
+})
+export const ListAdminProviderKeysResponse = zod.array(ListAdminProviderKeysResponseItem)
+
+
+/**
  * @summary List provider key metadata without secret values
  */
 export const ListProviderKeysResponseItem = zod.object({
