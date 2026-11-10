@@ -498,6 +498,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
         </div>
           {scenes.length ? <div className="script-bar panel" role="status" data-testid="story-scenes-ready"><div className="script-symbol"><Check size={18}/></div><div className="script-copy"><b>{tx(lang,'المشاهد موجودة بالفعل','Scenes already exist')}</b><p>{tx(lang,'تابع تعديل المشاهد من الخط الزمني. لا يمكن بدء تأليف جديد فوق مشاهد موجودة.','Continue editing these scenes in the timeline. A new storyboard cannot be generated over existing scenes.')}</p></div></div> : <><div className="script-bar panel"><div className="script-symbol"><WandSparkles size={18}/></div><div className="script-copy"><b>{tx(lang,'حوّل الفكرة إلى سيناريو','Turn the idea into a storyboard')}</b><p>{textProviderReady ? tx(lang,'أنشئ مسودة مشاهد باستخدام مزوّد نص مضبوط.','Generate a scene draft using a configured text provider.') : tx(lang,'لا يوجد مفتاح نص جاهز؛ أضف مفتاحًا صالحًا قبل التوليد.','No available text provider. Add an enabled key before generating.')}</p><label className="checkline charge-consent"><input type="checkbox" checked={chargeApproved} onChange={e=>setChargeApproved(e.target.checked)}/>{tx(lang,'أوافق على احتمال احتساب رسوم من المزوّد الأساسي أو الاحتياطي.','I approve possible charges from the primary or fallback provider.')}</label></div><button disabled={!textProviderReady || generate.isPending || !chargeApproved || Boolean(currentJob?.status === 'running' || currentJob?.status === 'queued')} className="btn btn-primary" onClick={()=>generate.mutate({projectId,data:{providerKeyId:null,allowRotation:true,approvePotentialCharges:chargeApproved}},{onSuccess:refresh})} data-testid="button-generate-script">{generate.isPending ? <LoaderCircle size={16} className="animate-spin"/> : <WandSparkles size={16}/ >}{tx(lang,'توليد المشاهد','Generate scenes')}</button></div>
          {generate.isError && <div className="inline-error">{tx(lang,'تعذّر بدء التوليد. تحقق من مفتاح النص أو أعد المحاولة.','Could not start generation. Check your text key or try again.')}</div>}</>}
+         {scenes.length > 0 && <BatchVideoGeneration projectId={projectId} scenes={scenes} keys={keysQuery.data || []} lang={lang} hasActiveJob={Boolean(currentJob && (currentJob.status === 'queued' || currentJob.status === 'running'))} onQueued={refresh}/>}
          {currentJob && <div className="job-progress panel" role="status"><div className="job-progress-head"><div><b>{tx(lang,({script:'توليد السيناريو',export:'تصدير الفيديو',image:'توليد صورة',video:'توليد فيديو',voice:'توليد صوت'})[currentJob.jobType],({script:'Script generation',export:'Video export',image:'Image generation',video:'Video generation',voice:'Voice generation'})[currentJob.jobType])}</b><span className={`job-state job-${currentJob.status}`}>{tx(lang,currentJob.status==='queued'?'في الانتظار':currentJob.status==='running'?'قيد التنفيذ':currentJob.status==='completed'?'مكتملة':'فشلت',currentJob.status)}</span></div><Link href="/jobs" className="text-link">{tx(lang,'عرض المهام','View jobs')}</Link></div>{(currentJob.status==='queued'||currentJob.status==='running')&&<div className="job-progress-track"><span style={{width:`${currentJob.progress}%`}}/></div>}<p>{currentJob.error || currentJob.message}</p>{latestExportJob?.status==='completed'&&<a className="btn btn-primary" href={`${basePath}/api/projects/${projectId}/export/file`} download>{tx(lang,'تنزيل الفيديو','Download video')}<ArrowDown size={15}/></a>}</div>}
       </section>
       <aside className="scene-inspector panel">
@@ -662,7 +663,7 @@ function GenerationPanel({projectId,scene,keys,lang,onQueued}:{projectId:string;
   };
   const modelValid=action==='voice'?voiceId.trim().length>0:model.trim().length>0;
   return <div className="generation-tools"><div className="generation-heading"><span className="eyebrow">{tx(lang,'توليد الأصول','GENERATE ASSETS')}</span><Link href="/settings/providers" className="text-link">{tx(lang,'إعداد المزوّدين','Provider setup')}<ArrowLeft size={13}/></Link></div><div className="generation-buttons">
-    {(['image','video','voice'] as const).map(kind=>{const available=keys.some(key=>key.enabled&&key.serviceType===kind&&providerSupports(key.provider,kind)&&(key.status==='valid'||key.status==='untested'));return <button key={kind} className="btn btn-quiet" disabled={!available} onClick={()=>{setAction(kind);setProviderId('');setApproved(false)}} title={!available?tx(lang,'لا يوجد مفتاح مفعّل لمزوّد موصول بهذه المهمة','No enabled key for a provider currently connected to this task'):undefined}>{kind==='image'?<ImagePlus size={15}/>:kind==='video'?<Film size={15}/>:<Languages size={15}/ >}{tx(lang,kind==='image'?'صورة':kind==='video'?'فيديو':'صوت',kind)}</button>})}
+    {(['image','video','voice'] as const).map(kind=>{const available=keys.some(key=>key.enabled&&key.serviceType===kind&&providerSupports(key.provider,kind)&&(key.status==='valid'||key.status==='untested'));return <button key={kind} className="btn btn-quiet" disabled={!available} onClick={()=>{setAction(kind);setProviderId('');setApproved(false);if(kind==='video')setMode(scene.assetType==='image'?'image':'text')}} title={!available?tx(lang,'لا يوجد مفتاح مفعّل لمزوّد موصول بهذه المهمة','No enabled key for a provider currently connected to this task'):undefined}>{kind==='image'?<ImagePlus size={15}/>:kind==='video'?<Film size={15}/>:<Languages size={15}/ >}{tx(lang,kind==='image'?'صورة':kind==='video'?'فيديو':'صوت',kind)}</button>})}
   </div><p className="generation-note">{tx(lang,'المخرجات تظهر هنا بعد اكتمال المهمة؛ لا توجد نتائج تجريبية.','Completed outputs appear here after the job finishes. No sample assets are shown.')}</p>
   {(imageJob.isError||videoJob.isError||voiceJob.isError)&&<p className="inline-error">{tx(lang,'تعذر إرسال طلب التوليد. تحقّق من المفتاح وإعدادات المزوّد.','Could not queue generation. Check the provider key and settings.')}</p>}
   {action&&<Modal title={tx(lang,'تأكيد طلب التوليد','Confirm generation request')} subtitle={tx(lang,'قد تُحتسب رسوم على هذا الطلب، وقد يجرّب النظام مزوّدًا احتياطيًا آخر عند التعطل أو نفاد الحصة.','This request may incur charges. Automatic failover may also use another configured provider.')} onClose={close}><div className="form-stack">
@@ -676,6 +677,69 @@ function GenerationPanel({projectId,scene,keys,lang,onQueued}:{projectId:string;
     <div className="modal-actions"><button className="btn btn-quiet" onClick={close}>{tx(lang,'إلغاء','Cancel')}</button><button className="btn btn-primary" disabled={!readyKeys.length||busy||!approved||!modelValid} onClick={submit}>{busy?<LoaderCircle size={15} className="animate-spin"/>:<WandSparkles size={15}/ >}{tx(lang,'إرسال إلى قائمة المهام','Queue generation')}</button></div>
   </div></Modal>}
   </div>;
+}
+
+function BatchVideoGeneration({projectId,scenes,keys,lang,hasActiveJob,onQueued}:{projectId:string;scenes:Scene[];keys:ProviderKey[];lang:Lang;hasActiveJob:boolean;onQueued:()=>void}) {
+  const videoJob=useQueueSceneVideoGeneration();
+  const videoKeys=keys.filter(key=>key.enabled&&key.serviceType==='video'&&providerSupports(key.provider,'video')&&(key.status==='valid'||key.status==='untested'));
+  const scenesWithoutVideo=scenes.filter(scene=>scene.assetType!=='video'||!scene.assetUrl);
+  const allHaveImages=scenesWithoutVideo.every(scene=>scene.assetType==='image'&&Boolean(scene.assetUrl));
+  const [open,setOpen]=useState(false);
+  const [providerId,setProviderId]=useState('');
+  const [model,setModel]=useState('minimax/video-01');
+  const [mode,setMode]=useState<'text'|'image'>('text');
+  const [approved,setApproved]=useState(false);
+  const [queueing,setQueueing]=useState(false);
+  const [progress,setProgress]=useState<{queued:number;failed:number;total:number;processed:number}|null>(null);
+  const [summary,setSummary]=useState<{queued:number;failed:number;total:number}|null>(null);
+  const activeKey=videoKeys.find(key=>key.id===providerId)||videoKeys[0];
+  const scenesToQueue=mode==='image'?scenesWithoutVideo.filter(scene=>scene.assetType==='image'&&Boolean(scene.assetUrl)):scenesWithoutVideo;
+  const close=()=>{if(queueing)return;setOpen(false);setApproved(false)};
+  const begin=async()=>{
+    if(!activeKey||!model.trim()||!approved||!scenesToQueue.length||queueing||hasActiveJob)return;
+    setQueueing(true);
+    setProgress({queued:0,failed:0,total:scenesToQueue.length,processed:0});
+    let queued=0,failed=0;
+    for(const scene of scenesToQueue){
+      try{
+        await videoJob.mutateAsync({projectId,sceneId:scene.id,data:{providerKeyId:activeKey.id,model:model.trim(),mode,approvePotentialCharges:true}});
+        queued++;
+      }catch{
+        failed++;
+      }
+      setProgress({queued,failed,total:scenesToQueue.length,processed:queued+failed});
+    }
+    setQueueing(false);
+    setApproved(false);
+    if(queued){
+      setSummary({queued,failed,total:scenesToQueue.length});
+      setOpen(false);
+      onQueued();
+    }
+  };
+  if(!scenes.length)return null;
+  return <>
+    <section className="script-bar panel mt-4" data-testid="batch-video-panel">
+      <div className="script-symbol"><Film size={18}/></div>
+      <div className="script-copy"><b>{tx(lang,'حوّل المشاهد إلى فيديو','Turn scenes into video')}</b><p>{scenesWithoutVideo.length?tx(lang,'ولّد مقطعًا لكل مشهد ناقص دفعة واحدة، أو اختر كل مشهد وولّده وحده.','Generate clips for all scenes without video, or generate each scene individually.'):tx(lang,'كل المشاهد لديها فيديو بالفعل.','Every scene already has a video.')}</p>
+        {videoKeys.length===0&&scenesWithoutVideo.length>0&&<Link href="/settings/providers" className="text-link" data-testid="link-batch-video-provider-settings">{tx(lang,'أضف مفتاح Replicate لخدمة الفيديو','Add a Replicate video key')}<ArrowLeft size={14}/></Link>}
+        {hasActiveJob&&<small className="provider-purpose-description">{tx(lang,'انتظر انتهاء المهمة الحالية قبل بدء دفعة فيديو جديدة.','Wait for the current job to finish before starting a video batch.')}</small>}
+        {summary&&<p role="status" data-testid="batch-video-result">{summary.failed?tx(lang,`أُرسل ${summary.queued} من ${summary.total} طلبات الفيديو؛ تعذّر إرسال ${summary.failed}.`,`${summary.queued} of ${summary.total} video requests were queued; ${summary.failed} could not be queued.`):tx(lang,`تم إرسال ${summary.queued} طلبات فيديو إلى قائمة المهام.`,`Queued ${summary.queued} video requests.`)} <Link href="/jobs" className="text-link">{tx(lang,'عرض المهام','View jobs')}<ArrowLeft size={13}/></Link></p>}
+      </div>
+      {scenesWithoutVideo.length>0&&<button className="btn btn-primary" disabled={!videoKeys.length||hasActiveJob} onClick={()=>{setProgress(null);setSummary(null);setApproved(false);setOpen(true)}} data-testid="button-batch-video">{tx(lang,'توليد فيديو لكل المشاهد','Generate all scene videos')}</button>}
+    </section>
+    {open&&<Modal title={tx(lang,'توليد فيديو للمشاهد','Generate scene videos')} subtitle={tx(lang,`سيتم إرسال ${scenesToQueue.length} طلب فيديو. قد تُحتسب رسوم لكل مشهد.`,`This will send ${scenesToQueue.length} video requests. Each scene may incur a charge.`)} onClose={close}>
+      <div className="form-stack">
+        {videoKeys.length>1&&<label><span className="field-label">{tx(lang,'مفتاح الفيديو','Video key')}</span><select className="studio-input" value={activeKey?.id||''} onChange={e=>setProviderId(e.target.value)} data-testid="select-batch-video-key">{videoKeys.map(key=><option key={key.id} value={key.id}>{key.label} · {key.provider}</option>)}</select></label>}
+        <label><span className="field-label">{tx(lang,'معرّف نموذج Replicate','Replicate model ID')}</span><input required className="studio-input" value={model} onChange={e=>setModel(e.target.value)} placeholder="minimax/video-01" data-testid="input-batch-video-model"/></label>
+        <label><span className="field-label">{tx(lang,'طريقة إنشاء الفيديو','Video source')}</span><select className="studio-input" value={mode} onChange={e=>setMode(e.target.value as 'text'|'image')} data-testid="select-batch-video-mode"><option value="text">{tx(lang,'من وصف المشهد','From each scene prompt')}</option><option value="image" disabled={!allHaveImages}>{tx(lang,'من صورة كل مشهد','From each scene image')}</option></select></label>
+        {!allHaveImages&&<p className="generation-note">{tx(lang,'خيار الصورة يحتاج صورة مرفقة بكل مشهد؛ استخدم وصف المشهد إذا لم تتوفر الصور.','Image mode needs an attached image on every scene. Use scene prompts when images are missing.')}</p>}
+        <label className="checkline charge-consent"><input type="checkbox" checked={approved} onChange={e=>setApproved(e.target.checked)} data-testid="checkbox-batch-video-consent"/>{tx(lang,`أوافق على إرسال ${scenesToQueue.length} طلبات فيديو، وقد تُحتسب رسوم لكل مشهد.`,`I approve ${scenesToQueue.length} video requests; each scene may incur a charge.`)}</label>
+        {progress&&<div className="export-confirm" role="status" data-testid="batch-video-progress">{queueing?tx(lang,`جارٍ إرسال الطلب ${progress.processed} من ${progress.total}…`,`Sending request ${progress.processed} of ${progress.total}…`):progress.queued?tx(lang,`أُرسل ${progress.queued} طلبات وتعذّر ${progress.failed}.`,`Queued ${progress.queued}; ${progress.failed} failed.`):tx(lang,'تعذّر إرسال الطلبات. تحقّق من مفتاح الفيديو والنموذج.','Requests could not be queued. Check the video key and model.')}</div>}
+        <div className="modal-actions"><button type="button" className="btn btn-quiet" onClick={close} disabled={queueing}>{tx(lang,'إلغاء','Cancel')}</button><button type="button" className="btn btn-primary" disabled={!activeKey||!model.trim()||!approved||!scenesToQueue.length||queueing||hasActiveJob} onClick={()=>void begin()} data-testid="button-submit-batch-video">{queueing?<LoaderCircle size={15} className="animate-spin"/>:<Film size={15}/ >}{queueing?tx(lang,'جارٍ إرسال الطلبات…','Queueing videos…'):tx(lang,'ابدأ توليد الفيديو','Start video generation')}</button></div>
+      </div>
+    </Modal>}
+  </>;
 }
 
 function TranscriptionPanel({projectId,sceneId,language,keys,lang}:{projectId:string;sceneId:string;language:string;keys:ProviderKey[];lang:Lang}) {
