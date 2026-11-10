@@ -19,6 +19,21 @@ export const HealthCheckResponse = zod.object({
 /**
  * @summary Get dashboard summary
  */
+export const getStudioSummaryResponseRecentProjectsItemCharactersItemIdMax = 100;
+
+export const getStudioSummaryResponseRecentProjectsItemCharactersItemNameMax = 160;
+
+export const getStudioSummaryResponseRecentProjectsItemCharactersItemDescriptionMax = 4000;
+
+export const getStudioSummaryResponseRecentProjectsItemCharactersItemCostumeMax = 2000;
+
+export const getStudioSummaryResponseRecentProjectsItemCharactersItemVoiceDescriptionMax = 1000;
+
+export const getStudioSummaryResponseRecentProjectsItemMusicVolumeMin = 0;
+export const getStudioSummaryResponseRecentProjectsItemMusicVolumeMax = 100;
+
+
+
 export const GetStudioSummaryResponse = zod.object({
   "projectCount": zod.number().int(),
   "activeCount": zod.number().int(),
@@ -34,6 +49,16 @@ export const GetStudioSummaryResponse = zod.object({
   "audience": zod.string(),
   "visualStyle": zod.string(),
   "aspectRatio": zod.string(),
+  "characters": zod.array(zod.object({
+  "id": zod.string().min(1).max(getStudioSummaryResponseRecentProjectsItemCharactersItemIdMax),
+  "name": zod.string().min(1).max(getStudioSummaryResponseRecentProjectsItemCharactersItemNameMax),
+  "description": zod.string().max(getStudioSummaryResponseRecentProjectsItemCharactersItemDescriptionMax),
+  "costume": zod.string().max(getStudioSummaryResponseRecentProjectsItemCharactersItemCostumeMax),
+  "voiceDescription": zod.string().max(getStudioSummaryResponseRecentProjectsItemCharactersItemVoiceDescriptionMax),
+  "referenceImageUrl": zod.string().url().nullable()
+})),
+  "musicUrl": zod.string().nullable(),
+  "musicVolume": zod.number().int().min(getStudioSummaryResponseRecentProjectsItemMusicVolumeMin).max(getStudioSummaryResponseRecentProjectsItemMusicVolumeMax),
   "status": zod.enum(['draft', 'scripting', 'editing', 'exporting', 'completed', 'failed']),
   "progress": zod.number().int(),
   "sceneCount": zod.number().int(),
@@ -47,6 +72,21 @@ export const GetStudioSummaryResponse = zod.object({
 /**
  * @summary List the current user's projects
  */
+export const listProjectsResponseCharactersItemIdMax = 100;
+
+export const listProjectsResponseCharactersItemNameMax = 160;
+
+export const listProjectsResponseCharactersItemDescriptionMax = 4000;
+
+export const listProjectsResponseCharactersItemCostumeMax = 2000;
+
+export const listProjectsResponseCharactersItemVoiceDescriptionMax = 1000;
+
+export const listProjectsResponseMusicVolumeMin = 0;
+export const listProjectsResponseMusicVolumeMax = 100;
+
+
+
 export const ListProjectsResponseItem = zod.object({
   "id": zod.string().uuid(),
   "title": zod.string(),
@@ -57,6 +97,16 @@ export const ListProjectsResponseItem = zod.object({
   "audience": zod.string(),
   "visualStyle": zod.string(),
   "aspectRatio": zod.string(),
+  "characters": zod.array(zod.object({
+  "id": zod.string().min(1).max(listProjectsResponseCharactersItemIdMax),
+  "name": zod.string().min(1).max(listProjectsResponseCharactersItemNameMax),
+  "description": zod.string().max(listProjectsResponseCharactersItemDescriptionMax),
+  "costume": zod.string().max(listProjectsResponseCharactersItemCostumeMax),
+  "voiceDescription": zod.string().max(listProjectsResponseCharactersItemVoiceDescriptionMax),
+  "referenceImageUrl": zod.string().url().nullable()
+})),
+  "musicUrl": zod.string().nullable(),
+  "musicVolume": zod.number().int().min(listProjectsResponseMusicVolumeMin).max(listProjectsResponseMusicVolumeMax),
   "status": zod.enum(['draft', 'scripting', 'editing', 'exporting', 'completed', 'failed']),
   "progress": zod.number().int(),
   "sceneCount": zod.number().int(),
@@ -77,6 +127,21 @@ export const createProjectBodyIdeaMax = 12000;
 export const createProjectBodyDurationSecondsMin = 5;
 export const createProjectBodyDurationSecondsMax = 3600;
 
+export const createProjectBodyCharactersItemIdMax = 100;
+
+export const createProjectBodyCharactersItemNameMax = 160;
+
+export const createProjectBodyCharactersItemDescriptionMax = 4000;
+
+export const createProjectBodyCharactersItemCostumeMax = 2000;
+
+export const createProjectBodyCharactersItemVoiceDescriptionMax = 1000;
+
+export const createProjectBodyCharactersMax = 24;
+
+export const createProjectBodyMusicVolumeMin = 0;
+export const createProjectBodyMusicVolumeMax = 100;
+
 
 
 export const CreateProjectBody = zod.object({
@@ -87,8 +152,33 @@ export const CreateProjectBody = zod.object({
   "durationSeconds": zod.number().int().min(createProjectBodyDurationSecondsMin).max(createProjectBodyDurationSecondsMax),
   "audience": zod.string(),
   "visualStyle": zod.string(),
-  "aspectRatio": zod.enum(['16:9', '9:16', '1:1'])
+  "aspectRatio": zod.enum(['16:9', '9:16', '1:1']),
+  "characters": zod.array(zod.object({
+  "id": zod.string().min(1).max(createProjectBodyCharactersItemIdMax),
+  "name": zod.string().min(1).max(createProjectBodyCharactersItemNameMax),
+  "description": zod.string().max(createProjectBodyCharactersItemDescriptionMax),
+  "costume": zod.string().max(createProjectBodyCharactersItemCostumeMax),
+  "voiceDescription": zod.string().max(createProjectBodyCharactersItemVoiceDescriptionMax),
+  "referenceImageUrl": zod.string().url().nullable()
+})).max(createProjectBodyCharactersMax).optional(),
+  "musicUrl": zod.string().nullish(),
+  "musicVolume": zod.number().int().min(createProjectBodyMusicVolumeMin).max(createProjectBodyMusicVolumeMax).optional()
 })
+
+export const createProjectResponseCharactersItemIdMax = 100;
+
+export const createProjectResponseCharactersItemNameMax = 160;
+
+export const createProjectResponseCharactersItemDescriptionMax = 4000;
+
+export const createProjectResponseCharactersItemCostumeMax = 2000;
+
+export const createProjectResponseCharactersItemVoiceDescriptionMax = 1000;
+
+export const createProjectResponseMusicVolumeMin = 0;
+export const createProjectResponseMusicVolumeMax = 100;
+
+
 
 export const CreateProjectResponse = zod.object({
   "id": zod.string().uuid(),
@@ -100,6 +190,16 @@ export const CreateProjectResponse = zod.object({
   "audience": zod.string(),
   "visualStyle": zod.string(),
   "aspectRatio": zod.string(),
+  "characters": zod.array(zod.object({
+  "id": zod.string().min(1).max(createProjectResponseCharactersItemIdMax),
+  "name": zod.string().min(1).max(createProjectResponseCharactersItemNameMax),
+  "description": zod.string().max(createProjectResponseCharactersItemDescriptionMax),
+  "costume": zod.string().max(createProjectResponseCharactersItemCostumeMax),
+  "voiceDescription": zod.string().max(createProjectResponseCharactersItemVoiceDescriptionMax),
+  "referenceImageUrl": zod.string().url().nullable()
+})),
+  "musicUrl": zod.string().nullable(),
+  "musicVolume": zod.number().int().min(createProjectResponseMusicVolumeMin).max(createProjectResponseMusicVolumeMax),
   "status": zod.enum(['draft', 'scripting', 'editing', 'exporting', 'completed', 'failed']),
   "progress": zod.number().int(),
   "sceneCount": zod.number().int(),
@@ -116,6 +216,31 @@ export const GetProjectParams = zod.object({
   "projectId": zod.coerce.string().uuid()
 })
 
+export const getProjectResponseOneCharactersItemIdMax = 100;
+
+export const getProjectResponseOneCharactersItemNameMax = 160;
+
+export const getProjectResponseOneCharactersItemDescriptionMax = 4000;
+
+export const getProjectResponseOneCharactersItemCostumeMax = 2000;
+
+export const getProjectResponseOneCharactersItemVoiceDescriptionMax = 1000;
+
+export const getProjectResponseOneMusicVolumeMin = 0;
+export const getProjectResponseOneMusicVolumeMax = 100;
+
+export const getProjectResponseTwoScenesItemVoiceVolumeMin = 0;
+export const getProjectResponseTwoScenesItemVoiceVolumeMax = 100;
+
+export const getProjectResponseTwoScenesItemClipStartSecondsMin = 0;
+
+export const getProjectResponseTwoScenesItemClipEndSecondsMin = 0;
+
+export const getProjectResponseTwoScenesItemPlaybackSpeedMin = 0.25;
+export const getProjectResponseTwoScenesItemPlaybackSpeedMax = 4;
+
+
+
 export const GetProjectResponse = zod.object({
   "id": zod.string().uuid(),
   "title": zod.string(),
@@ -126,6 +251,16 @@ export const GetProjectResponse = zod.object({
   "audience": zod.string(),
   "visualStyle": zod.string(),
   "aspectRatio": zod.string(),
+  "characters": zod.array(zod.object({
+  "id": zod.string().min(1).max(getProjectResponseOneCharactersItemIdMax),
+  "name": zod.string().min(1).max(getProjectResponseOneCharactersItemNameMax),
+  "description": zod.string().max(getProjectResponseOneCharactersItemDescriptionMax),
+  "costume": zod.string().max(getProjectResponseOneCharactersItemCostumeMax),
+  "voiceDescription": zod.string().max(getProjectResponseOneCharactersItemVoiceDescriptionMax),
+  "referenceImageUrl": zod.string().url().nullable()
+})),
+  "musicUrl": zod.string().nullable(),
+  "musicVolume": zod.number().int().min(getProjectResponseOneMusicVolumeMin).max(getProjectResponseOneMusicVolumeMax),
   "status": zod.enum(['draft', 'scripting', 'editing', 'exporting', 'completed', 'failed']),
   "progress": zod.number().int(),
   "sceneCount": zod.number().int(),
@@ -144,6 +279,24 @@ export const GetProjectResponse = zod.object({
   "durationSeconds": zod.number().int(),
   "assetUrl": zod.string().nullable(),
   "assetType": zod.string().nullable(),
+  "shotType": zod.string(),
+  "cameraMovement": zod.string(),
+  "location": zod.string(),
+  "lighting": zod.string(),
+  "characterIds": zod.array(zod.string()),
+  "voiceUrl": zod.string().nullable(),
+  "voiceVolume": zod.number().int().min(getProjectResponseTwoScenesItemVoiceVolumeMin).max(getProjectResponseTwoScenesItemVoiceVolumeMax),
+  "clipStartSeconds": zod.number().int().min(getProjectResponseTwoScenesItemClipStartSecondsMin),
+  "clipEndSeconds": zod.number().int().min(getProjectResponseTwoScenesItemClipEndSecondsMin).nullable(),
+  "playbackSpeed": zod.number().min(getProjectResponseTwoScenesItemPlaybackSpeedMin).max(getProjectResponseTwoScenesItemPlaybackSpeedMax),
+  "transition": zod.string(),
+  "assetHistory": zod.array(zod.object({
+  "id": zod.string(),
+  "url": zod.string(),
+  "type": zod.enum(['image', 'video']),
+  "prompt": zod.string(),
+  "createdAt": zod.coerce.date()
+})),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 }))
@@ -164,6 +317,21 @@ export const updateProjectBodyIdeaMax = 12000;
 export const updateProjectBodyDurationSecondsMin = 5;
 export const updateProjectBodyDurationSecondsMax = 3600;
 
+export const updateProjectBodyCharactersItemIdMax = 100;
+
+export const updateProjectBodyCharactersItemNameMax = 160;
+
+export const updateProjectBodyCharactersItemDescriptionMax = 4000;
+
+export const updateProjectBodyCharactersItemCostumeMax = 2000;
+
+export const updateProjectBodyCharactersItemVoiceDescriptionMax = 1000;
+
+export const updateProjectBodyCharactersMax = 24;
+
+export const updateProjectBodyMusicVolumeMin = 0;
+export const updateProjectBodyMusicVolumeMax = 100;
+
 
 
 export const UpdateProjectBody = zod.object({
@@ -174,8 +342,33 @@ export const UpdateProjectBody = zod.object({
   "durationSeconds": zod.number().int().min(updateProjectBodyDurationSecondsMin).max(updateProjectBodyDurationSecondsMax).optional(),
   "audience": zod.string().optional(),
   "visualStyle": zod.string().optional(),
-  "aspectRatio": zod.enum(['16:9', '9:16', '1:1']).optional()
+  "aspectRatio": zod.enum(['16:9', '9:16', '1:1']).optional(),
+  "characters": zod.array(zod.object({
+  "id": zod.string().min(1).max(updateProjectBodyCharactersItemIdMax),
+  "name": zod.string().min(1).max(updateProjectBodyCharactersItemNameMax),
+  "description": zod.string().max(updateProjectBodyCharactersItemDescriptionMax),
+  "costume": zod.string().max(updateProjectBodyCharactersItemCostumeMax),
+  "voiceDescription": zod.string().max(updateProjectBodyCharactersItemVoiceDescriptionMax),
+  "referenceImageUrl": zod.string().url().nullable()
+})).max(updateProjectBodyCharactersMax).optional(),
+  "musicUrl": zod.string().url().nullish(),
+  "musicVolume": zod.number().int().min(updateProjectBodyMusicVolumeMin).max(updateProjectBodyMusicVolumeMax).optional()
 })
+
+export const updateProjectResponseCharactersItemIdMax = 100;
+
+export const updateProjectResponseCharactersItemNameMax = 160;
+
+export const updateProjectResponseCharactersItemDescriptionMax = 4000;
+
+export const updateProjectResponseCharactersItemCostumeMax = 2000;
+
+export const updateProjectResponseCharactersItemVoiceDescriptionMax = 1000;
+
+export const updateProjectResponseMusicVolumeMin = 0;
+export const updateProjectResponseMusicVolumeMax = 100;
+
+
 
 export const UpdateProjectResponse = zod.object({
   "id": zod.string().uuid(),
@@ -187,6 +380,16 @@ export const UpdateProjectResponse = zod.object({
   "audience": zod.string(),
   "visualStyle": zod.string(),
   "aspectRatio": zod.string(),
+  "characters": zod.array(zod.object({
+  "id": zod.string().min(1).max(updateProjectResponseCharactersItemIdMax),
+  "name": zod.string().min(1).max(updateProjectResponseCharactersItemNameMax),
+  "description": zod.string().max(updateProjectResponseCharactersItemDescriptionMax),
+  "costume": zod.string().max(updateProjectResponseCharactersItemCostumeMax),
+  "voiceDescription": zod.string().max(updateProjectResponseCharactersItemVoiceDescriptionMax),
+  "referenceImageUrl": zod.string().url().nullable()
+})),
+  "musicUrl": zod.string().nullable(),
+  "musicVolume": zod.number().int().min(updateProjectResponseMusicVolumeMin).max(updateProjectResponseMusicVolumeMax),
   "status": zod.enum(['draft', 'scripting', 'editing', 'exporting', 'completed', 'failed']),
   "progress": zod.number().int(),
   "sceneCount": zod.number().int(),
@@ -219,6 +422,28 @@ export const createSceneBodyTitleMax = 160;
 
 export const createSceneBodyDurationSecondsMax = 600;
 
+export const createSceneBodyShotTypeMax = 100;
+
+export const createSceneBodyCameraMovementMax = 100;
+
+export const createSceneBodyLocationMax = 2000;
+
+export const createSceneBodyLightingMax = 2000;
+
+export const createSceneBodyCharacterIdsMax = 24;
+
+export const createSceneBodyVoiceVolumeMin = 0;
+export const createSceneBodyVoiceVolumeMax = 100;
+
+export const createSceneBodyClipStartSecondsMin = 0;
+
+export const createSceneBodyClipEndSecondsMin = 0;
+
+export const createSceneBodyPlaybackSpeedMin = 0.25;
+export const createSceneBodyPlaybackSpeedMax = 4;
+
+export const createSceneBodyTransitionMax = 100;
+
 
 
 export const CreateSceneBody = zod.object({
@@ -228,9 +453,32 @@ export const CreateSceneBody = zod.object({
   "imagePrompt": zod.string(),
   "narration": zod.string(),
   "durationSeconds": zod.number().int().min(1).max(createSceneBodyDurationSecondsMax),
-  "assetUrl": zod.string().url().nullish(),
-  "assetType": zod.union([zod.literal('image'),zod.literal('video'),zod.literal('audio'),zod.literal(null)]).nullish()
+  "assetUrl": zod.string().nullish(),
+  "assetType": zod.union([zod.literal('image'),zod.literal('video'),zod.literal('audio'),zod.literal(null)]).nullish(),
+  "shotType": zod.string().max(createSceneBodyShotTypeMax).optional(),
+  "cameraMovement": zod.string().max(createSceneBodyCameraMovementMax).optional(),
+  "location": zod.string().max(createSceneBodyLocationMax).optional(),
+  "lighting": zod.string().max(createSceneBodyLightingMax).optional(),
+  "characterIds": zod.array(zod.string()).max(createSceneBodyCharacterIdsMax).optional(),
+  "voiceUrl": zod.string().nullish(),
+  "voiceVolume": zod.number().int().min(createSceneBodyVoiceVolumeMin).max(createSceneBodyVoiceVolumeMax).optional(),
+  "clipStartSeconds": zod.number().int().min(createSceneBodyClipStartSecondsMin).optional(),
+  "clipEndSeconds": zod.number().int().min(createSceneBodyClipEndSecondsMin).nullish(),
+  "playbackSpeed": zod.number().min(createSceneBodyPlaybackSpeedMin).max(createSceneBodyPlaybackSpeedMax).optional(),
+  "transition": zod.string().max(createSceneBodyTransitionMax).optional()
 })
+
+export const createSceneResponseVoiceVolumeMin = 0;
+export const createSceneResponseVoiceVolumeMax = 100;
+
+export const createSceneResponseClipStartSecondsMin = 0;
+
+export const createSceneResponseClipEndSecondsMin = 0;
+
+export const createSceneResponsePlaybackSpeedMin = 0.25;
+export const createSceneResponsePlaybackSpeedMax = 4;
+
+
 
 export const CreateSceneResponse = zod.object({
   "id": zod.string().uuid(),
@@ -243,6 +491,24 @@ export const CreateSceneResponse = zod.object({
   "durationSeconds": zod.number().int(),
   "assetUrl": zod.string().nullable(),
   "assetType": zod.string().nullable(),
+  "shotType": zod.string(),
+  "cameraMovement": zod.string(),
+  "location": zod.string(),
+  "lighting": zod.string(),
+  "characterIds": zod.array(zod.string()),
+  "voiceUrl": zod.string().nullable(),
+  "voiceVolume": zod.number().int().min(createSceneResponseVoiceVolumeMin).max(createSceneResponseVoiceVolumeMax),
+  "clipStartSeconds": zod.number().int().min(createSceneResponseClipStartSecondsMin),
+  "clipEndSeconds": zod.number().int().min(createSceneResponseClipEndSecondsMin).nullable(),
+  "playbackSpeed": zod.number().min(createSceneResponsePlaybackSpeedMin).max(createSceneResponsePlaybackSpeedMax),
+  "transition": zod.string(),
+  "assetHistory": zod.array(zod.object({
+  "id": zod.string(),
+  "url": zod.string(),
+  "type": zod.enum(['image', 'video']),
+  "prompt": zod.string(),
+  "createdAt": zod.coerce.date()
+})),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
@@ -262,6 +528,28 @@ export const updateSceneBodyTitleMax = 160;
 
 export const updateSceneBodyDurationSecondsMax = 600;
 
+export const updateSceneBodyShotTypeMax = 100;
+
+export const updateSceneBodyCameraMovementMax = 100;
+
+export const updateSceneBodyLocationMax = 2000;
+
+export const updateSceneBodyLightingMax = 2000;
+
+export const updateSceneBodyCharacterIdsMax = 24;
+
+export const updateSceneBodyVoiceVolumeMin = 0;
+export const updateSceneBodyVoiceVolumeMax = 100;
+
+export const updateSceneBodyClipStartSecondsMin = 0;
+
+export const updateSceneBodyClipEndSecondsMin = 0;
+
+export const updateSceneBodyPlaybackSpeedMin = 0.25;
+export const updateSceneBodyPlaybackSpeedMax = 4;
+
+export const updateSceneBodyTransitionMax = 100;
+
 
 
 export const UpdateSceneBody = zod.object({
@@ -271,9 +559,32 @@ export const UpdateSceneBody = zod.object({
   "imagePrompt": zod.string().optional(),
   "narration": zod.string().optional(),
   "durationSeconds": zod.number().int().min(1).max(updateSceneBodyDurationSecondsMax).optional(),
-  "assetUrl": zod.string().url().nullish(),
-  "assetType": zod.union([zod.literal('image'),zod.literal('video'),zod.literal('audio'),zod.literal(null)]).nullish()
+  "assetUrl": zod.string().nullish(),
+  "assetType": zod.union([zod.literal('image'),zod.literal('video'),zod.literal('audio'),zod.literal(null)]).nullish(),
+  "shotType": zod.string().max(updateSceneBodyShotTypeMax).optional(),
+  "cameraMovement": zod.string().max(updateSceneBodyCameraMovementMax).optional(),
+  "location": zod.string().max(updateSceneBodyLocationMax).optional(),
+  "lighting": zod.string().max(updateSceneBodyLightingMax).optional(),
+  "characterIds": zod.array(zod.string()).max(updateSceneBodyCharacterIdsMax).optional(),
+  "voiceUrl": zod.string().nullish(),
+  "voiceVolume": zod.number().int().min(updateSceneBodyVoiceVolumeMin).max(updateSceneBodyVoiceVolumeMax).optional(),
+  "clipStartSeconds": zod.number().int().min(updateSceneBodyClipStartSecondsMin).optional(),
+  "clipEndSeconds": zod.number().int().min(updateSceneBodyClipEndSecondsMin).nullish(),
+  "playbackSpeed": zod.number().min(updateSceneBodyPlaybackSpeedMin).max(updateSceneBodyPlaybackSpeedMax).optional(),
+  "transition": zod.string().max(updateSceneBodyTransitionMax).optional()
 })
+
+export const updateSceneResponseVoiceVolumeMin = 0;
+export const updateSceneResponseVoiceVolumeMax = 100;
+
+export const updateSceneResponseClipStartSecondsMin = 0;
+
+export const updateSceneResponseClipEndSecondsMin = 0;
+
+export const updateSceneResponsePlaybackSpeedMin = 0.25;
+export const updateSceneResponsePlaybackSpeedMax = 4;
+
+
 
 export const UpdateSceneResponse = zod.object({
   "id": zod.string().uuid(),
@@ -286,6 +597,24 @@ export const UpdateSceneResponse = zod.object({
   "durationSeconds": zod.number().int(),
   "assetUrl": zod.string().nullable(),
   "assetType": zod.string().nullable(),
+  "shotType": zod.string(),
+  "cameraMovement": zod.string(),
+  "location": zod.string(),
+  "lighting": zod.string(),
+  "characterIds": zod.array(zod.string()),
+  "voiceUrl": zod.string().nullable(),
+  "voiceVolume": zod.number().int().min(updateSceneResponseVoiceVolumeMin).max(updateSceneResponseVoiceVolumeMax),
+  "clipStartSeconds": zod.number().int().min(updateSceneResponseClipStartSecondsMin),
+  "clipEndSeconds": zod.number().int().min(updateSceneResponseClipEndSecondsMin).nullable(),
+  "playbackSpeed": zod.number().min(updateSceneResponsePlaybackSpeedMin).max(updateSceneResponsePlaybackSpeedMax),
+  "transition": zod.string(),
+  "assetHistory": zod.array(zod.object({
+  "id": zod.string(),
+  "url": zod.string(),
+  "type": zod.enum(['image', 'video']),
+  "prompt": zod.string(),
+  "createdAt": zod.coerce.date()
+})),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
@@ -303,6 +632,135 @@ export const DeleteSceneResponse = zod.void()
 
 
 /**
+ * @summary Queue image generation for a scene
+ */
+export const QueueSceneImageGenerationParams = zod.object({
+  "projectId": zod.coerce.string().uuid(),
+  "sceneId": zod.coerce.string().uuid()
+})
+
+export const queueSceneImageGenerationBodyModelMax = 200;
+
+
+
+export const QueueSceneImageGenerationBody = zod.object({
+  "providerKeyId": zod.string().uuid().nullish(),
+  "model": zod.string().min(1).max(queueSceneImageGenerationBodyModelMax),
+  "outputs": zod.union([zod.literal(1),zod.literal(2),zod.literal(3),zod.literal(4)]),
+  "resolution": zod.union([zod.literal(512),zod.literal(768),zod.literal(1024)]),
+  "approvePotentialCharges": zod.boolean()
+})
+
+export const queueSceneImageGenerationResponseProgressMin = 0;
+export const queueSceneImageGenerationResponseProgressMax = 100;
+
+export const queueSceneImageGenerationResponseAttemptsMin = 0;
+
+
+
+export const QueueSceneImageGenerationResponse = zod.object({
+  "id": zod.string().uuid(),
+  "projectId": zod.string().uuid(),
+  "jobType": zod.enum(['script', 'export', 'image', 'video', 'voice']),
+  "status": zod.enum(['queued', 'running', 'completed', 'failed']),
+  "stage": zod.string(),
+  "progress": zod.number().int().min(queueSceneImageGenerationResponseProgressMin).max(queueSceneImageGenerationResponseProgressMax),
+  "message": zod.string(),
+  "error": zod.string().nullable(),
+  "attempts": zod.number().int().min(queueSceneImageGenerationResponseAttemptsMin),
+  "startedAt": zod.coerce.date().nullable(),
+  "completedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Queue text-to-video or image-to-video generation
+ */
+export const QueueSceneVideoGenerationParams = zod.object({
+  "projectId": zod.coerce.string().uuid(),
+  "sceneId": zod.coerce.string().uuid()
+})
+
+export const queueSceneVideoGenerationBodyModelMax = 200;
+
+
+
+export const QueueSceneVideoGenerationBody = zod.object({
+  "providerKeyId": zod.string().uuid().nullish(),
+  "model": zod.string().min(1).max(queueSceneVideoGenerationBodyModelMax),
+  "mode": zod.enum(['text', 'image']),
+  "approvePotentialCharges": zod.boolean()
+})
+
+export const queueSceneVideoGenerationResponseProgressMin = 0;
+export const queueSceneVideoGenerationResponseProgressMax = 100;
+
+export const queueSceneVideoGenerationResponseAttemptsMin = 0;
+
+
+
+export const QueueSceneVideoGenerationResponse = zod.object({
+  "id": zod.string().uuid(),
+  "projectId": zod.string().uuid(),
+  "jobType": zod.enum(['script', 'export', 'image', 'video', 'voice']),
+  "status": zod.enum(['queued', 'running', 'completed', 'failed']),
+  "stage": zod.string(),
+  "progress": zod.number().int().min(queueSceneVideoGenerationResponseProgressMin).max(queueSceneVideoGenerationResponseProgressMax),
+  "message": zod.string(),
+  "error": zod.string().nullable(),
+  "attempts": zod.number().int().min(queueSceneVideoGenerationResponseAttemptsMin),
+  "startedAt": zod.coerce.date().nullable(),
+  "completedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Queue spoken narration generation for a scene
+ */
+export const QueueSceneVoiceGenerationParams = zod.object({
+  "projectId": zod.coerce.string().uuid(),
+  "sceneId": zod.coerce.string().uuid()
+})
+
+export const queueSceneVoiceGenerationBodyVoiceIdMax = 120;
+
+
+
+export const QueueSceneVoiceGenerationBody = zod.object({
+  "providerKeyId": zod.string().uuid().nullish(),
+  "voiceId": zod.string().min(1).max(queueSceneVoiceGenerationBodyVoiceIdMax),
+  "approvePotentialCharges": zod.boolean()
+})
+
+export const queueSceneVoiceGenerationResponseProgressMin = 0;
+export const queueSceneVoiceGenerationResponseProgressMax = 100;
+
+export const queueSceneVoiceGenerationResponseAttemptsMin = 0;
+
+
+
+export const QueueSceneVoiceGenerationResponse = zod.object({
+  "id": zod.string().uuid(),
+  "projectId": zod.string().uuid(),
+  "jobType": zod.enum(['script', 'export', 'image', 'video', 'voice']),
+  "status": zod.enum(['queued', 'running', 'completed', 'failed']),
+  "stage": zod.string(),
+  "progress": zod.number().int().min(queueSceneVoiceGenerationResponseProgressMin).max(queueSceneVoiceGenerationResponseProgressMax),
+  "message": zod.string(),
+  "error": zod.string().nullable(),
+  "attempts": zod.number().int().min(queueSceneVoiceGenerationResponseAttemptsMin),
+  "startedAt": zod.coerce.date().nullable(),
+  "completedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
  * @summary Generate a script and storyboard using a configured provider
  */
 export const GenerateProjectScriptParams = zod.object({
@@ -317,6 +775,31 @@ export const GenerateProjectScriptBody = zod.object({
   "approvePotentialCharges": zod.boolean()
 })
 
+export const generateProjectScriptResponseOneCharactersItemIdMax = 100;
+
+export const generateProjectScriptResponseOneCharactersItemNameMax = 160;
+
+export const generateProjectScriptResponseOneCharactersItemDescriptionMax = 4000;
+
+export const generateProjectScriptResponseOneCharactersItemCostumeMax = 2000;
+
+export const generateProjectScriptResponseOneCharactersItemVoiceDescriptionMax = 1000;
+
+export const generateProjectScriptResponseOneMusicVolumeMin = 0;
+export const generateProjectScriptResponseOneMusicVolumeMax = 100;
+
+export const generateProjectScriptResponseTwoScenesItemVoiceVolumeMin = 0;
+export const generateProjectScriptResponseTwoScenesItemVoiceVolumeMax = 100;
+
+export const generateProjectScriptResponseTwoScenesItemClipStartSecondsMin = 0;
+
+export const generateProjectScriptResponseTwoScenesItemClipEndSecondsMin = 0;
+
+export const generateProjectScriptResponseTwoScenesItemPlaybackSpeedMin = 0.25;
+export const generateProjectScriptResponseTwoScenesItemPlaybackSpeedMax = 4;
+
+
+
 export const GenerateProjectScriptResponse = zod.object({
   "id": zod.string().uuid(),
   "title": zod.string(),
@@ -327,6 +810,16 @@ export const GenerateProjectScriptResponse = zod.object({
   "audience": zod.string(),
   "visualStyle": zod.string(),
   "aspectRatio": zod.string(),
+  "characters": zod.array(zod.object({
+  "id": zod.string().min(1).max(generateProjectScriptResponseOneCharactersItemIdMax),
+  "name": zod.string().min(1).max(generateProjectScriptResponseOneCharactersItemNameMax),
+  "description": zod.string().max(generateProjectScriptResponseOneCharactersItemDescriptionMax),
+  "costume": zod.string().max(generateProjectScriptResponseOneCharactersItemCostumeMax),
+  "voiceDescription": zod.string().max(generateProjectScriptResponseOneCharactersItemVoiceDescriptionMax),
+  "referenceImageUrl": zod.string().url().nullable()
+})),
+  "musicUrl": zod.string().nullable(),
+  "musicVolume": zod.number().int().min(generateProjectScriptResponseOneMusicVolumeMin).max(generateProjectScriptResponseOneMusicVolumeMax),
   "status": zod.enum(['draft', 'scripting', 'editing', 'exporting', 'completed', 'failed']),
   "progress": zod.number().int(),
   "sceneCount": zod.number().int(),
@@ -345,6 +838,24 @@ export const GenerateProjectScriptResponse = zod.object({
   "durationSeconds": zod.number().int(),
   "assetUrl": zod.string().nullable(),
   "assetType": zod.string().nullable(),
+  "shotType": zod.string(),
+  "cameraMovement": zod.string(),
+  "location": zod.string(),
+  "lighting": zod.string(),
+  "characterIds": zod.array(zod.string()),
+  "voiceUrl": zod.string().nullable(),
+  "voiceVolume": zod.number().int().min(generateProjectScriptResponseTwoScenesItemVoiceVolumeMin).max(generateProjectScriptResponseTwoScenesItemVoiceVolumeMax),
+  "clipStartSeconds": zod.number().int().min(generateProjectScriptResponseTwoScenesItemClipStartSecondsMin),
+  "clipEndSeconds": zod.number().int().min(generateProjectScriptResponseTwoScenesItemClipEndSecondsMin).nullable(),
+  "playbackSpeed": zod.number().min(generateProjectScriptResponseTwoScenesItemPlaybackSpeedMin).max(generateProjectScriptResponseTwoScenesItemPlaybackSpeedMax),
+  "transition": zod.string(),
+  "assetHistory": zod.array(zod.object({
+  "id": zod.string(),
+  "url": zod.string(),
+  "type": zod.enum(['image', 'video']),
+  "prompt": zod.string(),
+  "createdAt": zod.coerce.date()
+})),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 }))
@@ -376,7 +887,7 @@ export const queueProjectScriptResponseAttemptsMin = 0;
 export const QueueProjectScriptResponse = zod.object({
   "id": zod.string().uuid(),
   "projectId": zod.string().uuid(),
-  "jobType": zod.enum(['script', 'export']),
+  "jobType": zod.enum(['script', 'export', 'image', 'video', 'voice']),
   "status": zod.enum(['queued', 'running', 'completed', 'failed']),
   "stage": zod.string(),
   "progress": zod.number().int().min(queueProjectScriptResponseProgressMin).max(queueProjectScriptResponseProgressMax),
@@ -413,7 +924,7 @@ export const queueProjectExportResponseAttemptsMin = 0;
 export const QueueProjectExportResponse = zod.object({
   "id": zod.string().uuid(),
   "projectId": zod.string().uuid(),
-  "jobType": zod.enum(['script', 'export']),
+  "jobType": zod.enum(['script', 'export', 'image', 'video', 'voice']),
   "status": zod.enum(['queued', 'running', 'completed', 'failed']),
   "stage": zod.string(),
   "progress": zod.number().int().min(queueProjectExportResponseProgressMin).max(queueProjectExportResponseProgressMax),
@@ -444,7 +955,7 @@ export const listStudioJobsResponseAttemptsMin = 0;
 export const ListStudioJobsResponseItem = zod.object({
   "id": zod.string().uuid(),
   "projectId": zod.string().uuid(),
-  "jobType": zod.enum(['script', 'export']),
+  "jobType": zod.enum(['script', 'export', 'image', 'video', 'voice']),
   "status": zod.enum(['queued', 'running', 'completed', 'failed']),
   "stage": zod.string(),
   "progress": zod.number().int().min(listStudioJobsResponseProgressMin).max(listStudioJobsResponseProgressMax),
@@ -482,7 +993,7 @@ export const retryStudioJobResponseAttemptsMin = 0;
 export const RetryStudioJobResponse = zod.object({
   "id": zod.string().uuid(),
   "projectId": zod.string().uuid(),
-  "jobType": zod.enum(['script', 'export']),
+  "jobType": zod.enum(['script', 'export', 'image', 'video', 'voice']),
   "status": zod.enum(['queued', 'running', 'completed', 'failed']),
   "stage": zod.string(),
   "progress": zod.number().int().min(retryStudioJobResponseProgressMin).max(retryStudioJobResponseProgressMax),
@@ -503,7 +1014,7 @@ export const ListProviderKeysResponseItem = zod.object({
   "id": zod.string().uuid(),
   "provider": zod.string(),
   "label": zod.string(),
-  "serviceType": zod.enum(['text', 'image', 'video', 'voice', 'transcription', 'music']),
+  "serviceType": zod.enum(['text', 'image', 'video', 'voice', 'transcription', 'music', 'media']),
   "enabled": zod.boolean(),
   "priority": zod.number().int(),
   "status": zod.enum(['untested', 'valid', 'invalid', 'rate_limited', 'quota_limited', 'unavailable']),
@@ -530,7 +1041,7 @@ export const CreateProviderKeyBody = zod.object({
   "provider": zod.string(),
   "label": zod.string().min(1).max(createProviderKeyBodyLabelMax),
   "apiKey": zod.string().min(1),
-  "serviceType": zod.enum(['text', 'image', 'video', 'voice', 'transcription', 'music']),
+  "serviceType": zod.enum(['text', 'image', 'video', 'voice', 'transcription', 'music', 'media']),
   "enabled": zod.boolean(),
   "priority": zod.number().int().min(createProviderKeyBodyPriorityMin)
 })
@@ -539,7 +1050,7 @@ export const CreateProviderKeyResponse = zod.object({
   "id": zod.string().uuid(),
   "provider": zod.string(),
   "label": zod.string(),
-  "serviceType": zod.enum(['text', 'image', 'video', 'voice', 'transcription', 'music']),
+  "serviceType": zod.enum(['text', 'image', 'video', 'voice', 'transcription', 'music', 'media']),
   "enabled": zod.boolean(),
   "priority": zod.number().int(),
   "status": zod.enum(['untested', 'valid', 'invalid', 'rate_limited', 'quota_limited', 'unavailable']),
@@ -568,7 +1079,7 @@ export const updateProviderKeyBodyPriorityMin = 0;
 export const UpdateProviderKeyBody = zod.object({
   "label": zod.string().min(1).max(updateProviderKeyBodyLabelMax).optional(),
   "apiKey": zod.string().min(1).optional(),
-  "serviceType": zod.enum(['text', 'image', 'video', 'voice', 'transcription', 'music']).optional(),
+  "serviceType": zod.enum(['text', 'image', 'video', 'voice', 'transcription', 'music', 'media']).optional(),
   "enabled": zod.boolean().optional(),
   "priority": zod.number().int().min(updateProviderKeyBodyPriorityMin).optional()
 })
@@ -577,7 +1088,7 @@ export const UpdateProviderKeyResponse = zod.object({
   "id": zod.string().uuid(),
   "provider": zod.string(),
   "label": zod.string(),
-  "serviceType": zod.enum(['text', 'image', 'video', 'voice', 'transcription', 'music']),
+  "serviceType": zod.enum(['text', 'image', 'video', 'voice', 'transcription', 'music', 'media']),
   "enabled": zod.boolean(),
   "priority": zod.number().int(),
   "status": zod.enum(['untested', 'valid', 'invalid', 'rate_limited', 'quota_limited', 'unavailable']),
@@ -677,13 +1188,16 @@ export const UpdateProviderSettingsResponse = zod.object({
  * @summary Search real openly licensed media
  */
 export const searchFreeMediaQueryMediaTypeDefault = `image`;
+export const searchFreeMediaQuerySourceDefault = `openverse`;
 export const searchFreeMediaQueryPageDefault = 1;
 
 
 
 export const SearchFreeMediaQueryParams = zod.object({
   "q": zod.coerce.string(),
-  "mediaType": zod.enum(['image', 'video']).default(searchFreeMediaQueryMediaTypeDefault),
+  "mediaType": zod.enum(['image', 'video', 'audio']).default(searchFreeMediaQueryMediaTypeDefault),
+  "source": zod.enum(['openverse', 'wikimedia', 'archive', 'pexels', 'pixabay', 'unsplash']).default(searchFreeMediaQuerySourceDefault),
+  "orientation": zod.enum(['landscape', 'portrait', 'square']).optional(),
   "page": zod.coerce.number().int().min(1).default(searchFreeMediaQueryPageDefault)
 })
 
@@ -698,12 +1212,83 @@ export const SearchFreeMediaResponse = zod.object({
   "license": zod.string(),
   "licenseUrl": zod.string().url().nullable(),
   "creator": zod.string().nullable(),
-  "mediaType": zod.enum(['image', 'video'])
+  "mediaType": zod.enum(['image', 'video', 'audio'])
 })),
   "page": zod.number().int(),
   "total": zod.number().int(),
   "source": zod.string()
 })
+
+
+/**
+ * @summary List the current user's saved media
+ */
+export const ListFavoriteMediaResponseItem = zod.object({
+  "id": zod.string().uuid(),
+  "mediaId": zod.string(),
+  "source": zod.string(),
+  "title": zod.string(),
+  "url": zod.string().url(),
+  "thumbnailUrl": zod.string().url().nullable(),
+  "mediaType": zod.enum(['image', 'video', 'audio']),
+  "license": zod.string(),
+  "licenseUrl": zod.string().url().nullable(),
+  "creator": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+})
+export const ListFavoriteMediaResponse = zod.array(ListFavoriteMediaResponseItem)
+
+
+/**
+ * @summary Save a media item to favorites
+ */
+export const createFavoriteMediaBodyMediaIdMax = 300;
+
+export const createFavoriteMediaBodySourceMax = 100;
+
+export const createFavoriteMediaBodyTitleMax = 1000;
+
+export const createFavoriteMediaBodyLicenseMax = 300;
+
+export const createFavoriteMediaBodyCreatorMax = 300;
+
+
+
+export const CreateFavoriteMediaBody = zod.object({
+  "mediaId": zod.string().min(1).max(createFavoriteMediaBodyMediaIdMax),
+  "source": zod.string().min(1).max(createFavoriteMediaBodySourceMax),
+  "title": zod.string().min(1).max(createFavoriteMediaBodyTitleMax),
+  "url": zod.string().url(),
+  "thumbnailUrl": zod.string().url().nullable(),
+  "mediaType": zod.enum(['image', 'video', 'audio']),
+  "license": zod.string().max(createFavoriteMediaBodyLicenseMax),
+  "licenseUrl": zod.string().url().nullable(),
+  "creator": zod.string().max(createFavoriteMediaBodyCreatorMax).nullable()
+})
+
+export const CreateFavoriteMediaResponse = zod.object({
+  "id": zod.string().uuid(),
+  "mediaId": zod.string(),
+  "source": zod.string(),
+  "title": zod.string(),
+  "url": zod.string().url(),
+  "thumbnailUrl": zod.string().url().nullable(),
+  "mediaType": zod.enum(['image', 'video', 'audio']),
+  "license": zod.string(),
+  "licenseUrl": zod.string().url().nullable(),
+  "creator": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Remove a saved media item
+ */
+export const DeleteFavoriteMediaParams = zod.object({
+  "favoriteId": zod.coerce.string().uuid()
+})
+
+export const DeleteFavoriteMediaResponse = zod.void()
 
 
 /**

@@ -12,4 +12,7 @@ export type StudioJobJobType = typeof StudioJobJobType[keyof typeof StudioJobJob
 export const StudioJobJobType = {
   script: 'script',
   export: 'export',
+  image: 'image',
+  video: 'video',
+  voice: 'voice',
 } as const;

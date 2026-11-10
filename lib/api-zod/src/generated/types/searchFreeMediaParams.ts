@@ -6,10 +6,14 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { SearchFreeMediaMediaType } from './searchFreeMediaMediaType';
+import type { SearchFreeMediaOrientation } from './searchFreeMediaOrientation';
+import type { SearchFreeMediaSource } from './searchFreeMediaSource';
 
 export type SearchFreeMediaParams = {
 q: string;
 mediaType?: SearchFreeMediaMediaType;
+source?: SearchFreeMediaSource;
+orientation?: SearchFreeMediaOrientation;
 /**
  * @minimum 1
  */

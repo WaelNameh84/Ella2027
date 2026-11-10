@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './characterProfile';
 export * from './exportInput';
 export * from './exportInputFps';
 export * from './exportInputResolution';
@@ -13,6 +14,10 @@ export * from './exportResult';
 export * from './freeTool';
 export * from './healthStatus';
 export * from './listStudioJobsParams';
+export * from './mediaFavorite';
+export * from './mediaFavoriteInput';
+export * from './mediaFavoriteInputMediaType';
+export * from './mediaFavoriteMediaType';
 export * from './mediaResult';
 export * from './mediaResultMediaType';
 export * from './mediaSearchResponse';
@@ -33,13 +38,23 @@ export * from './providerKeyUpdateServiceType';
 export * from './providerSettings';
 export * from './providerTestResult';
 export * from './scene';
+export * from './sceneAssetVersion';
+export * from './sceneAssetVersionType';
+export * from './sceneImageGenerationInput';
+export * from './sceneImageGenerationInputOutputs';
+export * from './sceneImageGenerationInputResolution';
 export * from './sceneInput';
 export * from './sceneInputAssetType';
 export * from './sceneUpdate';
 export * from './sceneUpdateAssetType';
+export * from './sceneVideoGenerationInput';
+export * from './sceneVideoGenerationInputMode';
+export * from './sceneVoiceGenerationInput';
 export * from './scriptGenerationInput';
 export * from './searchFreeMediaMediaType';
+export * from './searchFreeMediaOrientation';
 export * from './searchFreeMediaParams';
+export * from './searchFreeMediaSource';
 export * from './studioJob';
 export * from './studioJobJobType';
 export * from './studioJobRetryInput';

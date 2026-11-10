@@ -9,6 +9,27 @@ export interface HealthStatus {
   status: string;
 }
 
+export interface CharacterProfile {
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
+  id: string;
+  /**
+     * @minLength 1
+     * @maxLength 160
+     */
+  name: string;
+  /** @maxLength 4000 */
+  description: string;
+  /** @maxLength 2000 */
+  costume: string;
+  /** @maxLength 1000 */
+  voiceDescription: string;
+  /** @nullable */
+  referenceImageUrl: string | null;
+}
+
 export type ProjectStatus = typeof ProjectStatus[keyof typeof ProjectStatus];
 
 
@@ -31,6 +52,14 @@ export interface Project {
   audience: string;
   visualStyle: string;
   aspectRatio: string;
+  characters: CharacterProfile[];
+  /** @nullable */
+  musicUrl: string | null;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  musicVolume: number;
   status: ProjectStatus;
   progress: number;
   sceneCount: number;
@@ -48,6 +77,22 @@ export interface StudioSummary {
   recentProjects: Project[];
 }
 
+export type SceneAssetVersionType = typeof SceneAssetVersionType[keyof typeof SceneAssetVersionType];
+
+
+export const SceneAssetVersionType = {
+  image: 'image',
+  video: 'video',
+} as const;
+
+export interface SceneAssetVersion {
+  id: string;
+  url: string;
+  type: SceneAssetVersionType;
+  prompt: string;
+  createdAt: string;
+}
+
 export interface Scene {
   id: string;
   projectId: string;
@@ -61,6 +106,32 @@ export interface Scene {
   assetUrl: string | null;
   /** @nullable */
   assetType: string | null;
+  shotType: string;
+  cameraMovement: string;
+  location: string;
+  lighting: string;
+  characterIds: string[];
+  /** @nullable */
+  voiceUrl: string | null;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  voiceVolume: number;
+  /** @minimum 0 */
+  clipStartSeconds: number;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  clipEndSeconds: number | null;
+  /**
+     * @minimum 0.25
+     * @maximum 4
+     */
+  playbackSpeed: number;
+  transition: string;
+  assetHistory: SceneAssetVersion[];
   createdAt: string;
   updatedAt: string;
 }
@@ -99,6 +170,15 @@ export interface ProjectInput {
   audience: string;
   visualStyle: string;
   aspectRatio: ProjectInputAspectRatio;
+  /** @maxItems 24 */
+  characters?: CharacterProfile[];
+  /** @nullable */
+  musicUrl?: string | null;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  musicVolume?: number;
 }
 
 export type ProjectUpdateAspectRatio = typeof ProjectUpdateAspectRatio[keyof typeof ProjectUpdateAspectRatio];
@@ -128,6 +208,15 @@ export interface ProjectUpdate {
   audience?: string;
   visualStyle?: string;
   aspectRatio?: ProjectUpdateAspectRatio;
+  /** @maxItems 24 */
+  characters?: CharacterProfile[];
+  /** @nullable */
+  musicUrl?: string | null;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  musicVolume?: number;
 }
 
 /**
@@ -162,6 +251,37 @@ export interface SceneInput {
   assetUrl?: string | null;
   /** @nullable */
   assetType?: SceneInputAssetType;
+  /** @maxLength 100 */
+  shotType?: string;
+  /** @maxLength 100 */
+  cameraMovement?: string;
+  /** @maxLength 2000 */
+  location?: string;
+  /** @maxLength 2000 */
+  lighting?: string;
+  /** @maxItems 24 */
+  characterIds?: string[];
+  /** @nullable */
+  voiceUrl?: string | null;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  voiceVolume?: number;
+  /** @minimum 0 */
+  clipStartSeconds?: number;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  clipEndSeconds?: number | null;
+  /**
+     * @minimum 0.25
+     * @maximum 4
+     */
+  playbackSpeed?: number;
+  /** @maxLength 100 */
+  transition?: string;
 }
 
 /**
@@ -196,12 +316,106 @@ export interface SceneUpdate {
   assetUrl?: string | null;
   /** @nullable */
   assetType?: SceneUpdateAssetType;
+  /** @maxLength 100 */
+  shotType?: string;
+  /** @maxLength 100 */
+  cameraMovement?: string;
+  /** @maxLength 2000 */
+  location?: string;
+  /** @maxLength 2000 */
+  lighting?: string;
+  /** @maxItems 24 */
+  characterIds?: string[];
+  /** @nullable */
+  voiceUrl?: string | null;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  voiceVolume?: number;
+  /** @minimum 0 */
+  clipStartSeconds?: number;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  clipEndSeconds?: number | null;
+  /**
+     * @minimum 0.25
+     * @maximum 4
+     */
+  playbackSpeed?: number;
+  /** @maxLength 100 */
+  transition?: string;
 }
 
 export interface ScriptGenerationInput {
   /** @nullable */
   providerKeyId?: string | null;
   allowRotation: boolean;
+  approvePotentialCharges: boolean;
+}
+
+export type SceneImageGenerationInputOutputs = typeof SceneImageGenerationInputOutputs[keyof typeof SceneImageGenerationInputOutputs];
+
+
+export const SceneImageGenerationInputOutputs = {
+  NUMBER_1: 1,
+  NUMBER_2: 2,
+  NUMBER_3: 3,
+  NUMBER_4: 4,
+} as const;
+
+export type SceneImageGenerationInputResolution = typeof SceneImageGenerationInputResolution[keyof typeof SceneImageGenerationInputResolution];
+
+
+export const SceneImageGenerationInputResolution = {
+  NUMBER_512: 512,
+  NUMBER_768: 768,
+  NUMBER_1024: 1024,
+} as const;
+
+export interface SceneImageGenerationInput {
+  /** @nullable */
+  providerKeyId?: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  model: string;
+  outputs: SceneImageGenerationInputOutputs;
+  resolution: SceneImageGenerationInputResolution;
+  approvePotentialCharges: boolean;
+}
+
+export type SceneVideoGenerationInputMode = typeof SceneVideoGenerationInputMode[keyof typeof SceneVideoGenerationInputMode];
+
+
+export const SceneVideoGenerationInputMode = {
+  text: 'text',
+  image: 'image',
+} as const;
+
+export interface SceneVideoGenerationInput {
+  /** @nullable */
+  providerKeyId?: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  model: string;
+  mode: SceneVideoGenerationInputMode;
+  approvePotentialCharges: boolean;
+}
+
+export interface SceneVoiceGenerationInput {
+  /** @nullable */
+  providerKeyId?: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  voiceId: string;
   approvePotentialCharges: boolean;
 }
 
@@ -215,6 +429,9 @@ export type StudioJobJobType = typeof StudioJobJobType[keyof typeof StudioJobJob
 export const StudioJobJobType = {
   script: 'script',
   export: 'export',
+  image: 'image',
+  video: 'video',
+  voice: 'voice',
 } as const;
 
 export type StudioJobStatus = typeof StudioJobStatus[keyof typeof StudioJobStatus];
@@ -261,6 +478,7 @@ export const ProviderKeyServiceType = {
   voice: 'voice',
   transcription: 'transcription',
   music: 'music',
+  media: 'media',
 } as const;
 
 export type ProviderKeyStatus = typeof ProviderKeyStatus[keyof typeof ProviderKeyStatus];
@@ -303,6 +521,7 @@ export const ProviderKeyInputServiceType = {
   voice: 'voice',
   transcription: 'transcription',
   music: 'music',
+  media: 'media',
 } as const;
 
 export interface ProviderKeyInput {
@@ -330,6 +549,7 @@ export const ProviderKeyUpdateServiceType = {
   voice: 'voice',
   transcription: 'transcription',
   music: 'music',
+  media: 'media',
 } as const;
 
 export interface ProviderKeyUpdate {
@@ -378,6 +598,7 @@ export type MediaResultMediaType = typeof MediaResultMediaType[keyof typeof Medi
 export const MediaResultMediaType = {
   image: 'image',
   video: 'video',
+  audio: 'audio',
 } as const;
 
 export interface MediaResult {
@@ -401,6 +622,72 @@ export interface MediaSearchResponse {
   page: number;
   total: number;
   source: string;
+}
+
+export type MediaFavoriteMediaType = typeof MediaFavoriteMediaType[keyof typeof MediaFavoriteMediaType];
+
+
+export const MediaFavoriteMediaType = {
+  image: 'image',
+  video: 'video',
+  audio: 'audio',
+} as const;
+
+export interface MediaFavorite {
+  id: string;
+  mediaId: string;
+  source: string;
+  title: string;
+  url: string;
+  /** @nullable */
+  thumbnailUrl: string | null;
+  mediaType: MediaFavoriteMediaType;
+  license: string;
+  /** @nullable */
+  licenseUrl: string | null;
+  /** @nullable */
+  creator: string | null;
+  createdAt: string;
+}
+
+export type MediaFavoriteInputMediaType = typeof MediaFavoriteInputMediaType[keyof typeof MediaFavoriteInputMediaType];
+
+
+export const MediaFavoriteInputMediaType = {
+  image: 'image',
+  video: 'video',
+  audio: 'audio',
+} as const;
+
+export interface MediaFavoriteInput {
+  /**
+     * @minLength 1
+     * @maxLength 300
+     */
+  mediaId: string;
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
+  source: string;
+  /**
+     * @minLength 1
+     * @maxLength 1000
+     */
+  title: string;
+  url: string;
+  /** @nullable */
+  thumbnailUrl: string | null;
+  mediaType: MediaFavoriteInputMediaType;
+  /** @maxLength 300 */
+  license: string;
+  /** @nullable */
+  licenseUrl: string | null;
+  /**
+     * @maxLength 300
+     * @nullable
+     */
+  creator: string | null;
 }
 
 export interface FreeTool {
@@ -450,6 +737,8 @@ projectId?: string;
 export type SearchFreeMediaParams = {
 q: string;
 mediaType?: SearchFreeMediaMediaType;
+source?: SearchFreeMediaSource;
+orientation?: SearchFreeMediaOrientation;
 /**
  * @minimum 1
  */
@@ -462,5 +751,27 @@ export type SearchFreeMediaMediaType = typeof SearchFreeMediaMediaType[keyof typ
 export const SearchFreeMediaMediaType = {
   image: 'image',
   video: 'video',
+  audio: 'audio',
+} as const;
+
+export type SearchFreeMediaSource = typeof SearchFreeMediaSource[keyof typeof SearchFreeMediaSource];
+
+
+export const SearchFreeMediaSource = {
+  openverse: 'openverse',
+  wikimedia: 'wikimedia',
+  archive: 'archive',
+  pexels: 'pexels',
+  pixabay: 'pixabay',
+  unsplash: 'unsplash',
+} as const;
+
+export type SearchFreeMediaOrientation = typeof SearchFreeMediaOrientation[keyof typeof SearchFreeMediaOrientation];
+
+
+export const SearchFreeMediaOrientation = {
+  landscape: 'landscape',
+  portrait: 'portrait',
+  square: 'square',
 } as const;
 

@@ -5,6 +5,7 @@
  * AI Video Studio API
  * OpenAPI spec version: 0.1.0
  */
+import type { SceneAssetVersion } from './sceneAssetVersion';
 
 export interface Scene {
   id: string;
@@ -19,6 +20,32 @@ export interface Scene {
   assetUrl: string | null;
   /** @nullable */
   assetType: string | null;
+  shotType: string;
+  cameraMovement: string;
+  location: string;
+  lighting: string;
+  characterIds: string[];
+  /** @nullable */
+  voiceUrl: string | null;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  voiceVolume: number;
+  /** @minimum 0 */
+  clipStartSeconds: number;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  clipEndSeconds: number | null;
+  /**
+     * @minimum 0.25
+     * @maximum 4
+     */
+  playbackSpeed: number;
+  transition: string;
+  assetHistory: SceneAssetVersion[];
   createdAt: Date;
   updatedAt: Date;
 }

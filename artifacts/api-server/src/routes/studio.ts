@@ -6,11 +6,14 @@ import {
   CreateProjectResponse,
   CreateProviderKeyBody,
   CreateProviderKeyResponse,
+  CreateFavoriteMediaBody,
+  CreateFavoriteMediaResponse,
   CreateSceneBody,
   CreateSceneParams,
   CreateSceneResponse,
   DeleteProjectParams,
   DeleteSceneParams,
+  DeleteFavoriteMediaParams,
   ExportProjectBody,
   ExportProjectParams,
   ExportProjectResponse,
@@ -21,6 +24,7 @@ import {
   GetProviderSettingsResponse,
   GetStudioSummaryResponse,
   ListFreeToolsResponse,
+  ListFavoriteMediaResponse,
   ListProjectsResponse,
   ListProviderKeysResponse,
   ListStudioJobsQueryParams,
@@ -52,6 +56,7 @@ import {
 } from "@workspace/api-zod";
 import {
   db,
+  favoriteMediaTable,
   projectsTable,
   providerKeysTable,
   providerSettingsTable,
@@ -67,6 +72,7 @@ import {
   testProviderCredential,
 } from "../lib/providerRegistry";
 import { renderMp4 } from "../lib/videoExport";
+import { searchMediaCatalog } from "../lib/mediaCatalog";
 
 const router: IRouter = Router();
 const mediaProviders = [
@@ -143,6 +149,9 @@ function projectDto(project: typeof projectsTable.$inferSelect, sceneCount: numb
     audience: project.audience,
     visualStyle: project.visualStyle,
     aspectRatio: project.aspectRatio,
+    characters: project.characters ?? [],
+    musicUrl: project.musicUrl,
+    musicVolume: project.musicVolume,
     status: project.status,
     progress: project.progress,
     sceneCount,
@@ -164,6 +173,18 @@ function sceneDto(scene: typeof scenesTable.$inferSelect) {
     durationSeconds: scene.durationSeconds,
     assetUrl: scene.assetUrl,
     assetType: scene.assetType,
+    shotType: scene.shotType,
+    cameraMovement: scene.cameraMovement,
+    location: scene.location,
+    lighting: scene.lighting,
+    characterIds: scene.characterIds ?? [],
+    voiceUrl: scene.voiceUrl,
+    voiceVolume: scene.voiceVolume,
+    clipStartSeconds: scene.clipStartSeconds,
+    clipEndSeconds: scene.clipEndSeconds,
+    playbackSpeed: scene.playbackSpeed,
+    transition: scene.transition,
+    assetHistory: scene.assetHistory ?? [],
     createdAt: scene.createdAt,
     updatedAt: scene.updatedAt,
   };
@@ -873,54 +894,75 @@ router.get("/media/search", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const { q, mediaType, page } = parsed.data;
-  const kind = mediaType ?? "image";
-  const url = new URL(`https://api.openverse.org/v1/${kind}s/`);
-  url.searchParams.set("q", q);
-  url.searchParams.set("page", String(page ?? 1));
-  url.searchParams.set("page_size", "24");
+  const { q, mediaType, source, page, orientation } = parsed.data;
   try {
-    const response = await fetch(url, {
-      headers: { Accept: "application/json", "User-Agent": "AI-Video-Studio/1.0" },
-      signal: AbortSignal.timeout(20_000),
-      redirect: "error",
-    });
-    if (!response.ok) {
-      res.status(502).json({ error: `Openverse search failed (HTTP ${response.status}). Try again later.` });
-      return;
-    }
-    const payload = await response.json() as {
-      results?: Array<Record<string, unknown>>;
-      page_count?: number;
-      result_count?: number;
-    };
-    const results = (payload.results ?? []).flatMap((item, index) => {
-      const mediaUrl = typeof item.url === "string" ? item.url : "";
-      if (!mediaUrl.startsWith("https://")) return [];
-      const licenseUrl = typeof item.license_url === "string" ? item.license_url : null;
-      const thumbnailUrl = typeof item.thumbnail === "string" ? item.thumbnail : null;
-      return [{
-        id: typeof item.id === "string" ? item.id : `${page}-${index}`,
-        title: typeof item.title === "string" ? item.title : "Untitled media",
-        description: typeof item.description === "string" ? item.description : "",
-        url: mediaUrl,
-        thumbnailUrl,
-        source: typeof item.source === "string" ? item.source : "Openverse",
-        license: typeof item.license === "string" ? item.license : "Check source page",
-        licenseUrl,
-        creator: typeof item.creator === "string" ? item.creator : null,
-        mediaType: kind,
-      }];
+    const result = await searchMediaCatalog({
+      userId: userIdOf(res),
+      q,
+      mediaType: mediaType ?? "image",
+      source: source ?? "openverse",
+      page: page ?? 1,
+      orientation,
     });
     res.json(SearchFreeMediaResponse.parse({
-      results,
+      results: result.results,
       page: page ?? 1,
-      total: Number(payload.result_count ?? 0),
-      source: "Openverse",
+      total: result.total,
+      source: result.source,
     }));
-  } catch {
-    res.status(502).json({ error: "Could not reach Openverse. No sample results are shown; retry when the service is available." });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Media search failed.";
+    res.status(message.includes("Add an enabled") ? 409 : 502).json({ error: message });
   }
+});
+
+router.get("/media/favorites", async (_req, res): Promise<void> => {
+  const rows = await db.select().from(favoriteMediaTable)
+    .where(eq(favoriteMediaTable.userId, userIdOf(res)))
+    .orderBy(desc(favoriteMediaTable.createdAt));
+  res.json(ListFavoriteMediaResponse.parse(rows));
+});
+
+router.post("/media/favorites", async (req, res): Promise<void> => {
+  const parsed = CreateFavoriteMediaBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const userId = userIdOf(res);
+  const [created] = await db.insert(favoriteMediaTable)
+    .values({ ...parsed.data, userId })
+    .onConflictDoNothing({
+      target: [favoriteMediaTable.userId, favoriteMediaTable.source, favoriteMediaTable.mediaId],
+    })
+    .returning();
+  const row = created ?? (await db.select().from(favoriteMediaTable).where(and(
+    eq(favoriteMediaTable.userId, userId),
+    eq(favoriteMediaTable.source, parsed.data.source),
+    eq(favoriteMediaTable.mediaId, parsed.data.mediaId),
+  )).limit(1))[0];
+  if (!row) {
+    res.status(500).json({ error: "The media item could not be saved." });
+    return;
+  }
+  res.status(created ? 201 : 200).json(CreateFavoriteMediaResponse.parse(row));
+});
+
+router.delete("/media/favorites/:favoriteId", async (req, res): Promise<void> => {
+  const params = DeleteFavoriteMediaParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const [removed] = await db.delete(favoriteMediaTable).where(and(
+    eq(favoriteMediaTable.id, params.data.favoriteId),
+    eq(favoriteMediaTable.userId, userIdOf(res)),
+  )).returning({ id: favoriteMediaTable.id });
+  if (!removed) {
+    res.status(404).json({ error: "Saved media item not found." });
+    return;
+  }
+  res.sendStatus(204);
 });
 
 router.get("/free-tools", async (_req, res): Promise<void> => {

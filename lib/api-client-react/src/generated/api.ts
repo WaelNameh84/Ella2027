@@ -30,6 +30,8 @@ import type {
   FreeTool,
   HealthStatus,
   ListStudioJobsParams,
+  MediaFavorite,
+  MediaFavoriteInput,
   MediaSearchResponse,
   Project,
   ProjectDetail,
@@ -41,8 +43,11 @@ import type {
   ProviderSettings,
   ProviderTestResult,
   Scene,
+  SceneImageGenerationInput,
   SceneInput,
   SceneUpdate,
+  SceneVideoGenerationInput,
+  SceneVoiceGenerationInput,
   ScriptGenerationInput,
   SearchFreeMediaParams,
   StudioJob,
@@ -986,6 +991,279 @@ export const useDeleteScene = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getDeleteSceneMutationOptions(options), queryClient);
+    }
+
+export const getQueueSceneImageGenerationUrl = (projectId: string,
+    sceneId: string,) => {
+
+
+
+
+  return `/api/projects/${projectId}/scenes/${sceneId}/jobs/image`
+}
+
+/**
+ * @summary Queue image generation for a scene
+ */
+export const queueSceneImageGeneration = async (projectId: string,
+    sceneId: string,
+    sceneImageGenerationInput: SceneImageGenerationInput, options?: Parameters<typeof customFetch>[1]): Promise<StudioJob> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<StudioJob>(getQueueSceneImageGenerationUrl(projectId,sceneId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(sceneImageGenerationInput)
+  }
+);}
+
+
+
+
+
+export const getQueueSceneImageGenerationMutationKey = () => ['queueSceneImageGeneration'] as const;
+
+export const getQueueSceneImageGenerationMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof queueSceneImageGeneration>>, TError,QueueSceneImageGenerationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof queueSceneImageGeneration>>, TError,QueueSceneImageGenerationMutationVariables, TContext> => {
+
+const mutationKey = getQueueSceneImageGenerationMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof queueSceneImageGeneration>>, QueueSceneImageGenerationMutationVariables> = (props) => {
+          const {projectId,sceneId,data} = props ?? {};
+
+          return  queueSceneImageGeneration(projectId,sceneId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type QueueSceneImageGenerationMutationResult = NonNullable<Awaited<ReturnType<typeof queueSceneImageGeneration>>>
+    export type QueueSceneImageGenerationMutationBody = BodyType<SceneImageGenerationInput>
+    export type QueueSceneImageGenerationMutationError = ErrorType<unknown>
+    export type QueueSceneImageGenerationMutationVariables = {projectId: string;sceneId: string;data: BodyType<SceneImageGenerationInput>}
+
+    /**
+ * @summary Queue image generation for a scene
+ */
+export const useQueueSceneImageGeneration = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof queueSceneImageGeneration>>, TError,QueueSceneImageGenerationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof queueSceneImageGeneration>>,
+        TError,
+        QueueSceneImageGenerationMutationVariables,
+        TContext
+      > => {
+      return useMutation(getQueueSceneImageGenerationMutationOptions(options), queryClient);
+    }
+
+export const getQueueSceneVideoGenerationUrl = (projectId: string,
+    sceneId: string,) => {
+
+
+
+
+  return `/api/projects/${projectId}/scenes/${sceneId}/jobs/video`
+}
+
+/**
+ * @summary Queue text-to-video or image-to-video generation
+ */
+export const queueSceneVideoGeneration = async (projectId: string,
+    sceneId: string,
+    sceneVideoGenerationInput: SceneVideoGenerationInput, options?: Parameters<typeof customFetch>[1]): Promise<StudioJob> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<StudioJob>(getQueueSceneVideoGenerationUrl(projectId,sceneId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(sceneVideoGenerationInput)
+  }
+);}
+
+
+
+
+
+export const getQueueSceneVideoGenerationMutationKey = () => ['queueSceneVideoGeneration'] as const;
+
+export const getQueueSceneVideoGenerationMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof queueSceneVideoGeneration>>, TError,QueueSceneVideoGenerationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof queueSceneVideoGeneration>>, TError,QueueSceneVideoGenerationMutationVariables, TContext> => {
+
+const mutationKey = getQueueSceneVideoGenerationMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof queueSceneVideoGeneration>>, QueueSceneVideoGenerationMutationVariables> = (props) => {
+          const {projectId,sceneId,data} = props ?? {};
+
+          return  queueSceneVideoGeneration(projectId,sceneId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type QueueSceneVideoGenerationMutationResult = NonNullable<Awaited<ReturnType<typeof queueSceneVideoGeneration>>>
+    export type QueueSceneVideoGenerationMutationBody = BodyType<SceneVideoGenerationInput>
+    export type QueueSceneVideoGenerationMutationError = ErrorType<unknown>
+    export type QueueSceneVideoGenerationMutationVariables = {projectId: string;sceneId: string;data: BodyType<SceneVideoGenerationInput>}
+
+    /**
+ * @summary Queue text-to-video or image-to-video generation
+ */
+export const useQueueSceneVideoGeneration = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof queueSceneVideoGeneration>>, TError,QueueSceneVideoGenerationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof queueSceneVideoGeneration>>,
+        TError,
+        QueueSceneVideoGenerationMutationVariables,
+        TContext
+      > => {
+      return useMutation(getQueueSceneVideoGenerationMutationOptions(options), queryClient);
+    }
+
+export const getQueueSceneVoiceGenerationUrl = (projectId: string,
+    sceneId: string,) => {
+
+
+
+
+  return `/api/projects/${projectId}/scenes/${sceneId}/jobs/voice`
+}
+
+/**
+ * @summary Queue spoken narration generation for a scene
+ */
+export const queueSceneVoiceGeneration = async (projectId: string,
+    sceneId: string,
+    sceneVoiceGenerationInput: SceneVoiceGenerationInput, options?: Parameters<typeof customFetch>[1]): Promise<StudioJob> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<StudioJob>(getQueueSceneVoiceGenerationUrl(projectId,sceneId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(sceneVoiceGenerationInput)
+  }
+);}
+
+
+
+
+
+export const getQueueSceneVoiceGenerationMutationKey = () => ['queueSceneVoiceGeneration'] as const;
+
+export const getQueueSceneVoiceGenerationMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof queueSceneVoiceGeneration>>, TError,QueueSceneVoiceGenerationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof queueSceneVoiceGeneration>>, TError,QueueSceneVoiceGenerationMutationVariables, TContext> => {
+
+const mutationKey = getQueueSceneVoiceGenerationMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof queueSceneVoiceGeneration>>, QueueSceneVoiceGenerationMutationVariables> = (props) => {
+          const {projectId,sceneId,data} = props ?? {};
+
+          return  queueSceneVoiceGeneration(projectId,sceneId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type QueueSceneVoiceGenerationMutationResult = NonNullable<Awaited<ReturnType<typeof queueSceneVoiceGeneration>>>
+    export type QueueSceneVoiceGenerationMutationBody = BodyType<SceneVoiceGenerationInput>
+    export type QueueSceneVoiceGenerationMutationError = ErrorType<unknown>
+    export type QueueSceneVoiceGenerationMutationVariables = {projectId: string;sceneId: string;data: BodyType<SceneVoiceGenerationInput>}
+
+    /**
+ * @summary Queue spoken narration generation for a scene
+ */
+export const useQueueSceneVoiceGeneration = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof queueSceneVoiceGeneration>>, TError,QueueSceneVoiceGenerationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof queueSceneVoiceGeneration>>,
+        TError,
+        QueueSceneVoiceGenerationMutationVariables,
+        TContext
+      > => {
+      return useMutation(getQueueSceneVoiceGenerationMutationOptions(options), queryClient);
     }
 
 export const getGenerateProjectScriptUrl = (projectId: string,) => {
@@ -2174,6 +2452,269 @@ export function useSearchFreeMedia<TData = Awaited<ReturnType<typeof searchFreeM
 
 
 
+
+export const getListFavoriteMediaUrl = () => {
+
+
+
+
+  return `/api/media/favorites`
+}
+
+/**
+ * @summary List the current user's saved media
+ */
+export const listFavoriteMedia = async ( options?: Parameters<typeof customFetch>[1]): Promise<MediaFavorite[]> => {
+
+  return customFetch<MediaFavorite[]>(getListFavoriteMediaUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListFavoriteMediaQueryKey = () => {
+    return [
+    `/api/media/favorites`
+    ] as const;
+    }
+
+
+export const getListFavoriteMediaQueryOptions = <TData = Awaited<ReturnType<typeof listFavoriteMedia>>, TError = ErrorType<unknown>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFavoriteMedia>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListFavoriteMediaQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listFavoriteMedia>>> = ({ signal }) => listFavoriteMedia({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listFavoriteMedia>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListFavoriteMediaQueryResult = NonNullable<Awaited<ReturnType<typeof listFavoriteMedia>>>
+export type ListFavoriteMediaQueryError = ErrorType<unknown>
+
+
+export function useListFavoriteMedia<TData = Awaited<ReturnType<typeof listFavoriteMedia>>, TError = ErrorType<unknown>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFavoriteMedia>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listFavoriteMedia>>,
+          TError,
+          Awaited<ReturnType<typeof listFavoriteMedia>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListFavoriteMedia<TData = Awaited<ReturnType<typeof listFavoriteMedia>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFavoriteMedia>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listFavoriteMedia>>,
+          TError,
+          Awaited<ReturnType<typeof listFavoriteMedia>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListFavoriteMedia<TData = Awaited<ReturnType<typeof listFavoriteMedia>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFavoriteMedia>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List the current user's saved media
+ */
+
+export function useListFavoriteMedia<TData = Awaited<ReturnType<typeof listFavoriteMedia>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFavoriteMedia>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListFavoriteMediaQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateFavoriteMediaUrl = () => {
+
+
+
+
+  return `/api/media/favorites`
+}
+
+/**
+ * @summary Save a media item to favorites
+ */
+export const createFavoriteMedia = async (mediaFavoriteInput: MediaFavoriteInput, options?: Parameters<typeof customFetch>[1]): Promise<MediaFavorite> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<MediaFavorite>(getCreateFavoriteMediaUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(mediaFavoriteInput)
+  }
+);}
+
+
+
+
+
+export const getCreateFavoriteMediaMutationKey = () => ['createFavoriteMedia'] as const;
+
+export const getCreateFavoriteMediaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createFavoriteMedia>>, TError,CreateFavoriteMediaMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createFavoriteMedia>>, TError,CreateFavoriteMediaMutationVariables, TContext> => {
+
+const mutationKey = getCreateFavoriteMediaMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createFavoriteMedia>>, CreateFavoriteMediaMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createFavoriteMedia(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateFavoriteMediaMutationResult = NonNullable<Awaited<ReturnType<typeof createFavoriteMedia>>>
+    export type CreateFavoriteMediaMutationBody = BodyType<MediaFavoriteInput>
+    export type CreateFavoriteMediaMutationError = ErrorType<unknown>
+    export type CreateFavoriteMediaMutationVariables = {data: BodyType<MediaFavoriteInput>}
+
+    /**
+ * @summary Save a media item to favorites
+ */
+export const useCreateFavoriteMedia = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createFavoriteMedia>>, TError,CreateFavoriteMediaMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createFavoriteMedia>>,
+        TError,
+        CreateFavoriteMediaMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateFavoriteMediaMutationOptions(options), queryClient);
+    }
+
+export const getDeleteFavoriteMediaUrl = (favoriteId: string,) => {
+
+
+
+
+  return `/api/media/favorites/${favoriteId}`
+}
+
+/**
+ * @summary Remove a saved media item
+ */
+export const deleteFavoriteMedia = async (favoriteId: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteFavoriteMediaUrl(favoriteId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteFavoriteMediaMutationKey = () => ['deleteFavoriteMedia'] as const;
+
+export const getDeleteFavoriteMediaMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteFavoriteMedia>>, TError,DeleteFavoriteMediaMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteFavoriteMedia>>, TError,DeleteFavoriteMediaMutationVariables, TContext> => {
+
+const mutationKey = getDeleteFavoriteMediaMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteFavoriteMedia>>, DeleteFavoriteMediaMutationVariables> = (props) => {
+          const {favoriteId} = props ?? {};
+
+          return  deleteFavoriteMedia(favoriteId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteFavoriteMediaMutationResult = NonNullable<Awaited<ReturnType<typeof deleteFavoriteMedia>>>
+
+    export type DeleteFavoriteMediaMutationError = ErrorType<unknown>
+    export type DeleteFavoriteMediaMutationVariables = {favoriteId: string}
+
+    /**
+ * @summary Remove a saved media item
+ */
+export const useDeleteFavoriteMedia = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteFavoriteMedia>>, TError,DeleteFavoriteMediaMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteFavoriteMedia>>,
+        TError,
+        DeleteFavoriteMediaMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteFavoriteMediaMutationOptions(options), queryClient);
+    }
 
 export const getListFreeToolsUrl = () => {
 

@@ -16,4 +16,5 @@ export const ProviderKeyUpdateServiceType = {
   voice: 'voice',
   transcription: 'transcription',
   music: 'music',
+  media: 'media',
 } as const;

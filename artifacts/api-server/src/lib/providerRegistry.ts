@@ -142,6 +142,22 @@ export const providerDefinitions: Record<string, ProviderDefinition> = {
     officialUrl: "https://console.cloud.google.com/apis/credentials",
     testUrl: (key) => `https://texttospeech.googleapis.com/v1/voices?key=${encodeURIComponent(key)}`,
   },
+  pexels: {
+    label: "Pexels",
+    officialUrl: "https://www.pexels.com/api/",
+    testUrl: () => "https://api.pexels.com/v1/curated?per_page=1",
+    testHeaders: (key) => ({ Authorization: key }),
+  },
+  pixabay: {
+    label: "Pixabay",
+    officialUrl: "https://pixabay.com/api/docs/",
+    testUrl: (key) => `https://pixabay.com/api/?key=${encodeURIComponent(key)}&q=cinema&per_page=3`,
+  },
+  unsplash: {
+    label: "Unsplash",
+    officialUrl: "https://unsplash.com/developers",
+    testUrl: (key) => `https://api.unsplash.com/photos?per_page=1&client_id=${encodeURIComponent(key)}`,
+  },
 };
 
 export const providerCatalog = [

@@ -177,6 +177,81 @@ paths:
       responses:
         "204":
           description: Deleted
+  /projects/{projectId}/scenes/{sceneId}/jobs/image:
+    parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: sceneId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: queueSceneImageGeneration
+      tags: [jobs]
+      summary: Queue image generation for a scene
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SceneImageGenerationInput" }
+      responses:
+        "202":
+          description: Image generation queued
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StudioJob" }
+  /projects/{projectId}/scenes/{sceneId}/jobs/video:
+    parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: sceneId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: queueSceneVideoGeneration
+      tags: [jobs]
+      summary: Queue text-to-video or image-to-video generation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SceneVideoGenerationInput" }
+      responses:
+        "202":
+          description: Video generation queued
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StudioJob" }
+  /projects/{projectId}/scenes/{sceneId}/jobs/voice:
+    parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: sceneId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: queueSceneVoiceGeneration
+      tags: [jobs]
+      summary: Queue spoken narration generation for a scene
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SceneVoiceGenerationInput" }
+      responses:
+        "202":
+          description: Voice generation queued
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StudioJob" }
   /projects/{projectId}/generate-script:
     parameters:
       - name: projectId
@@ -423,8 +498,19 @@ paths:
           in: query
           schema:
             type: string
-            enum: [image, video]
+            enum: [image, video, audio]
             default: image
+        - name: source
+          in: query
+          schema:
+            type: string
+            enum: [openverse, wikimedia, archive, pexels, pixabay, unsplash]
+            default: openverse
+        - name: orientation
+          in: query
+          schema:
+            type: string
+            enum: [landscape, portrait, square]
         - name: page
           in: query
           schema:
@@ -438,6 +524,47 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/MediaSearchResponse"
+  /media/favorites:
+    get:
+      operationId: listFavoriteMedia
+      tags: [media]
+      summary: List the current user's saved media
+      responses:
+        "200":
+          description: Saved media
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MediaFavorite" }
+    post:
+      operationId: createFavoriteMedia
+      tags: [media]
+      summary: Save a media item to favorites
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MediaFavoriteInput" }
+      responses:
+        "201":
+          description: Saved media item
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MediaFavorite" }
+  /media/favorites/{favoriteId}:
+    delete:
+      operationId: deleteFavoriteMedia
+      tags: [media]
+      summary: Remove a saved media item
+      parameters:
+        - name: favoriteId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204":
+          description: Removed
   /free-tools:
     get:
       operationId: listFreeTools
@@ -530,13 +657,28 @@ components:
         audience: { type: string }
         visualStyle: { type: string }
         aspectRatio: { type: string }
+        characters:
+          type: array
+          items: { $ref: "#/components/schemas/CharacterProfile" }
+        musicUrl: { type: ["string", "null"], format: uri-reference }
+        musicVolume: { type: integer, minimum: 0, maximum: 100 }
         status: { type: string, enum: [draft, scripting, editing, exporting, completed, failed] }
         progress: { type: integer }
         sceneCount: { type: integer }
         exportUrl: { type: ["string", "null"] }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
-      required: [id, title, idea, videoType, language, durationSeconds, audience, visualStyle, aspectRatio, status, progress, sceneCount, exportUrl, createdAt, updatedAt]
+      required: [id, title, idea, videoType, language, durationSeconds, audience, visualStyle, aspectRatio, characters, musicUrl, musicVolume, status, progress, sceneCount, exportUrl, createdAt, updatedAt]
+    CharacterProfile:
+      type: object
+      properties:
+        id: { type: string, minLength: 1, maxLength: 100 }
+        name: { type: string, minLength: 1, maxLength: 160 }
+        description: { type: string, maxLength: 4000 }
+        costume: { type: string, maxLength: 2000 }
+        voiceDescription: { type: string, maxLength: 1000 }
+        referenceImageUrl: { type: ["string", "null"], format: uri }
+      required: [id, name, description, costume, voiceDescription, referenceImageUrl]
     ProjectDetail:
       allOf:
         - $ref: "#/components/schemas/Project"
@@ -557,6 +699,12 @@ components:
         audience: { type: string }
         visualStyle: { type: string }
         aspectRatio: { type: string, enum: ["16:9", "9:16", "1:1"] }
+        characters:
+          type: array
+          maxItems: 24
+          items: { $ref: "#/components/schemas/CharacterProfile" }
+        musicUrl: { type: ["string", "null"], format: uri-reference }
+        musicVolume: { type: integer, minimum: 0, maximum: 100 }
       required: [title, idea, videoType, language, durationSeconds, audience, visualStyle, aspectRatio]
     ProjectUpdate:
       type: object
@@ -569,6 +717,12 @@ components:
         audience: { type: string }
         visualStyle: { type: string }
         aspectRatio: { type: string, enum: ["16:9", "9:16", "1:1"] }
+        characters:
+          type: array
+          maxItems: 24
+          items: { $ref: "#/components/schemas/CharacterProfile" }
+        musicUrl: { type: ["string", "null"], format: uri-reference }
+        musicVolume: { type: integer, minimum: 0, maximum: 100 }
     Scene:
       type: object
       properties:
@@ -582,9 +736,32 @@ components:
         durationSeconds: { type: integer }
         assetUrl: { type: ["string", "null"] }
         assetType: { type: ["string", "null"] }
+        shotType: { type: string }
+        cameraMovement: { type: string }
+        location: { type: string }
+        lighting: { type: string }
+        characterIds: { type: array, items: { type: string } }
+        voiceUrl: { type: ["string", "null"], format: uri-reference }
+        voiceVolume: { type: integer, minimum: 0, maximum: 100 }
+        clipStartSeconds: { type: integer, minimum: 0 }
+        clipEndSeconds: { type: ["integer", "null"], minimum: 0 }
+        playbackSpeed: { type: number, minimum: 0.25, maximum: 4 }
+        transition: { type: string }
+        assetHistory:
+          type: array
+          items: { $ref: "#/components/schemas/SceneAssetVersion" }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
-      required: [id, projectId, sortOrder, title, description, imagePrompt, narration, durationSeconds, assetUrl, assetType, createdAt, updatedAt]
+      required: [id, projectId, sortOrder, title, description, imagePrompt, narration, durationSeconds, assetUrl, assetType, shotType, cameraMovement, location, lighting, characterIds, voiceUrl, voiceVolume, clipStartSeconds, clipEndSeconds, playbackSpeed, transition, assetHistory, createdAt, updatedAt]
+    SceneAssetVersion:
+      type: object
+      properties:
+        id: { type: string }
+        url: { type: string, format: uri-reference }
+        type: { type: string, enum: [image, video] }
+        prompt: { type: string }
+        createdAt: { type: string, format: date-time }
+      required: [id, url, type, prompt, createdAt]
     SceneInput:
       type: object
       properties:
@@ -594,8 +771,19 @@ components:
         imagePrompt: { type: string }
         narration: { type: string }
         durationSeconds: { type: integer, minimum: 1, maximum: 600 }
-        assetUrl: { type: ["string", "null"], format: uri }
+        assetUrl: { type: ["string", "null"], format: uri-reference }
         assetType: { type: ["string", "null"], enum: [image, video, audio, null] }
+        shotType: { type: string, maxLength: 100 }
+        cameraMovement: { type: string, maxLength: 100 }
+        location: { type: string, maxLength: 2000 }
+        lighting: { type: string, maxLength: 2000 }
+        characterIds: { type: array, items: { type: string }, maxItems: 24 }
+        voiceUrl: { type: ["string", "null"], format: uri-reference }
+        voiceVolume: { type: integer, minimum: 0, maximum: 100 }
+        clipStartSeconds: { type: integer, minimum: 0 }
+        clipEndSeconds: { type: ["integer", "null"], minimum: 0 }
+        playbackSpeed: { type: number, minimum: 0.25, maximum: 4 }
+        transition: { type: string, maxLength: 100 }
       required: [sortOrder, title, description, imagePrompt, narration, durationSeconds]
     SceneUpdate:
       type: object
@@ -606,8 +794,19 @@ components:
         imagePrompt: { type: string }
         narration: { type: string }
         durationSeconds: { type: integer, minimum: 1, maximum: 600 }
-        assetUrl: { type: ["string", "null"], format: uri }
+        assetUrl: { type: ["string", "null"], format: uri-reference }
         assetType: { type: ["string", "null"], enum: [image, video, audio, null] }
+        shotType: { type: string, maxLength: 100 }
+        cameraMovement: { type: string, maxLength: 100 }
+        location: { type: string, maxLength: 2000 }
+        lighting: { type: string, maxLength: 2000 }
+        characterIds: { type: array, items: { type: string }, maxItems: 24 }
+        voiceUrl: { type: ["string", "null"], format: uri-reference }
+        voiceVolume: { type: integer, minimum: 0, maximum: 100 }
+        clipStartSeconds: { type: integer, minimum: 0 }
+        clipEndSeconds: { type: ["integer", "null"], minimum: 0 }
+        playbackSpeed: { type: number, minimum: 0.25, maximum: 4 }
+        transition: { type: string, maxLength: 100 }
     ScriptGenerationInput:
       type: object
       properties:
@@ -615,6 +814,30 @@ components:
         allowRotation: { type: boolean, default: true }
         approvePotentialCharges: { type: boolean }
       required: [allowRotation, approvePotentialCharges]
+    SceneImageGenerationInput:
+      type: object
+      properties:
+        providerKeyId: { type: ["string", "null"], format: uuid }
+        model: { type: string, minLength: 1, maxLength: 200 }
+        outputs: { type: integer, enum: [1, 2, 3, 4] }
+        resolution: { type: integer, enum: [512, 768, 1024] }
+        approvePotentialCharges: { type: boolean }
+      required: [model, outputs, resolution, approvePotentialCharges]
+    SceneVideoGenerationInput:
+      type: object
+      properties:
+        providerKeyId: { type: ["string", "null"], format: uuid }
+        model: { type: string, minLength: 1, maxLength: 200 }
+        mode: { type: string, enum: [text, image] }
+        approvePotentialCharges: { type: boolean }
+      required: [model, mode, approvePotentialCharges]
+    SceneVoiceGenerationInput:
+      type: object
+      properties:
+        providerKeyId: { type: ["string", "null"], format: uuid }
+        voiceId: { type: string, minLength: 1, maxLength: 120 }
+        approvePotentialCharges: { type: boolean }
+      required: [voiceId, approvePotentialCharges]
     StudioJobRetryInput:
       type: object
       properties:
@@ -625,7 +848,7 @@ components:
       properties:
         id: { type: string, format: uuid }
         projectId: { type: string, format: uuid }
-        jobType: { type: string, enum: [script, export] }
+        jobType: { type: string, enum: [script, export, image, video, voice] }
         status: { type: string, enum: [queued, running, completed, failed] }
         stage: { type: string }
         progress: { type: integer, minimum: 0, maximum: 100 }
@@ -643,7 +866,7 @@ components:
         id: { type: string, format: uuid }
         provider: { type: string }
         label: { type: string }
-        serviceType: { type: string, enum: [text, image, video, voice, transcription, music] }
+        serviceType: { type: string, enum: [text, image, video, voice, transcription, music, media] }
         enabled: { type: boolean }
         priority: { type: integer }
         status: { type: string, enum: [untested, valid, invalid, rate_limited, quota_limited, unavailable] }
@@ -659,7 +882,7 @@ components:
         provider: { type: string }
         label: { type: string, minLength: 1, maxLength: 120 }
         apiKey: { type: string, minLength: 1 }
-        serviceType: { type: string, enum: [text, image, video, voice, transcription, music] }
+        serviceType: { type: string, enum: [text, image, video, voice, transcription, music, media] }
         enabled: { type: boolean }
         priority: { type: integer, minimum: 0 }
       required: [provider, label, apiKey, serviceType, enabled, priority]
@@ -668,7 +891,7 @@ components:
       properties:
         label: { type: string, minLength: 1, maxLength: 120 }
         apiKey: { type: string, minLength: 1 }
-        serviceType: { type: string, enum: [text, image, video, voice, transcription, music] }
+        serviceType: { type: string, enum: [text, image, video, voice, transcription, music, media] }
         enabled: { type: boolean }
         priority: { type: integer, minimum: 0 }
     ProviderTestResult:
@@ -712,8 +935,36 @@ components:
         license: { type: string }
         licenseUrl: { type: ["string", "null"], format: uri }
         creator: { type: ["string", "null"] }
-        mediaType: { type: string, enum: [image, video] }
+        mediaType: { type: string, enum: [image, video, audio] }
       required: [id, title, description, url, thumbnailUrl, source, license, licenseUrl, creator, mediaType]
+    MediaFavorite:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        mediaId: { type: string }
+        source: { type: string }
+        title: { type: string }
+        url: { type: string, format: uri }
+        thumbnailUrl: { type: ["string", "null"], format: uri }
+        mediaType: { type: string, enum: [image, video, audio] }
+        license: { type: string }
+        licenseUrl: { type: ["string", "null"], format: uri }
+        creator: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+      required: [id, mediaId, source, title, url, thumbnailUrl, mediaType, license, licenseUrl, creator, createdAt]
+    MediaFavoriteInput:
+      type: object
+      properties:
+        mediaId: { type: string, minLength: 1, maxLength: 300 }
+        source: { type: string, minLength: 1, maxLength: 100 }
+        title: { type: string, minLength: 1, maxLength: 1000 }
+        url: { type: string, format: uri }
+        thumbnailUrl: { type: ["string", "null"], format: uri }
+        mediaType: { type: string, enum: [image, video, audio] }
+        license: { type: string, maxLength: 300 }
+        licenseUrl: { type: ["string", "null"], format: uri }
+        creator: { type: ["string", "null"], maxLength: 300 }
+      required: [mediaId, source, title, url, thumbnailUrl, mediaType, license, licenseUrl, creator]
     FreeTool:
       type: object
       properties:

@@ -5,6 +5,7 @@
  * AI Video Studio API
  * OpenAPI spec version: 0.1.0
  */
+import type { CharacterProfile } from './characterProfile';
 import type { ProjectInputAspectRatio } from './projectInputAspectRatio';
 
 export interface ProjectInput {
@@ -28,4 +29,13 @@ export interface ProjectInput {
   audience: string;
   visualStyle: string;
   aspectRatio: ProjectInputAspectRatio;
+  /** @maxItems 24 */
+  characters?: CharacterProfile[];
+  /** @nullable */
+  musicUrl?: string | null;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  musicVolume?: number;
 }

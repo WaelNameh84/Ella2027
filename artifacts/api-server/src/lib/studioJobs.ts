@@ -1,4 +1,5 @@
 import { and, asc, eq } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
 import {
   db,
   projectsTable,
@@ -7,6 +8,7 @@ import {
   scenesTable,
   studioJobsTable,
 } from "@workspace/db";
+import type { SceneAssetVersion, StudioCharacter } from "@workspace/db";
 import { logger } from "./logger";
 import { decryptProviderKey } from "./secretVault";
 import {
@@ -14,6 +16,8 @@ import {
   generateWithProvider,
 } from "./providerRegistry";
 import { renderMp4 } from "./videoExport";
+import { generateNarration, generateStill, generateVideo, isProviderCallError } from "./mediaGeneration";
+import { readGeneratedAsset, saveGeneratedAsset } from "./studioAssets";
 
 type SceneDraft = {
   title: string;
@@ -21,7 +25,14 @@ type SceneDraft = {
   imagePrompt: string;
   narration: string;
   durationSeconds: number;
+  shotType: string;
+  cameraMovement: string;
+  location: string;
+  lighting: string;
+  characterIds: string[];
 };
+
+type ScriptResult = { scenes: SceneDraft[]; characters: StudioCharacter[] };
 
 type JobInput = {
   providerKeyId?: string | null;
@@ -30,9 +41,15 @@ type JobInput = {
   resolution?: number;
   fps?: number;
   includeSubtitles?: boolean;
+  sceneId?: string;
+  model?: string;
+  mode?: "text" | "image";
+  outputs?: number;
+  resolution?: 512 | 768 | 1024;
+  voiceId?: string;
 };
 
-function parseGeneratedJson(text: string): SceneDraft[] {
+function parseGeneratedJson(text: string): ScriptResult {
   const normalized = text.replace(/```(?:json)?/gi, "").trim();
   const firstBrace = normalized.indexOf("{");
   const lastBrace = normalized.lastIndexOf("}");
@@ -45,11 +62,29 @@ function parseGeneratedJson(text: string): SceneDraft[] {
   } catch {
     throw new Error("The provider response was not valid JSON.");
   }
-  const scenes = (data as { scenes?: unknown })?.scenes;
+  const response = data as { scenes?: unknown; characters?: unknown };
+  const scenes = response.scenes;
   if (!Array.isArray(scenes) || scenes.length < 1 || scenes.length > 24) {
     throw new Error("The provider returned an invalid number of scenes.");
   }
-  return scenes.map((scene, index) => {
+  const characters: StudioCharacter[] = Array.isArray(response.characters)
+    ? response.characters.slice(0, 24).map((character, index) => {
+      const item = character as Record<string, unknown>;
+      const value = (field: string, fallback = "") =>
+        typeof item[field] === "string" ? (item[field] as string).trim() : fallback;
+      return {
+        id: value("id", `character-${index + 1}`).slice(0, 100),
+        name: value("name", `Character ${index + 1}`).slice(0, 160),
+        description: value("description").slice(0, 4000),
+        costume: value("costume").slice(0, 2000),
+        voiceDescription: value("voiceDescription").slice(0, 1000),
+        referenceImageUrl: null,
+      };
+    }).filter((character) => character.name)
+    : [];
+  return {
+    characters,
+    scenes: scenes.map((scene, index) => {
     const item = scene as Record<string, unknown>;
     const title = typeof item.title === "string" ? item.title.trim() : "";
     const description = typeof item.description === "string" ? item.description.trim() : "";
@@ -65,8 +100,16 @@ function parseGeneratedJson(text: string): SceneDraft[] {
       imagePrompt: imagePrompt.slice(0, 6000),
       narration: narration.slice(0, 6000),
       durationSeconds: Math.min(600, Math.max(1, Math.round(duration))),
+      shotType: typeof item.shotType === "string" ? item.shotType.slice(0, 100) : "wide",
+      cameraMovement: typeof item.cameraMovement === "string" ? item.cameraMovement.slice(0, 100) : "static",
+      location: typeof item.location === "string" ? item.location.slice(0, 2000) : "",
+      lighting: typeof item.lighting === "string" ? item.lighting.slice(0, 2000) : "",
+      characterIds: Array.isArray(item.characterIds)
+        ? item.characterIds.filter((value): value is string => typeof value === "string").slice(0, 24)
+        : [],
     };
-  });
+    }),
+  };
 }
 
 function safeJobError(error: unknown): string {
@@ -74,6 +117,95 @@ function safeJobError(error: unknown): string {
     return error.message.slice(0, 1000);
   }
   return "The job could not be completed.";
+}
+
+function supportsJob(provider: string, jobType: JobKind): boolean {
+  if (jobType === "image") return ["openai", "stability", "replicate"].includes(provider);
+  if (jobType === "video") return provider === "replicate";
+  if (jobType === "voice") return ["elevenlabs", "openai", "openai-audio"].includes(provider);
+  return false;
+}
+
+type JobKind = "image" | "video" | "voice";
+
+async function providerSettingsFor(userId: string) {
+  await db.insert(providerSettingsTable)
+    .values({ userId })
+    .onConflictDoNothing({ target: providerSettingsTable.userId });
+  const [settings] = await db.select().from(providerSettingsTable)
+    .where(eq(providerSettingsTable.userId, userId))
+    .limit(1);
+  return settings;
+}
+
+async function callMediaProvider<T>(
+  job: typeof studioJobsTable.$inferSelect,
+  serviceType: "image" | "video" | "voice",
+  selectedKeyId: string | null | undefined,
+  stage: string,
+  call: (provider: string, key: string) => Promise<T>,
+): Promise<T> {
+  const settings = await providerSettingsFor(job.userId);
+  const eligible = await db.select().from(providerKeysTable).where(and(
+    eq(providerKeysTable.userId, job.userId),
+    eq(providerKeysTable.serviceType, serviceType),
+    eq(providerKeysTable.enabled, true),
+  )).orderBy(asc(providerKeysTable.priority), asc(providerKeysTable.createdAt));
+  const now = Date.now();
+  const candidates = eligible.filter((row) =>
+    supportsJob(row.provider, job.jobType as JobKind)
+    && row.status !== "invalid"
+    && (!row.cooldownUntil || row.cooldownUntil.getTime() <= now),
+  );
+  let ordered = candidates;
+  if (selectedKeyId) {
+    const selected = candidates.find((row) => row.id === selectedKeyId);
+    if (!selected) throw new Error("The selected provider key is disabled, incompatible, or cooling down.");
+    ordered = [selected, ...candidates.filter((row) => row.provider === selected.provider && row.id !== selected.id)];
+  }
+  if (!settings?.autoRotate) ordered = ordered.slice(0, 1);
+  const maxAttempts = Math.max(1, Math.min(settings?.maxAttempts ?? 3, ordered.length));
+  if (!ordered.length) throw new Error(`No usable ${serviceType} provider key is configured.`);
+  let lastMessage = "All configured providers failed.";
+  for (const [attempt, row] of ordered.slice(0, maxAttempts).entries()) {
+    await updateJob(job.id, {
+      stage,
+      progress: Math.min(30 + attempt * 10, 75),
+      message: `Trying ${row.provider} (${attempt + 1}/${Math.min(maxAttempts, ordered.length)}).`,
+    });
+    try {
+      const result = await call(row.provider, decryptProviderKey(row.encryptedKey));
+      await db.update(providerKeysTable).set({
+        status: "valid",
+        usedCount: row.usedCount + 1,
+        cooldownUntil: null,
+        testMessage: `Last ${serviceType} request succeeded.`,
+      }).where(eq(providerKeysTable.id, row.id));
+      return result;
+    } catch (error) {
+      const classification = isProviderCallError(error)
+        ? classifyProviderResponse(error.providerStatus, error.responseBody)
+        : { status: "unavailable" as const, message: safeJobError(error) };
+      lastMessage = classification.message;
+      const cooldownUntil = ["rate_limited", "quota_limited"].includes(classification.status)
+        ? new Date(Date.now() + Math.max(60, settings?.retryDelaySeconds ?? 60) * 1000)
+        : null;
+      await db.update(providerKeysTable).set({
+        status: classification.status,
+        testMessage: classification.message,
+        cooldownUntil,
+      }).where(eq(providerKeysTable.id, row.id));
+      const canRotate = classification.status === "rate_limited"
+        ? settings?.rotateOnRateLimit
+        : classification.status === "quota_limited"
+          ? settings?.rotateOnQuota
+          : settings?.rotateOnConnectionFailure;
+      if (!canRotate || !settings?.autoRotate) break;
+      const delay = Math.min(settings.retryDelaySeconds, 10);
+      if (delay > 0) await new Promise((resolvePromise) => setTimeout(resolvePromise, delay * 1000));
+    }
+  }
+  throw new Error(lastMessage);
 }
 
 async function claimNextJob() {
@@ -125,10 +257,15 @@ async function processScriptJob(job: typeof studioJobsTable.$inferSelect): Promi
     .limit(1);
   if (!project) throw new Error("The project for this job no longer exists.");
 
-  let generated: SceneDraft[] | undefined;
+  let generated: ScriptResult | undefined;
   const savedScenes = job.result?.scenes;
   if (Array.isArray(savedScenes)) {
-    generated = savedScenes as SceneDraft[];
+    generated = {
+      scenes: savedScenes as SceneDraft[],
+      characters: Array.isArray(job.result?.characters)
+        ? job.result.characters as StudioCharacter[]
+        : project.characters ?? [],
+    };
   } else {
     const currentScenes = await db.select({ id: scenesTable.id })
       .from(scenesTable)
@@ -167,15 +304,15 @@ async function processScriptJob(job: typeof studioJobsTable.$inferSelect): Promi
     if (!ordered.length) throw new Error("No usable text provider is configured. Add and test a provider key.");
 
     const prompt = [
-      "Analyze the premise and create a production-ready video script and storyboard. Return only valid JSON:",
-      '{"scenes":[{"title":"...","description":"...","imagePrompt":"...","narration":"...","durationSeconds":8}]}',
+      "Analyze the premise and create a production-ready film script, character bible, and storyboard. Return only valid JSON with this shape:",
+      '{"characters":[{"id":"character-1","name":"...","description":"fixed visual identity","costume":"fixed costume","voiceDescription":"..."}],"scenes":[{"title":"...","description":"...","imagePrompt":"...","narration":"...","durationSeconds":8,"shotType":"wide","cameraMovement":"slow push-in","location":"...","lighting":"...","characterIds":["character-1"]}]}',
       `Concept: ${project.idea}`,
       `Video type: ${project.videoType}`,
       `Language: ${project.language}`,
       `Audience: ${project.audience}`,
       `Visual style: ${project.visualStyle}`,
       `Target duration: ${project.durationSeconds} seconds`,
-      "Use 3 to 12 scenes. Keep recurring characters, clothing, color palette, and environment consistent across scenes. Write narration in the selected language. Make image prompts visually specific and keep scene durations close to the total target.",
+      "Use 3 to 12 scenes. Create 1 to 8 recurring character profiles, and refer to them by their stable IDs. Keep each character's face, age, hair, body, costume, palette, and environment consistent across every scene. Make each image prompt include only the relevant character profile details, shot size, camera movement, lens feel, location, lighting, and composition. Write narration in the selected language and keep scene durations close to the target total.",
     ].join("\n");
 
     let lastError = "All configured providers failed.";
@@ -205,7 +342,7 @@ async function processScriptJob(job: typeof studioJobsTable.$inferSelect): Promi
             stage: "storyboard_ready",
             progress: 60,
             message: "Storyboard saved. Preparing scenes.",
-            result: { scenes: generated },
+            result: generated,
             updatedAt: new Date(),
           }).where(eq(studioJobsTable.id, job.id));
         });
@@ -267,19 +404,251 @@ async function processScriptJob(job: typeof studioJobsTable.$inferSelect): Promi
     if (existing.length) {
       throw new Error("The project changed while this job was running. Review its existing scenes.");
     }
-    await tx.insert(scenesTable).values(generated!.map((scene, index) => ({
+    await tx.insert(scenesTable).values(generated!.scenes.map((scene, index) => ({
       projectId: project.id,
       userId: job.userId,
       sortOrder: index,
       ...scene,
     })));
-    await tx.update(projectsTable).set({ status: "editing", progress: 45 })
+    await tx.update(projectsTable).set({
+      status: "editing",
+      progress: 45,
+      characters: generated!.characters,
+    })
       .where(and(eq(projectsTable.id, project.id), eq(projectsTable.userId, job.userId)));
     await tx.update(studioJobsTable).set({
       status: "completed",
       stage: "completed",
       progress: 100,
       message: "Storyboard generated and saved.",
+      error: null,
+      completedAt: new Date(),
+      updatedAt: new Date(),
+    }).where(eq(studioJobsTable.id, job.id));
+  });
+}
+
+function scenePrompt(project: typeof projectsTable.$inferSelect, scene: typeof scenesTable.$inferSelect) {
+  const characterBible = (project.characters ?? [])
+    .filter((character) => scene.characterIds.includes(character.id))
+    .map((character) =>
+      `${character.name}: ${character.description}. Clothing: ${character.costume}.`,
+    );
+  return [
+    project.visualStyle || project.videoType,
+    `Scene: ${scene.title}.`,
+    scene.description,
+    scene.imagePrompt,
+    `Shot size: ${scene.shotType}.`,
+    `Camera movement: ${scene.cameraMovement}.`,
+    `Location: ${scene.location}.`,
+    `Lighting: ${scene.lighting}.`,
+    characterBible.length ? `Character continuity bible: ${characterBible.join(" ")}` : "",
+    "Keep the same character identities, face details, hair, clothing, color palette, and world design across the entire film.",
+  ].filter(Boolean).join("\n");
+}
+
+function assetResult(job: typeof studioJobsTable.$inferSelect): Array<{
+  id: string;
+  url: string;
+  type: "image" | "video";
+  prompt: string;
+  createdAt: string;
+}> {
+  const values = job.result?.assets;
+  return Array.isArray(values) ? values as Array<{
+    id: string;
+    url: string;
+    type: "image" | "video";
+    prompt: string;
+    createdAt: string;
+  }> : [];
+}
+
+async function persistJobResult(
+  job: typeof studioJobsTable.$inferSelect,
+  result: Record<string, unknown>,
+  progress: number,
+  message: string,
+): Promise<void> {
+  await db.update(studioJobsTable).set({
+    result,
+    progress,
+    message,
+    updatedAt: new Date(),
+  }).where(eq(studioJobsTable.id, job.id));
+  job.result = result;
+}
+
+async function completeSceneAssetJob(
+  job: typeof studioJobsTable.$inferSelect,
+  scene: typeof scenesTable.$inferSelect,
+  assets: Array<{ id: string; url: string; type: "image" | "video"; prompt: string; createdAt: string }>,
+): Promise<void> {
+  if (!assets.length) throw new Error("No generated media was saved for this scene.");
+  const history: SceneAssetVersion[] = [...(scene.assetHistory ?? [])];
+  if (scene.assetUrl && (scene.assetType === "image" || scene.assetType === "video")) {
+    history.push({
+      id: randomUUID(),
+      url: scene.assetUrl,
+      type: scene.assetType,
+      prompt: scene.imagePrompt,
+      createdAt: scene.updatedAt.toISOString(),
+    });
+  }
+  history.push(...assets);
+  await db.transaction(async (tx) => {
+    await tx.update(scenesTable).set({
+      assetUrl: assets[0].url,
+      assetType: assets[0].type,
+      assetHistory: history.slice(-50),
+      updatedAt: new Date(),
+    }).where(and(
+      eq(scenesTable.id, scene.id),
+      eq(scenesTable.projectId, scene.projectId),
+      eq(scenesTable.userId, scene.userId),
+    ));
+    await tx.update(projectsTable).set({ status: "editing", progress: 45 })
+      .where(and(eq(projectsTable.id, job.projectId), eq(projectsTable.userId, job.userId)));
+    await tx.update(studioJobsTable).set({
+      status: "completed",
+      stage: "completed",
+      progress: 100,
+      message: assets[0].type === "image" ? "Scene image generated and saved." : "Scene video generated and saved.",
+      error: null,
+      completedAt: new Date(),
+      updatedAt: new Date(),
+    }).where(eq(studioJobsTable.id, job.id));
+  });
+}
+
+async function getJobScene(job: typeof studioJobsTable.$inferSelect) {
+  const input = job.input as JobInput;
+  if (!input.sceneId) throw new Error("This generation job is missing its scene.");
+  const [project] = await db.select().from(projectsTable).where(and(
+    eq(projectsTable.id, job.projectId),
+    eq(projectsTable.userId, job.userId),
+  )).limit(1);
+  if (!project) throw new Error("The project for this job no longer exists.");
+  const [scene] = await db.select().from(scenesTable).where(and(
+    eq(scenesTable.id, input.sceneId),
+    eq(scenesTable.projectId, job.projectId),
+    eq(scenesTable.userId, job.userId),
+  )).limit(1);
+  if (!scene) throw new Error("The scene for this job no longer exists.");
+  return { input, project, scene };
+}
+
+async function processImageJob(job: typeof studioJobsTable.$inferSelect): Promise<void> {
+  const { input, project, scene } = await getJobScene(job);
+  if (input.approvePotentialCharges !== true) {
+    throw new Error("Explicit confirmation is required before a generation provider can be used.");
+  }
+  const prompt = scenePrompt(project, scene);
+  const outputCount = Math.max(1, Math.min(input.outputs ?? 1, 4));
+  const outputAssets = assetResult(job);
+  while (outputAssets.length < outputCount) {
+    const requestedModel = input.model || "black-forest-labs/flux-schnell";
+    const bytes = await callMediaProvider(job, "image", input.providerKeyId, "provider_request", async (provider, key) => {
+      const providerModel = provider === "replicate"
+        ? (requestedModel.includes("/") ? requestedModel : "black-forest-labs/flux-schnell")
+        : provider === "openai"
+          ? (requestedModel.startsWith("gpt-") ? requestedModel : "gpt-image-1")
+          : requestedModel;
+      const bytes = await generateStill(
+        provider,
+        key,
+        prompt,
+        providerModel,
+        input.resolution ?? 1024,
+      );
+      return bytes;
+    });
+    const asset = await saveGeneratedAsset(project.id, scene.id, "image", bytes);
+    const saved = {
+      id: asset.id,
+      url: asset.url,
+      type: "image" as const,
+      prompt: scene.imagePrompt,
+      createdAt: new Date().toISOString(),
+    };
+    outputAssets.push(saved);
+    await persistJobResult(job, { sceneId: scene.id, assets: outputAssets }, 25 + outputAssets.length * 12, `Saved image ${outputAssets.length} of ${outputCount}.`);
+  }
+  await completeSceneAssetJob(job, scene, outputAssets);
+}
+
+async function processVideoJob(job: typeof studioJobsTable.$inferSelect): Promise<void> {
+  const { input, project, scene } = await getJobScene(job);
+  if (input.approvePotentialCharges !== true) {
+    throw new Error("Explicit confirmation is required before a generation provider can be used.");
+  }
+  let assets = assetResult(job);
+  if (!assets.length) {
+    const prompt = scenePrompt(project, scene);
+    const referenceImage = input.mode === "image" && scene.assetUrl
+      ? await readGeneratedAsset(scene.assetUrl, project.id, scene.id)
+      : null;
+    const reference = input.mode === "image" && scene.assetUrl
+      ? referenceImage
+        ? `data:image/png;base64,${referenceImage.toString("base64")}`
+        : scene.assetUrl.startsWith("https://")
+          ? scene.assetUrl
+          : null
+      : undefined;
+    if (input.mode === "image" && !reference) {
+      throw new Error("The source image is not available as a public URL or generated scene asset.");
+    }
+    await updateJob(job.id, {
+      stage: "provider_request",
+      progress: 20,
+      message: "Generating a video clip. The provider may take several minutes.",
+    });
+    const model = input.model?.includes("/") ? input.model : "minimax/video-01";
+    const video = await callMediaProvider(job, "video", input.providerKeyId, "provider_request", (provider, key) =>
+      generateVideo(provider, key, model, prompt, reference ?? undefined));
+    const savedAsset = await saveGeneratedAsset(project.id, scene.id, "video", video);
+    assets = [{
+      id: savedAsset.id,
+      url: savedAsset.url,
+      type: "video",
+      prompt: scene.imagePrompt,
+      createdAt: new Date().toISOString(),
+    }];
+    await persistJobResult(job, { sceneId: scene.id, assets }, 85, "Video clip saved; updating the scene.");
+  }
+  await completeSceneAssetJob(job, scene, assets);
+}
+
+async function processVoiceJob(job: typeof studioJobsTable.$inferSelect): Promise<void> {
+  const { input, scene } = await getJobScene(job);
+  if (input.approvePotentialCharges !== true) {
+    throw new Error("Explicit confirmation is required before a generation provider can be used.");
+  }
+  let voiceUrl = typeof job.result?.voiceUrl === "string" ? job.result.voiceUrl : "";
+  if (!voiceUrl) {
+    await updateJob(job.id, {
+      stage: "provider_request",
+      progress: 20,
+      message: "Generating spoken narration.",
+    });
+    const voice = await callMediaProvider(job, "voice", input.providerKeyId, "provider_request", (provider, key) =>
+      generateNarration(provider, key, input.voiceId || "alloy", scene.narration));
+    const saved = await saveGeneratedAsset(scene.projectId, scene.id, "voice", voice);
+    voiceUrl = saved.url;
+    await persistJobResult(job, { sceneId: scene.id, voiceUrl }, 85, "Narration saved; attaching it to the scene.");
+  }
+  await db.transaction(async (tx) => {
+    await tx.update(scenesTable).set({ voiceUrl, updatedAt: new Date() }).where(and(
+      eq(scenesTable.id, scene.id),
+      eq(scenesTable.projectId, scene.projectId),
+      eq(scenesTable.userId, scene.userId),
+    ));
+    await tx.update(studioJobsTable).set({
+      status: "completed",
+      stage: "completed",
+      progress: 100,
+      message: "Narration generated and saved.",
       error: null,
       completedAt: new Date(),
       updatedAt: new Date(),
@@ -312,6 +681,8 @@ async function processExportJob(job: typeof studioJobsTable.$inferSelect): Promi
     input.fps ?? 30,
     project.aspectRatio,
     input.includeSubtitles !== false,
+    project.musicUrl,
+    project.musicVolume,
   );
   const downloadUrl = `/api/projects/${project.id}/export/file`;
   await db.transaction(async (tx) => {
@@ -343,6 +714,12 @@ async function processNextJob(): Promise<void> {
       await processScriptJob(job);
     } else if (job.jobType === "export") {
       await processExportJob(job);
+    } else if (job.jobType === "image") {
+      await processImageJob(job);
+    } else if (job.jobType === "video") {
+      await processVideoJob(job);
+    } else if (job.jobType === "voice") {
+      await processVoiceJob(job);
     } else {
       throw new Error("Unsupported job type.");
     }
@@ -361,7 +738,7 @@ async function processNextJob(): Promise<void> {
       if (job.jobType === "script") {
         await tx.update(projectsTable).set({ status: "failed", progress: 0 })
           .where(and(eq(projectsTable.id, job.projectId), eq(projectsTable.userId, job.userId)));
-      } else if (job.jobType === "export") {
+      } else {
         await tx.update(projectsTable).set({ status: "editing", progress: 45 })
           .where(and(eq(projectsTable.id, job.projectId), eq(projectsTable.userId, job.userId)));
       }

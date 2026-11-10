@@ -12,4 +12,5 @@ export type SearchFreeMediaMediaType = typeof SearchFreeMediaMediaType[keyof typ
 export const SearchFreeMediaMediaType = {
   image: 'image',
   video: 'video',
+  audio: 'audio',
 } as const;

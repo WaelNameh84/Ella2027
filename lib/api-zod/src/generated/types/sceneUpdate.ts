@@ -27,4 +27,35 @@ export interface SceneUpdate {
   assetUrl?: string | null;
   /** @nullable */
   assetType?: SceneUpdateAssetType;
+  /** @maxLength 100 */
+  shotType?: string;
+  /** @maxLength 100 */
+  cameraMovement?: string;
+  /** @maxLength 2000 */
+  location?: string;
+  /** @maxLength 2000 */
+  lighting?: string;
+  /** @maxItems 24 */
+  characterIds?: string[];
+  /** @nullable */
+  voiceUrl?: string | null;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  voiceVolume?: number;
+  /** @minimum 0 */
+  clipStartSeconds?: number;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  clipEndSeconds?: number | null;
+  /**
+     * @minimum 0.25
+     * @maximum 4
+     */
+  playbackSpeed?: number;
+  /** @maxLength 100 */
+  transition?: string;
 }

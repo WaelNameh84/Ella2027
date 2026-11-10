@@ -1,13 +1,32 @@
 import {
   boolean,
+  doublePrecision,
   index,
   integer,
   jsonb,
   pgTable,
+  uniqueIndex,
   text,
   timestamp,
   uuid,
 } from "drizzle-orm/pg-core";
+
+export type StudioCharacter = {
+  id: string;
+  name: string;
+  description: string;
+  costume: string;
+  voiceDescription: string;
+  referenceImageUrl: string | null;
+};
+
+export type SceneAssetVersion = {
+  id: string;
+  url: string;
+  type: "image" | "video";
+  prompt: string;
+  createdAt: string;
+};
 
 export const projectsTable = pgTable("studio_projects", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -20,6 +39,9 @@ export const projectsTable = pgTable("studio_projects", {
   audience: text("audience").notNull(),
   visualStyle: text("visual_style").notNull(),
   aspectRatio: text("aspect_ratio").notNull(),
+  characters: jsonb("characters").$type<StudioCharacter[]>().notNull().default([]),
+  musicUrl: text("music_url"),
+  musicVolume: integer("music_volume").notNull().default(20),
   status: text("status").notNull().default("draft"),
   progress: integer("progress").notNull().default(0),
   exportUrl: text("export_url"),
@@ -48,6 +70,18 @@ export const scenesTable = pgTable("studio_scenes", {
   durationSeconds: integer("duration_seconds").notNull().default(5),
   assetUrl: text("asset_url"),
   assetType: text("asset_type"),
+  shotType: text("shot_type").notNull().default("wide"),
+  cameraMovement: text("camera_movement").notNull().default("static"),
+  location: text("location").notNull().default(""),
+  lighting: text("lighting").notNull().default(""),
+  characterIds: jsonb("character_ids").$type<string[]>().notNull().default([]),
+  voiceUrl: text("voice_url"),
+  voiceVolume: integer("voice_volume").notNull().default(100),
+  clipStartSeconds: integer("clip_start_seconds").notNull().default(0),
+  clipEndSeconds: integer("clip_end_seconds"),
+  playbackSpeed: doublePrecision("playback_speed").notNull().default(1),
+  transition: text("transition").notNull().default("cut"),
+  assetHistory: jsonb("asset_history").$type<SceneAssetVersion[]>().notNull().default([]),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -129,4 +163,27 @@ export const studioJobsTable = pgTable("studio_jobs", {
 }, (table) => [
   index("studio_jobs_queue_idx").on(table.status, table.createdAt),
   index("studio_jobs_user_created_idx").on(table.userId, table.createdAt),
+]);
+
+export const favoriteMediaTable = pgTable("studio_favorite_media", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: text("user_id").notNull(),
+  mediaId: text("media_id").notNull(),
+  source: text("source").notNull(),
+  title: text("title").notNull(),
+  url: text("url").notNull(),
+  thumbnailUrl: text("thumbnail_url"),
+  mediaType: text("media_type").notNull(),
+  license: text("license").notNull(),
+  licenseUrl: text("license_url"),
+  creator: text("creator"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+}, (table) => [
+  uniqueIndex("studio_favorite_media_user_item_idx").on(
+    table.userId,
+    table.source,
+    table.mediaId,
+  ),
 ]);

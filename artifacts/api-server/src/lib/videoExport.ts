@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
+import { generatedAssetContentType, generatedAssetPath } from "./studioAssets";
 
 type ExportScene = {
   id: string;
@@ -13,6 +14,11 @@ type ExportScene = {
   assetUrl: string | null;
   assetType: string | null;
   durationSeconds: number;
+  voiceUrl: string | null;
+  voiceVolume: number;
+  clipStartSeconds: number;
+  clipEndSeconds: number | null;
+  playbackSpeed: number;
 };
 
 function isPrivateAddress(address: string): boolean {
@@ -96,6 +102,23 @@ function ffmpegFilter(width: number, height: number, fps: number): string {
   return `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps}`;
 }
 
+async function mediaBytes(
+  url: string,
+  projectId: string,
+  sceneId?: string,
+): Promise<{ bytes: Buffer; contentType: string }> {
+  const localPath = sceneId ? generatedAssetPath(url, projectId, sceneId) : null;
+  const localType = sceneId ? generatedAssetContentType(url) : null;
+  if (localPath && localType) {
+    return { bytes: await readFile(localPath), contentType: localType };
+  }
+  const response = await safeAssetResponse(url);
+  return {
+    bytes: Buffer.from(await response.arrayBuffer()),
+    contentType: response.headers.get("content-type") ?? "",
+  };
+}
+
 function formatSubtitleTime(milliseconds: number): string {
   const hours = Math.floor(milliseconds / 3_600_000);
   const minutes = Math.floor((milliseconds % 3_600_000) / 60_000);
@@ -116,6 +139,8 @@ export async function renderMp4(
   fps: number,
   aspectRatio: string,
   includeSubtitles: boolean,
+  musicUrl: string | null = null,
+  musicVolume = 0,
 ): Promise<string> {
   if (!scenes.length) throw new Error("Add scenes before exporting.");
   if (scenes.some((scene) => !scene.assetUrl || !["image", "video"].includes(scene.assetType ?? ""))) {
@@ -140,12 +165,13 @@ export async function renderMp4(
   await mkdir(workDir, { recursive: true });
   await mkdir(userDir, { recursive: true });
   const finalPath = join(userDir, `${projectId}.mp4`);
+  const concatenatedPath = join(workDir, "video-track.mp4");
   const segmentList: string[] = [];
+  let totalDuration = 0;
 
   try {
     for (const [index, scene] of scenes.entries()) {
-      const response = await safeAssetResponse(scene.assetUrl!);
-      const contentType = response.headers.get("content-type") ?? "";
+      const { bytes: sourceBytes, contentType } = await mediaBytes(scene.assetUrl!, projectId, scene.id);
       const isVideo = scene.assetType === "video" || contentType.startsWith("video/");
       if (!isVideo && !contentType.startsWith("image/")) {
         throw new Error(`Scene ${index + 1} has an unsupported media type.`);
@@ -153,11 +179,19 @@ export async function renderMp4(
       const extension = isVideo ? "mp4" : contentType.includes("png") ? "png" : contentType.includes("webp") ? "webp" : "jpg";
       const sourcePath = join(workDir, `source-${index}.${extension}`);
       const segmentPath = join(workDir, `scene-${index}.mp4`);
-      await writeFile(sourcePath, Buffer.from(await response.arrayBuffer()));
+      await writeFile(sourcePath, sourceBytes);
+      const clipStart = isVideo ? Math.max(0, scene.clipStartSeconds || 0) : 0;
+      const clipRange = isVideo && scene.clipEndSeconds !== null
+        ? Math.max(0, scene.clipEndSeconds - clipStart)
+        : scene.durationSeconds;
+      if (clipRange <= 0) throw new Error(`Scene ${index + 1} has an invalid clip range.`);
+      const playbackSpeed = Math.max(0.25, Math.min(4, scene.playbackSpeed || 1));
+      const duration = Math.max(1, Math.min(600, clipRange / playbackSpeed));
+      totalDuration += duration;
       const narration = scene.narration.trim().replaceAll("-->", "—>").replace(/\r\n?/g, "\n");
       const subtitlePath = join(workDir, `subtitle-${index}.srt`);
       if (includeSubtitles && narration) {
-        const endTime = Math.max(1, Math.round(scene.durationSeconds * 1000));
+        const endTime = Math.max(1, Math.round(duration * 1000));
         await writeFile(
           subtitlePath,
           `1\n${formatSubtitleTime(0)} --> ${formatSubtitleTime(endTime)}\n${narration}\n`,
@@ -165,18 +199,38 @@ export async function renderMp4(
         );
       }
       const inputArgs = isVideo
-        ? ["-i", sourcePath, "-t", String(scene.durationSeconds)]
-        : ["-loop", "1", "-i", sourcePath, "-t", String(scene.durationSeconds)];
-      const videoFilter = includeSubtitles && narration
+        ? ["-ss", String(clipStart), "-i", sourcePath, "-t", String(clipRange)]
+        : ["-loop", "1", "-i", sourcePath, "-t", String(duration)];
+      let voicePath: string | null = null;
+      if (scene.voiceUrl) {
+        const voice = await mediaBytes(scene.voiceUrl, projectId, scene.id);
+        if (!voice.contentType.startsWith("audio/")) {
+          throw new Error(`Scene ${index + 1} has an unsupported narration audio format.`);
+        }
+        voicePath = join(workDir, `voice-${index}.${voice.contentType.includes("wav") ? "wav" : "mp3"}`);
+        await writeFile(voicePath, voice.bytes);
+      }
+      const baseVideoFilter = includeSubtitles && narration
         ? `${ffmpegFilter(width, height, fps)},subtitles=filename=${escapeFilterPath(subtitlePath)}:force_style='FontName=DejaVu Sans,FontSize=22,Outline=2,Shadow=1,Alignment=2,MarginV=36'`
         : ffmpegFilter(width, height, fps);
+      const videoFilter = `${baseVideoFilter},setpts=PTS/${playbackSpeed}`;
+      const audioInput = voicePath
+        ? ["-i", voicePath]
+        : ["-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000"];
+      const voiceVolume = Math.max(0, Math.min(2, (scene.voiceVolume ?? 100) / 100));
       await runFfmpeg([
         ...inputArgs,
-        "-vf", videoFilter,
-        "-an",
+        ...audioInput,
+        "-filter_complex", `[0:v]${videoFilter}[v];[1:a]volume=${voiceVolume},apad,atrim=duration=${duration}[a]`,
+        "-map", "[v]",
+        "-map", "[a]",
+        "-t", String(duration),
         "-c:v", "libx264",
         "-preset", "veryfast",
         "-pix_fmt", "yuv420p",
+        "-c:a", "aac",
+        "-ar", "48000",
+        "-ac", "2",
         "-movflags", "+faststart",
         segmentPath,
       ]);
@@ -194,8 +248,32 @@ export async function renderMp4(
       "-i", concatFile,
       "-c", "copy",
       "-movflags", "+faststart",
-      finalPath,
+      concatenatedPath,
     ]);
+    if (musicUrl && musicVolume > 0) {
+      const music = await mediaBytes(musicUrl, projectId);
+      if (!music.contentType.startsWith("audio/")) {
+        throw new Error("The selected soundtrack must be an audio file.");
+      }
+      const musicPath = join(workDir, "soundtrack");
+      await writeFile(musicPath, music.bytes);
+      await runFfmpeg([
+        "-i", concatenatedPath,
+        "-stream_loop", "-1",
+        "-i", musicPath,
+        "-filter_complex", `[0:a]volume=1[voice];[1:a]volume=${Math.max(0, Math.min(1, musicVolume / 100))}[music];[voice][music]amix=inputs=2:duration=first:dropout_transition=2[a]`,
+        "-map", "0:v:0",
+        "-map", "[a]",
+        "-t", String(totalDuration),
+        "-c:v", "copy",
+        "-c:a", "aac",
+        "-b:a", "192k",
+        "-movflags", "+faststart",
+        finalPath,
+      ]);
+    } else {
+      await writeFile(finalPath, await readFile(concatenatedPath));
+    }
     return finalPath;
   } finally {
     await rm(workDir, { recursive: true, force: true });

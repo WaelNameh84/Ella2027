@@ -16,4 +16,5 @@ export const ProviderKeyServiceType = {
   voice: 'voice',
   transcription: 'transcription',
   music: 'music',
+  media: 'media',
 } as const;

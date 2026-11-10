@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
 import studioRouter from "./studio";
+import generationRouter from "./generation";
 import { requireUser } from "../middlewares/requireUser";
 import { startStudioJobWorker } from "../lib/studioJobs";
 
@@ -10,5 +11,6 @@ void startStudioJobWorker();
 
 router.use(healthRouter);
 router.use(requireUser, studioRouter);
+router.use(requireUser, generationRouter);
 
 export default router;

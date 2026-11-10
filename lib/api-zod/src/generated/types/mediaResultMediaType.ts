@@ -12,4 +12,5 @@ export type MediaResultMediaType = typeof MediaResultMediaType[keyof typeof Medi
 export const MediaResultMediaType = {
   image: 'image',
   video: 'video',
+  audio: 'audio',
 } as const;
