@@ -339,23 +339,47 @@ const projectTemplates = [
   { id: 'documentary', ar: 'وثائقي', en: 'Documentary', videoType: 'documentary', durationSeconds: 300, aspectRatio: '16:9', visualStyle: 'Grounded documentary', audience: 'General audience' },
   { id: 'presentation', ar: 'عرض تقديمي', en: 'Presentation', videoType: 'presentation', durationSeconds: 120, aspectRatio: '16:9', visualStyle: 'Readable, professional slides', audience: 'Meeting attendees' },
 ] as const;
-function ProjectForm({ onClose, initial, onSave, pending }: { onClose: () => void; initial?: Partial<ProjectInput>; onSave: (data: ProjectInput) => void; pending: boolean }) {
+function ProjectForm({ onClose, initial, onSave, pending, textProviderReady = false, checkingProvider = false, generationError = false, projectCreated = false, onOpenCreated }: { onClose: () => void; initial?: Partial<ProjectInput>; onSave: (data: ProjectInput, approvePotentialCharges?: boolean) => void; pending: boolean; textProviderReady?: boolean; checkingProvider?: boolean; generationError?: boolean; projectCreated?: boolean; onOpenCreated?: () => void }) {
   const { lang } = useApp();
   const [form, setForm] = useState<ProjectInput>({ ...blankProject, ...initial });
   const [template, setTemplate] = useState('');
   const [customLanguage, setCustomLanguage] = useState('');
+  const [approvePotentialCharges, setApprovePotentialCharges] = useState(false);
   const editing = Boolean(initial);
   const update = (key: keyof ProjectInput, val: string | number) => setForm(old => ({ ...old, [key]: val }));
-  return <Modal onClose={onClose} title={editing ? tx(lang,'تعديل تفاصيل المشروع','Edit project details') : tx(lang, 'مشروع جديد', 'New project')} subtitle={tx(lang, 'ابدأ بوصف بسيط لما تريد صنعه.', 'Give your next film a starting point.')}>
-    <form onSubmit={e => { e.preventDefault(); onSave(form); }} className="form-stack">
-      {!editing && <label><span className="field-label">{tx(lang,'قالب بداية','Starting template')}</span><select className="studio-input" value={template} onChange={e=>{const selected=projectTemplates.find(item=>item.id===e.target.value);setTemplate(e.target.value);if(selected)setForm(old=>({...old,videoType:selected.videoType,durationSeconds:selected.durationSeconds,aspectRatio:selected.aspectRatio,visualStyle:selected.visualStyle,audience:selected.audience}));}}><option value="">{tx(lang,'بدون قالب','No template')}</option>{projectTemplates.map(item=><option key={item.id} value={item.id}>{tx(lang,item.ar,item.en)}</option>)}</select></label>}
-      <label><span className="field-label">{tx(lang,'عنوان المشروع','Project title')}</span><input required maxLength={160} className="studio-input" value={form.title} onChange={e => update('title',e.target.value)} placeholder={tx(lang,'مثال: ذاكرة البحر','e.g. Memory of the sea')} data-testid="input-project-title" /></label>
-      <label><span className="field-label">{tx(lang,'الفكرة','Concept')}</span><textarea required maxLength={12000} rows={3} className="studio-input resize-y" value={form.idea} onChange={e => update('idea',e.target.value)} placeholder={tx(lang,'ما القصة التي تريد روايتها؟','What story do you want to tell?')} data-testid="input-project-idea" /></label>
-      <div className="form-two"><label><span className="field-label">{tx(lang,'نوع الفيديو','Format')}</span><select className="studio-input" value={form.videoType} onChange={e => update('videoType',e.target.value)}>{videoTypes.map(([value,ar,en])=><option key={value} value={value}>{tx(lang,ar,en)}</option>)}</select></label><label><span className="field-label">{tx(lang,'اللغة','Language')}</span><select className="studio-input" value={['ar','en','fr','de','sv','es'].includes(form.language)?form.language:'other'} onChange={e => {const value=e.target.value;if(value==='other'){update('language',customLanguage||'other');}else{setCustomLanguage('');update('language',value);}}}><option value="ar">العربية</option><option value="en">English</option><option value="fr">Français</option><option value="de">Deutsch</option><option value="sv">Svenska</option><option value="es">Español</option><option value="other">{tx(lang,'لغة أخرى','Other language')}</option></select></label></div>
-      {!['ar','en','fr','de','sv','es'].includes(form.language) && <label><span className="field-label">{tx(lang,'اسم اللغة','Language name')}</span><input required className="studio-input" value={form.language==='other'?customLanguage:form.language} onChange={e=>{setCustomLanguage(e.target.value);update('language',e.target.value);}} placeholder={tx(lang,'مثال: التركية','e.g. Turkish')} /></label>}
-      <div className="form-two"><label><span className="field-label">{tx(lang,'المدة بالثواني','Duration in seconds')}</span><input type="number" min="5" max="3600" className="studio-input" value={form.durationSeconds} onChange={e => update('durationSeconds',Number(e.target.value))} /></label><label><span className="field-label">{tx(lang,'نسبة الأبعاد','Aspect ratio')}</span><select className="studio-input" value={form.aspectRatio} onChange={e => update('aspectRatio',e.target.value)}><option>16:9</option><option>9:16</option><option>1:1</option><option>4:5</option><option>4:3</option><option>3:2</option></select></label></div>
-       <div className="form-two"><label><span className="field-label">{tx(lang,'الجمهور','Audience')}</span><input className="studio-input" value={form.audience} onChange={e => update('audience',e.target.value)} /></label><label><span className="field-label">{tx(lang,'الأسلوب البصري','Visual style')}</span><select className="studio-input" value={visualStyles.some(([value])=>value===form.visualStyle)?form.visualStyle:'custom'} onChange={e=>{if(e.target.value!=='custom')update('visualStyle',e.target.value);else if(visualStyles.some(([value])=>value===form.visualStyle))update('visualStyle','');}}><option value="custom">{tx(lang,'أسلوب مخصص','Custom style')}</option>{visualStyles.map(([value,ar])=><option key={value} value={value}>{lang==='ar'?ar:value}</option>)}</select>{!visualStyles.some(([value])=>value===form.visualStyle)&&<input className="studio-input mt-2" value={form.visualStyle} onChange={e=>update('visualStyle',e.target.value)} placeholder={tx(lang,'اكتب أسلوبك الخاص','Describe your own style')} />}</label></div>
-      <div className="modal-actions"><button type="button" className="btn btn-quiet" onClick={onClose}>{tx(lang,'إلغاء','Cancel')}</button><button disabled={pending} className="btn btn-primary" data-testid="button-create-project">{pending ? <LoaderCircle className="animate-spin" size={16}/> : editing ? <Check size={16}/> : <Plus size={16}/ >}{editing ? tx(lang,'حفظ التعديلات','Save changes') : tx(lang,'إنشاء المشروع','Create project')}</button></div>
+  const submit = () => {
+    const idea = form.idea.trim();
+    const firstLine = idea.split(/\r?\n/, 1)[0]?.trim() || idea;
+    const firstSentence = firstLine.split(/[.!؟?]/, 1)[0]?.trim() || firstLine;
+    const title = firstSentence.length > 72 ? `${firstSentence.slice(0, 71).trimEnd()}…` : firstSentence;
+    onSave(editing ? { ...form, title: form.title.trim(), idea } : {
+      ...form,
+      title,
+      idea,
+      videoType: 'story',
+      language: lang === 'ar' ? 'ar' : 'en',
+      durationSeconds: 60,
+      audience: lang === 'ar' ? 'الجمهور العام' : 'General audience',
+      visualStyle: lang === 'ar' ? 'سينمائي' : 'Cinematic',
+      aspectRatio: '16:9',
+    }, !editing && approvePotentialCharges);
+  };
+  const canSubmit = editing || (Boolean(form.idea.trim()) && textProviderReady && approvePotentialCharges);
+  return <Modal onClose={onClose} title={editing ? tx(lang,'تعديل تفاصيل المشروع','Edit project details') : tx(lang, 'فكرتك إلى قصة', 'Turn your idea into a story')} subtitle={editing ? tx(lang, 'عدّل تفاصيل المشروع ومشاهده.', 'Update the project details.') : tx(lang, 'اكتب فكرة قصيرة، وسنؤلف منها القصة والمشاهد.', 'Write a short idea and we’ll turn it into a story and scenes.')}>
+    <form onSubmit={e => { e.preventDefault(); submit(); }} className="form-stack">
+      {!editing ? <>
+        <label><span className="field-label">{tx(lang,'فكرتك','Your idea')}</span><textarea required maxLength={1500} rows={5} className="studio-input resize-y" value={form.idea} onChange={e => update('idea',e.target.value)} placeholder={tx(lang,'مثال: طفل يجد رسالة قديمة تقوده إلى سرّ في قريته…','Example: A child finds an old letter that leads to a secret in their village…')} data-testid="input-project-idea" disabled={projectCreated} autoFocus /></label>
+        {checkingProvider ? <Busy text={tx(lang,'جارٍ التحقق من مفتاح الكتابة…','Checking your writing key…')} /> : !textProviderReady ? <div className="service-purpose-hint is-unavailable"><b>{tx(lang,'لا يوجد مفتاح كتابة جاهز','No text-generation key is ready')}</b><span>{tx(lang,'أضف مفتاحًا مفعّلًا لمزوّد نص، ثم ارجع لبدء القصة.','Enable a text provider key, then return to start the story.')}</span><Link href="/settings/providers" className="text-link">{tx(lang,'إعداد مفاتيح الخدمات','Set up provider keys')}<ArrowLeft size={14}/></Link></div> : <label className="checkline charge-consent"><input type="checkbox" checked={approvePotentialCharges} disabled={projectCreated} onChange={e=>setApprovePotentialCharges(e.target.checked)} data-testid="checkbox-story-charge-consent"/>{tx(lang,'أوافق على إرسال الفكرة لمزوّد النص؛ قد تُحتسب رسوم حسب خطتي.','I agree to send this idea to my text provider; charges may apply.')}</label>}
+        {generationError && <div className="inline-error" role="alert">{tx(lang,'تم حفظ الفكرة، لكن تعذّر بدء تأليف القصة. أعد المحاولة أو افتح المشروع.','Your idea was saved, but story generation could not start. Retry or open the project.')}{onOpenCreated && <button type="button" className="text-link mt-2" onClick={onOpenCreated}>{tx(lang,'فتح المشروع','Open project')}<ArrowLeft size={14}/></button>}</div>}
+      </> : <>
+        <label><span className="field-label">{tx(lang,'عنوان المشروع','Project title')}</span><input required maxLength={160} className="studio-input" value={form.title} onChange={e => update('title',e.target.value)} placeholder={tx(lang,'مثال: ذاكرة البحر','e.g. Memory of the sea')} data-testid="input-project-title" /></label>
+        <label><span className="field-label">{tx(lang,'الفكرة','Concept')}</span><textarea required maxLength={12000} rows={3} className="studio-input resize-y" value={form.idea} onChange={e => update('idea',e.target.value)} placeholder={tx(lang,'ما القصة التي تريد روايتها؟','What story do you want to tell?')} data-testid="input-project-idea" /></label>
+        <div className="form-two"><label><span className="field-label">{tx(lang,'نوع الفيديو','Format')}</span><select className="studio-input" value={form.videoType} onChange={e => update('videoType',e.target.value)}>{videoTypes.map(([value,ar,en])=><option key={value} value={value}>{tx(lang,ar,en)}</option>)}</select></label><label><span className="field-label">{tx(lang,'اللغة','Language')}</span><select className="studio-input" value={['ar','en','fr','de','sv','es'].includes(form.language)?form.language:'other'} onChange={e => {const value=e.target.value;if(value==='other'){update('language',customLanguage||'other');}else{setCustomLanguage('');update('language',value);}}}><option value="ar">العربية</option><option value="en">English</option><option value="fr">Français</option><option value="de">Deutsch</option><option value="sv">Svenska</option><option value="es">Español</option><option value="other">{tx(lang,'لغة أخرى','Other language')}</option></select></label></div>
+        {!['ar','en','fr','de','sv','es'].includes(form.language) && <label><span className="field-label">{tx(lang,'اسم اللغة','Language name')}</span><input required className="studio-input" value={form.language==='other'?customLanguage:form.language} onChange={e=>{setCustomLanguage(e.target.value);update('language',e.target.value);}} placeholder={tx(lang,'مثال: التركية','e.g. Turkish')} /></label>}
+        <div className="form-two"><label><span className="field-label">{tx(lang,'المدة بالثواني','Duration in seconds')}</span><input type="number" min="5" max="3600" className="studio-input" value={form.durationSeconds} onChange={e => update('durationSeconds',Number(e.target.value))} /></label><label><span className="field-label">{tx(lang,'نسبة الأبعاد','Aspect ratio')}</span><select className="studio-input" value={form.aspectRatio} onChange={e => update('aspectRatio',e.target.value)}><option>16:9</option><option>9:16</option><option>1:1</option><option>4:5</option><option>4:3</option><option>3:2</option></select></label></div>
+        <div className="form-two"><label><span className="field-label">{tx(lang,'الجمهور','Audience')}</span><input className="studio-input" value={form.audience} onChange={e => update('audience',e.target.value)} /></label><label><span className="field-label">{tx(lang,'الأسلوب البصري','Visual style')}</span><select className="studio-input" value={visualStyles.some(([value])=>value===form.visualStyle)?form.visualStyle:'custom'} onChange={e=>{if(e.target.value!=='custom')update('visualStyle',e.target.value);else if(visualStyles.some(([value])=>value===form.visualStyle))update('visualStyle','');}}><option value="custom">{tx(lang,'أسلوب مخصص','Custom style')}</option>{visualStyles.map(([value,ar])=><option key={value} value={value}>{lang==='ar'?ar:value}</option>)}</select>{!visualStyles.some(([value])=>value===form.visualStyle)&&<input className="studio-input mt-2" value={form.visualStyle} onChange={e=>update('visualStyle',e.target.value)} placeholder={tx(lang,'اكتب أسلوبك الخاص','Describe your own style')} />}</label></div>
+      </>}
+      <div className="modal-actions"><button type="button" className="btn btn-quiet" onClick={onClose}>{tx(lang,'إلغاء','Cancel')}</button><button disabled={pending || !canSubmit} className="btn btn-primary" data-testid="button-create-project">{pending ? <LoaderCircle className="animate-spin" size={16}/> : editing ? <Check size={16}/> : <WandSparkles size={16}/ >}{editing ? tx(lang,'حفظ التعديلات','Save changes') : pending ? projectCreated ? tx(lang,'جارٍ بدء كتابة القصة…','Starting story generation…') : tx(lang,'جارٍ إنشاء المشروع…','Creating project…') : generationError ? tx(lang,'إعادة محاولة التأليف','Retry story generation') : tx(lang,'اكتب القصة','Write the story')}</button></div>
     </form>
   </Modal>;
 }
@@ -367,17 +391,40 @@ function Projects() {
   const { lang } = useApp();
   const [, setLocation] = useLocation();
   const q = useListProjects();
+  const keysQuery = useListProviderKeys();
   const qc = useQueryClient();
   const create = useCreateProject();
+  const generate = useQueueProjectScript();
   const remove = useDeleteProject();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const [createdProjectId, setCreatedProjectId] = useState<string | null>(null);
   const list = useMemo(() => (q.data || []).filter(p => `${p.title} ${p.idea}`.toLowerCase().includes(search.toLowerCase())), [q.data, search]);
+  const textProviderReady = Boolean(keysQuery.data?.some(key => key.serviceType === 'text' && providerSupports(key.provider, 'text') && key.enabled && (key.status === 'valid' || key.status === 'untested')));
   const afterChange = () => { qc.invalidateQueries({ queryKey: getListProjectsQueryKey() }); qc.invalidateQueries({ queryKey: getGetStudioSummaryQueryKey() }); };
+  const startStory = (projectId: string) => generate.mutate({ projectId, data: { providerKeyId: null, allowRotation: true, approvePotentialCharges: true } }, {
+    onSuccess: () => {
+      afterChange();
+      setOpen(false);
+      setCreatedProjectId(null);
+      setLocation(`/projects/${projectId}`);
+    },
+  });
+  const saveProjectAndWriteStory = (data: ProjectInput, approvePotentialCharges = false) => {
+    if (createdProjectId) {
+      startStory(createdProjectId);
+      return;
+    }
+    create.mutate({ data }, { onSuccess: project => {
+      afterChange();
+      setCreatedProjectId(project.id);
+      if (approvePotentialCharges) startStory(project.id);
+    } });
+  };
   return <AppFrame title={tx(lang,'المشاريع','Projects')}><div className="page-toolbar"><div><span className="eyebrow">{tx(lang,'أرشيف الإنتاج','PRODUCTION ARCHIVE')}</span><h2>{tx(lang,'كل القصص التي بدأت.', 'Every story you started.')}</h2><p>{tx(lang,'مشاريعك وسيناريوهاتك محفوظة في مكان واحد.', 'Your projects and storyboards, kept in one place.')}</p></div><button onClick={() => setOpen(true)} className="btn btn-primary" data-testid="button-new-project"><Plus size={17}/>{tx(lang,'مشروع جديد','New project')}</button></div>
     <div className="list-controls"><label className="searchbox"><Search size={17}/><input value={search} onChange={e => setSearch(e.target.value)} placeholder={tx(lang,'ابحث في مشاريعك','Search projects')} data-testid="input-project-search" /></label><span className="result-count">{q.data?.length ?? '—'} {tx(lang,'مشروع','projects')}</span></div>
     {q.isLoading ? <div className="project-grid">{[1,2,3].map(n=><SkeletonBlock key={n} className="h-52" />)}</div> : q.isError ? <StateError lang={lang} retry={() => q.refetch()} /> : list.length ? <div className="project-grid">{list.map(p=><ProjectCard key={p.id} project={p} onDelete={id => { if (window.confirm(tx(lang,'هل تريد حذف المشروع وكل مشاهده؟','Delete this project and all its scenes?'))) remove.mutate({projectId:id},{onSuccess:()=>{afterChange();qc.invalidateQueries({queryKey:getGetProjectQueryKey(id)});}}); }} />)}</div> : <Empty title={search ? tx(lang,'لا توجد مطابقة','No matching projects') : tx(lang,'ابدأ بمشهد أول','Start with a first frame')} body={search ? tx(lang,'جرّب كلمات بحث أخرى.','Try another search term.') : tx(lang,'أنشئ مشروعًا ليصبح لديك مكان لصياغة الفكرة وبناء المشاهد.','Create a project to shape the idea and build your scenes.')} action={!search && <button className="btn btn-primary" onClick={() => setOpen(true)}><Plus size={16}/>{tx(lang,'إنشاء أول مشروع','Create your first project')}</button>} />}
-    {open && <ProjectForm onClose={() => setOpen(false)} pending={create.isPending} onSave={data => create.mutate({data},{onSuccess: p => { afterChange(); setOpen(false); setLocation(`/projects/${p.id}`); }})} />}
+    {open && <ProjectForm onClose={() => { setOpen(false); setCreatedProjectId(null); }} pending={create.isPending || generate.isPending} textProviderReady={textProviderReady} checkingProvider={keysQuery.isLoading} generationError={generate.isError && Boolean(createdProjectId)} projectCreated={Boolean(createdProjectId)} onOpenCreated={createdProjectId ? () => { setOpen(false); setCreatedProjectId(null); setLocation(`/projects/${createdProjectId}`); } : undefined} onSave={saveProjectAndWriteStory} />}
   </AppFrame>;
 }
 
