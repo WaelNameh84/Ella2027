@@ -297,12 +297,15 @@ router.post(
     const candidates = selected
       ? [selected, ...usable.filter((key) => key.id !== selected.id)]
       : usable;
-    const ordered = settings?.fallbackProvider
+    const orderedCandidates = settings?.fallbackProvider
       ? [
           ...candidates.filter((key) => key.provider !== settings.fallbackProvider),
           ...candidates.filter((key) => key.provider === settings.fallbackProvider),
         ]
       : candidates;
+    const ordered = selected
+      ? [selected, ...orderedCandidates.filter((key) => key.id !== selected.id)]
+      : orderedCandidates;
     const attemptLimit = autoRotate ? Math.max(1, Math.min(settings?.maxAttempts ?? 3, ordered.length)) : 1;
     if (!ordered.length) {
       res.status(409).json({ error: "Add an enabled Whisper or Hugging Face key under the transcription service type." });

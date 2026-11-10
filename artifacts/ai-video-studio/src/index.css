@@ -499,6 +499,7 @@ body { min-height: 100dvh; }
 .provider-ident b { font-size: 12px; }
 .provider-ident span { color: hsl(var(--muted-foreground)); font-size: 10px; text-transform: capitalize; }
 .provider-ident .provider-purpose { width: fit-content; border-radius: 999px; padding: 3px 7px; color: hsl(var(--primary)); background: hsl(var(--primary) / .09); font-size: 9px; line-height: 1.5; text-transform: none; }
+.provider-ident .provider-purpose-description { color: hsl(var(--muted-foreground)); font-size: 9px; line-height: 1.5; text-transform: none; }
 .provider-ident .provider-purpose.is-unavailable { color: hsl(var(--destructive)); background: hsl(var(--destructive) / .09); }
 .provider-ident .provider-purpose-warning { color: hsl(var(--destructive)); font-size: 9px; line-height: 1.5; }
 .service-purpose-hint { display: grid; gap: 4px; margin-top: -5px; padding: 10px 12px; border: 1px solid hsl(var(--primary) / .18); border-radius: 9px; color: hsl(var(--foreground)); background: hsl(var(--primary) / .045); font-size: 11px; line-height: 1.55; }

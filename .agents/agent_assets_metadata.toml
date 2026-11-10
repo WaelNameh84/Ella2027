@@ -1,0 +1,16 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "hGYQjIzx12XB0l3ExSZnQ"
+uri = "file://TECHNICAL_AUDIT.md"
+type = "text"
+title = "تقرير التدقيق التقني"
+description = "نتائج المراجعة التقنية، الإصلاحات، الاختبارات، والقيود المتبقية."
+logical_id = "05d569a4-0c44-4716-a809-b244dec7cd58"
+content_hash = "sha256:27f3d53e227b23b98fb6f8c81e51e030d2ec2a200a3dadc2295bdb02ed262840"
+size = 10949
+mtime_ms = 1794340991103
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:3f70e056-fa5e-4f04-879e-7e059200fd1f/05d569a4-0c44-4716-a809-b244dec7cd58/2d5cc278-c379-4040-9952-0d1589893539"
+storage_version_token = "1794341000715947"
+content_type = "text/markdown"

@@ -78,10 +78,11 @@ function providerSupports(provider: string, service: string) {
   if (service === 'video') return provider === 'replicate';
   if (service === 'voice') return ['elevenlabs','openai','openai-audio'].includes(provider);
   if (service === 'transcription') return ['openai','whisper','huggingface'].includes(provider);
-  return true;
+  if (service === 'media') return ['pexels','pixabay','unsplash'].includes(provider);
+  return false;
 }
 
-function providerServicePurpose(service: string, lang: Lang) {
+function providerServicePurpose(service: string, lang: Lang, provider = '') {
   const purposes: Record<string, { label: string; description: string }> = {
     text: {
       label: tx(lang, 'الكتابة وتوليد السيناريو', 'Writing and script generation'),
@@ -109,9 +110,27 @@ function providerServicePurpose(service: string, lang: Lang) {
     },
     media: {
       label: tx(lang, 'البحث عن الوسائط', 'Media search'),
-      description: tx(lang, 'البحث يستخدم مصادر مفتوحة ولا يحتاج مفتاح API.', 'Media search uses open sources and does not need an API key.'),
+      description: tx(lang, 'يبحث عن الصور والفيديو من مزوّد الوسائط المحدد. مصادر Openverse وWikimedia وInternet Archive لا تحتاج إلى مفتاح.', 'Searches the selected media provider for images or video. Openverse, Wikimedia, and Internet Archive do not need a key.'),
     },
   };
+  if (service === 'media' && provider === 'pexels') {
+    return {
+      label: tx(lang, 'البحث في Pexels', 'Pexels media search'),
+      description: tx(lang, 'يبحث عن الصور ومقاطع الفيديو في Pexels بهذا المفتاح.', 'Searches Pexels for photos and video clips with this key.'),
+    };
+  }
+  if (service === 'media' && provider === 'pixabay') {
+    return {
+      label: tx(lang, 'البحث في Pixabay', 'Pixabay media search'),
+      description: tx(lang, 'يبحث عن الصور ومقاطع الفيديو في Pixabay بهذا المفتاح.', 'Searches Pixabay for images and video clips with this key.'),
+    };
+  }
+  if (service === 'media' && provider === 'unsplash') {
+    return {
+      label: tx(lang, 'البحث عن الصور في Unsplash', 'Unsplash photo search'),
+      description: tx(lang, 'يبحث عن الصور فقط في Unsplash بهذا المفتاح.', 'Searches Unsplash for photos only with this key.'),
+    };
+  }
   return purposes[service] ?? {
     label: tx(lang, 'خدمة غير معروفة', 'Unknown service'),
     description: tx(lang, 'لم يُحدّد استخدام هذا المفتاح.', 'The purpose of this key is not defined.'),
@@ -119,7 +138,7 @@ function providerServicePurpose(service: string, lang: Lang) {
 }
 
 function providerServiceIsConnected(provider: string, service: string) {
-  return ['text', 'image', 'video', 'voice', 'transcription'].includes(service)
+  return ['text', 'image', 'video', 'voice', 'transcription', 'media'].includes(service)
     && providerSupports(provider, service);
 }
 
@@ -303,6 +322,9 @@ const providerOfficialUrls: Record<string, string> = {
   assemblyai: 'https://www.assemblyai.com/dashboard/signup',
   'google-speech': 'https://console.cloud.google.com/apis/credentials',
   musicgen: 'https://github.com/facebookresearch/audiocraft',
+  pexels: 'https://www.pexels.com/api/',
+  pixabay: 'https://pixabay.com/api/docs/',
+  unsplash: 'https://unsplash.com/developers',
   openverse: 'https://openverse.org/',
 };
 const projectTemplates = [
@@ -770,11 +792,11 @@ function ProvidersPage() {
 function ProviderRow({item,onEdit,onToggle,onPriority,onTest,onDelete,testing,lang}:{item:ProviderKey;onEdit:()=>void;onToggle:(v:boolean)=>void;onPriority:(v:number)=>void;onTest:()=>void;onDelete:()=>void;testing:boolean;lang:Lang}) {
   const officialUrl=providerOfficialUrls[item.provider];
   const testedAt=item.lastTestAt?new Date(item.lastTestAt).toLocaleString(lang==='ar'?'ar':'en') : tx(lang,'لم يُختبر بعد','Not tested yet');
-  const purpose=providerServicePurpose(item.serviceType,lang);
+  const purpose=providerServicePurpose(item.serviceType,lang,item.provider);
   const serviceConnected=providerServiceIsConnected(item.provider,item.serviceType);
   return <div className="provider-row">
     <div className="provider-avatar">{item.provider.slice(0,2).toUpperCase()}</div>
-    <div className="provider-ident"><b>{item.label}</b><span>{item.provider}</span><span className={`provider-purpose ${serviceConnected?'':'is-unavailable'}`}>{tx(lang,'يُستخدم لـ:','Used for:')} {purpose.label}</span>{!serviceConnected&&<small className="provider-purpose-warning">{tx(lang,'هذا الاستخدام غير موصول حاليًا لهذا المزوّد.','This task is not currently connected for this provider.')}</small>}</div>
+    <div className="provider-ident"><b>{item.label}</b><span>{item.provider}</span><span className={`provider-purpose ${serviceConnected?'':'is-unavailable'}`}>{tx(lang,'وظيفته:','Purpose:')} {purpose.label}</span><small className="provider-purpose-description">{purpose.description}</small>{!serviceConnected&&<small className="provider-purpose-warning">{tx(lang,'هذا الاستخدام غير موصول حاليًا لهذا المزوّد.','This task is not currently connected for this provider.')}</small>}</div>
     <span className={`key-status ${item.status}`}>{item.status.replace('_',' ')}</span>
     <label className="priority-control"><span>{tx(lang,'الأولوية','Priority')}</span><input type="number" min="0" value={item.priority} aria-label={tx(lang,'أولوية المفتاح','Key priority')} onChange={e=>onPriority(Number(e.target.value))}/></label>
     <label className="switch-control" title={tx(lang,'مفعّل','Enabled')}><input type="checkbox" checked={item.enabled} onChange={e=>onToggle(e.target.checked)}/><span /></label>
@@ -792,7 +814,7 @@ function ProviderForm({initial,onClose,onSave,pending}:{initial:ProviderKey|null
   const [provider,setProvider]=useState(initial?.provider||'huggingface'),[label,setLabel]=useState(initial?.label||''),[apiKey,setApiKey]=useState(''),[serviceType,setServiceType]=useState<'text'|'image'|'video'|'voice'|'transcription'|'music'|'media'>(initial?.serviceType||'text'),[enabled,setEnabled]=useState(initial?.enabled??true),[priority,setPriority]=useState(initial?.priority??0);
   const [revealed,setRevealed]=useState(false),[copied,setCopied]=useState(false);
   const providerOptions=[
-    ['openai','OpenAI','https://platform.openai.com/api-keys','text'],['gemini','Google Gemini','https://aistudio.google.com/app/apikey','text'],['anthropic','Anthropic Claude','https://console.anthropic.com/settings/keys','text'],['groq','Groq','https://console.groq.com/keys','text'],['openrouter','OpenRouter','https://openrouter.ai/keys','text'],['huggingface','Hugging Face (open models; limits vary)','https://huggingface.co/settings/tokens','text'],['mistral','Mistral','https://console.mistral.ai/api-keys/','text'],['cerebras','Cerebras','https://cloud.cerebras.ai/','text'],['together','Together AI','https://api.together.ai/settings/api-keys','text'],['sambanova','SambaNova','https://cloud.sambanova.ai/','text'],['deepseek','DeepSeek','https://platform.deepseek.com/api_keys','text'],['stability','Stability AI','https://platform.stability.ai/account/keys','image'],['replicate','Replicate','https://replicate.com/account/api-tokens','image'],['fal','fal.ai','https://fal.ai/dashboard/keys','video'],['runway','Runway','https://dev.runwayml.com/','video'],['elevenlabs','ElevenLabs','https://elevenlabs.io/app/settings/api-keys','voice'],['google-tts','Google Cloud Text-to-Speech','https://console.cloud.google.com/apis/credentials','voice'],['azure-speech','Azure Speech','https://portal.azure.com/','voice'],['openai-audio','OpenAI Audio','https://platform.openai.com/api-keys','voice'],['whisper','Whisper','https://platform.openai.com/api-keys','transcription'],['deepgram','Deepgram','https://console.deepgram.com/','transcription'],['assemblyai','AssemblyAI','https://www.assemblyai.com/dashboard/signup','transcription'],['google-speech','Google Speech-to-Text','https://console.cloud.google.com/apis/credentials','transcription'],['musicgen','MusicGen','https://github.com/facebookresearch/audiocraft','music'],['openverse','Openverse','https://openverse.org/','media'],
+    ['openai','OpenAI','https://platform.openai.com/api-keys','text'],['gemini','Google Gemini','https://aistudio.google.com/app/apikey','text'],['anthropic','Anthropic Claude','https://console.anthropic.com/settings/keys','text'],['groq','Groq','https://console.groq.com/keys','text'],['openrouter','OpenRouter','https://openrouter.ai/keys','text'],['huggingface','Hugging Face (open models; limits vary)','https://huggingface.co/settings/tokens','text'],['mistral','Mistral','https://console.mistral.ai/api-keys/','text'],['cerebras','Cerebras','https://cloud.cerebras.ai/','text'],['together','Together AI','https://api.together.ai/settings/api-keys','text'],['sambanova','SambaNova','https://cloud.sambanova.ai/','text'],['deepseek','DeepSeek','https://platform.deepseek.com/api_keys','text'],['stability','Stability AI','https://platform.stability.ai/account/keys','image'],['replicate','Replicate','https://replicate.com/account/api-tokens','image'],['fal','fal.ai','https://fal.ai/dashboard/keys','video'],['runway','Runway','https://dev.runwayml.com/','video'],['elevenlabs','ElevenLabs','https://elevenlabs.io/app/settings/api-keys','voice'],['google-tts','Google Cloud Text-to-Speech','https://console.cloud.google.com/apis/credentials','voice'],['azure-speech','Azure Speech','https://portal.azure.com/','voice'],['openai-audio','OpenAI Audio','https://platform.openai.com/api-keys','voice'],['whisper','Whisper','https://platform.openai.com/api-keys','transcription'],['deepgram','Deepgram','https://console.deepgram.com/','transcription'],['assemblyai','AssemblyAI','https://www.assemblyai.com/dashboard/signup','transcription'],['google-speech','Google Speech-to-Text','https://console.cloud.google.com/apis/credentials','transcription'],['musicgen','MusicGen','https://github.com/facebookresearch/audiocraft','music'],['openverse','Openverse (public search; no key required)','https://openverse.org/','media'],['pexels','Pexels','https://www.pexels.com/api/','media'],['pixabay','Pixabay','https://pixabay.com/api/docs/','media'],['unsplash','Unsplash','https://unsplash.com/developers','media'],
   ] as const;
   const currentProvider=providerOptions.find(item=>item[0]===provider);
   const serviceTypes=[
@@ -804,7 +826,7 @@ function ProviderForm({initial,onClose,onSave,pending}:{initial:ProviderKey|null
     {value:'music',label:tx(lang,'الموسيقى','Music')},
     {value:'media',label:tx(lang,'البحث عن الوسائط','Media search')},
   ];
-  const purpose=providerServicePurpose(serviceType,lang);
+  const purpose=providerServicePurpose(serviceType,lang,provider);
   const serviceConnected=providerServiceIsConnected(provider,serviceType);
   return <Modal title={initial?tx(lang,'تعديل المفتاح','Edit provider key'):tx(lang,'إضافة مفتاح مزوّد','Add provider key')} subtitle={tx(lang,'لن يُعرض المفتاح بعد إرساله إلى الخادم.','The secret will not be displayed after it is sent to the server.')} onClose={onClose}><form className="form-stack" onSubmit={e=>{e.preventDefault();onSave({provider,label,apiKey,serviceType,enabled,priority})}}>
     <label><span className="field-label">{tx(lang,'اسم المزوّد','Provider')}</span><select className="studio-input" value={provider} onChange={e=>{const value=e.target.value;setProvider(value);const selected=providerOptions.find(item=>item[0]===value);if(selected)setServiceType(selected[3]);}}>{providerOptions.map(item=><option key={item[0]} value={item[0]}>{item[1]}</option>)}</select></label>

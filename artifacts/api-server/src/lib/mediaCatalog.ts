@@ -1,5 +1,5 @@
 import { asc, and, eq } from "drizzle-orm";
-import { db, providerKeysTable } from "@workspace/db";
+import { db, providerKeysTable, providerSettingsTable } from "@workspace/db";
 import { decryptProviderKey } from "./secretVault";
 import { classifyProviderResponse } from "./providerRegistry";
 
@@ -185,15 +185,13 @@ async function searchArchive(term: string, kind: MediaKind, page: number) {
   };
 }
 
-async function userMediaKey(userId: string, provider: "pexels" | "pixabay" | "unsplash") {
-  const rows = await db.select().from(providerKeysTable).where(and(
+async function userMediaKeys(userId: string, provider: "pexels" | "pixabay" | "unsplash") {
+  return db.select().from(providerKeysTable).where(and(
     eq(providerKeysTable.userId, userId),
     eq(providerKeysTable.provider, provider),
     eq(providerKeysTable.serviceType, "media"),
     eq(providerKeysTable.enabled, true),
   )).orderBy(asc(providerKeysTable.priority), asc(providerKeysTable.createdAt));
-  const now = Date.now();
-  return rows.find((row) => row.status !== "invalid" && (!row.cooldownUntil || row.cooldownUntil.getTime() <= now));
 }
 
 async function searchKeyedSource(
@@ -204,55 +202,106 @@ async function searchKeyedSource(
   page: number,
   orientation?: MediaOrientation,
 ) {
-  const keyRow = await userMediaKey(userId, provider);
-  if (!keyRow) {
-    const title = provider === "pexels" ? "Pexels" : provider === "pixabay" ? "Pixabay" : "Unsplash";
-    throw new Error(`Add an enabled ${title} API key in Provider settings to search this source.`);
+  if (provider === "pexels" && kind === "audio") {
+    throw new Error("Pexels provides image and video search here, not audio.");
   }
-  const key = decryptProviderKey(keyRow.encryptedKey);
-  const perPage = 24;
-  let url: URL;
-  let headers: Record<string, string> = {};
-  if (provider === "pexels") {
-    if (kind === "audio") throw new Error("Pexels provides image and video search here, not audio.");
-    const isVideo = kind === "video";
-    url = new URL(isVideo ? "https://api.pexels.com/videos/search" : "https://api.pexels.com/v1/search");
-    url.searchParams.set("query", term);
-    url.searchParams.set("per_page", String(perPage));
-    url.searchParams.set("page", String(page));
-    if (orientation) url.searchParams.set("orientation", orientation);
-    headers = { Authorization: key };
-  } else if (provider === "pixabay") {
-    if (kind === "audio") throw new Error("Pixabay image and video search is available; use Openverse for audio.");
-    url = new URL(`https://pixabay.com/api/${kind === "video" ? "videos/" : ""}`);
-    url.searchParams.set("key", key);
-    url.searchParams.set("q", term);
-    url.searchParams.set("per_page", String(perPage));
-    url.searchParams.set("page", String(page));
-    if (orientation) url.searchParams.set("orientation", orientation === "landscape" ? "horizontal" : orientation === "portrait" ? "vertical" : "all");
-  } else {
-    if (kind !== "image") throw new Error("Unsplash search is available for photos; use Openverse for audio and video.");
-    url = new URL("https://api.unsplash.com/search/photos");
-    url.searchParams.set("query", term);
-    url.searchParams.set("per_page", String(perPage));
-    url.searchParams.set("page", String(page));
-    if (orientation) url.searchParams.set("orientation", orientation);
-    url.searchParams.set("client_id", key);
+  if (provider === "pixabay" && kind === "audio") {
+    throw new Error("Pixabay image and video search is available; use Openverse for audio.");
+  }
+  if (provider === "unsplash" && kind !== "image") {
+    throw new Error("Unsplash search is available for photos; use Openverse for audio and video.");
   }
 
-  const { response, text, payload } = await jsonRequest(url, headers);
-  if (!response.ok) {
-    const classification = classifyProviderResponse(response.status, text);
-    const cooldownUntil = ["quota_limited", "rate_limited"].includes(classification.status)
-      ? new Date(Date.now() + 60_000)
-      : null;
-    await db.update(providerKeysTable).set({
-      status: classification.status,
-      testMessage: classification.message,
-      cooldownUntil,
-    }).where(eq(providerKeysTable.id, keyRow.id));
-    throw new Error(classification.message);
+  const savedKeys = await userMediaKeys(userId, provider);
+  const [settings] = await db.select().from(providerSettingsTable)
+    .where(eq(providerSettingsTable.userId, userId))
+    .limit(1);
+  const now = Date.now();
+  const usableKeys = savedKeys.filter((row) =>
+    row.status !== "invalid" && (!row.cooldownUntil || row.cooldownUntil.getTime() <= now),
+  );
+  if (!usableKeys.length) {
+    const title = provider === "pexels" ? "Pexels" : provider === "pixabay" ? "Pixabay" : "Unsplash";
+    if (!savedKeys.length) {
+      throw new Error(`Add an enabled ${title} API key in Provider settings to search this source.`);
+    }
+    throw new Error(`No usable ${title} API key is available. Check its status or retry after its cooldown.`);
   }
+
+  const autoRotate = settings?.autoRotate !== false;
+  const attemptLimit = autoRotate
+    ? Math.max(1, Math.min(settings?.maxAttempts ?? 3, usableKeys.length))
+    : 1;
+  const perPage = 24;
+  let payload: Record<string, unknown> | null = null;
+  let keyRow: (typeof usableKeys)[number] | null = null;
+  let lastError = "The media provider could not process this search.";
+
+  for (const [attempt, candidate] of usableKeys.slice(0, attemptLimit).entries()) {
+    try {
+      const key = decryptProviderKey(candidate.encryptedKey);
+      let url: URL;
+      let headers: Record<string, string> = {};
+      if (provider === "pexels") {
+        const isVideo = kind === "video";
+        url = new URL(isVideo ? "https://api.pexels.com/videos/search" : "https://api.pexels.com/v1/search");
+        url.searchParams.set("query", term);
+        url.searchParams.set("per_page", String(perPage));
+        url.searchParams.set("page", String(page));
+        if (orientation) url.searchParams.set("orientation", orientation);
+        headers = { Authorization: key };
+      } else if (provider === "pixabay") {
+        url = new URL(`https://pixabay.com/api/${kind === "video" ? "videos/" : ""}`);
+        url.searchParams.set("key", key);
+        url.searchParams.set("q", term);
+        url.searchParams.set("per_page", String(perPage));
+        url.searchParams.set("page", String(page));
+        if (orientation) url.searchParams.set("orientation", orientation === "landscape" ? "horizontal" : orientation === "portrait" ? "vertical" : "all");
+      } else {
+        url = new URL("https://api.unsplash.com/search/photos");
+        url.searchParams.set("query", term);
+        url.searchParams.set("per_page", String(perPage));
+        url.searchParams.set("page", String(page));
+        if (orientation) url.searchParams.set("orientation", orientation);
+        url.searchParams.set("client_id", key);
+      }
+
+      const result = await jsonRequest(url, headers);
+      if (!result.response.ok) {
+        throw Object.assign(new Error(`The media provider returned HTTP ${result.response.status}.`), {
+          providerStatus: result.response.status,
+          responseBody: result.text,
+        });
+      }
+      payload = result.payload;
+      keyRow = candidate;
+      break;
+    } catch (error) {
+      const details = error as Error & { providerStatus?: number; responseBody?: string };
+      const classification = details.providerStatus
+        ? classifyProviderResponse(details.providerStatus, details.responseBody ?? "")
+        : { status: "unavailable" as const, message: "Could not reach the media provider." };
+      lastError = classification.message;
+      const cooldownUntil = ["rate_limited", "quota_limited"].includes(classification.status)
+        ? new Date(Date.now() + Math.max(60, settings?.retryDelaySeconds ?? 60) * 1000)
+        : null;
+      await db.update(providerKeysTable).set({
+        status: classification.status,
+        testMessage: classification.message,
+        cooldownUntil,
+      }).where(eq(providerKeysTable.id, candidate.id));
+
+      const mayRotate = classification.status === "invalid"
+        || (classification.status === "rate_limited" && settings?.rotateOnRateLimit !== false)
+        || (classification.status === "quota_limited" && settings?.rotateOnQuota !== false)
+        || (classification.status === "unavailable" && settings?.rotateOnConnectionFailure !== false);
+      if (!autoRotate || !mayRotate || attempt + 1 >= attemptLimit) break;
+      const delay = Math.min(settings?.retryDelaySeconds ?? 0, 10);
+      if (delay > 0) await new Promise((resolvePromise) => setTimeout(resolvePromise, delay * 1000));
+    }
+  }
+
+  if (!keyRow || !payload) throw new Error(lastError);
 
   const rows = provider === "pexels"
     ? (kind === "video" ? payload.videos : payload.photos) as Array<Record<string, unknown>> | undefined

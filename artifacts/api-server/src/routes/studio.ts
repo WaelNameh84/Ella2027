@@ -1011,7 +1011,7 @@ router.get("/media/search", async (req, res): Promise<void> => {
     }));
   } catch (error) {
     const message = error instanceof Error ? error.message : "Media search failed.";
-    res.status(message.includes("Add an enabled") ? 409 : 502).json({ error: message });
+    res.status(message.includes("Add an enabled") || message.includes("No usable") ? 409 : 502).json({ error: message });
   }
 });
 
