@@ -41,6 +41,7 @@ type JobInput = {
   resolution?: number;
   fps?: number;
   includeSubtitles?: boolean;
+  format?: "mp4" | "webm";
   sceneId?: string;
   model?: string;
   mode?: "text" | "image";
@@ -738,13 +739,14 @@ async function processExportJob(job: typeof studioJobsTable.$inferSelect): Promi
     input.includeSubtitles !== false,
     project.musicUrl,
     project.musicVolume,
+    input.format ?? "mp4",
   );
   const downloadUrl = `/api/projects/${project.id}/export/file`;
   await db.transaction(async (tx) => {
     await tx.update(projectsTable).set({
       exportPath: outputPath,
       exportUrl: downloadUrl,
-      exportContentType: "video/mp4",
+      exportContentType: input.format === "webm" ? "video/webm" : "video/mp4",
       status: "completed",
       progress: 100,
     }).where(and(eq(projectsTable.id, project.id), eq(projectsTable.userId, job.userId)));
@@ -752,7 +754,7 @@ async function processExportJob(job: typeof studioJobsTable.$inferSelect): Promi
       status: "completed",
       stage: "completed",
       progress: 100,
-      message: "MP4 export is ready to download.",
+      message: input.format === "webm" ? "WebM export is ready to download." : "MP4 export is ready to download.",
       result: { downloadUrl },
       error: null,
       completedAt: new Date(),

@@ -1,5 +1,5 @@
 import { and, asc, eq } from "drizzle-orm";
-import { Router, type IRouter, type Response } from "express";
+import express, { Router, type IRouter, type Response } from "express";
 import {
   QueueSceneImageGenerationBody,
   QueueSceneImageGenerationParams,
@@ -17,7 +17,12 @@ import {
   providerKeysTable,
   scenesTable,
   studioJobsTable,
+  providerSettingsTable,
 } from "@workspace/db";
+import { decryptProviderKey } from "../lib/secretVault";
+import { classifyProviderResponse } from "../lib/providerRegistry";
+import { isProviderCallError } from "../lib/mediaGeneration";
+import { transcribeAudio, type TranscriptionMode } from "../lib/transcription";
 import { generatedAssetContentType, generatedAssetPath } from "../lib/studioAssets";
 
 const router: IRouter = Router();
@@ -211,6 +216,143 @@ router.post("/projects/:projectId/scenes/:sceneId/jobs/voice", async (req, res):
   }
   res.status(202).json(QueueSceneVoiceGenerationResponse.parse(job));
 });
+
+router.post(
+  "/projects/:projectId/scenes/:sceneId/transcriptions",
+  express.raw({ type: ["audio/*", "application/octet-stream"], limit: "20mb" }),
+  async (req, res): Promise<void> => {
+    const { projectId, sceneId } = req.params;
+    const userId = userIdOf(res);
+    const modeHeader = req.headers["x-transcription-mode"];
+    const mode = modeHeader === "translate" ? "translate" : modeHeader === "transcribe" ? "transcribe" : null;
+    const keyId = req.headers["x-provider-key-id"] ?? "";
+    const approve = req.headers["x-approve-potential-charges"] === "true";
+    const contentType = (req.headers["content-type"] ?? "").split(";")[0].trim().toLowerCase();
+    const audio = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+
+    if (!/^[a-f0-9-]{36}$/i.test(projectId) || !/^[a-f0-9-]{36}$/i.test(sceneId)) {
+      res.status(400).json({ error: "Invalid project or scene." });
+      return;
+    }
+    if (!mode) {
+      res.status(400).json({ error: "Choose transcription or English translation." });
+      return;
+    }
+    if (!approve) {
+      res.status(400).json({ error: "Confirm possible provider charges before sending audio." });
+      return;
+    }
+    if (!contentType.startsWith("audio/") || !audio.length || audio.byteLength > 20 * 1024 * 1024) {
+      res.status(400).json({ error: "Upload a non-empty audio file smaller than 20 MB." });
+      return;
+    }
+    const [scene] = await db.select({ id: scenesTable.id, language: projectsTable.language })
+      .from(scenesTable)
+      .innerJoin(projectsTable, eq(projectsTable.id, scenesTable.projectId))
+      .where(and(
+        eq(scenesTable.id, sceneId),
+        eq(scenesTable.projectId, projectId),
+        eq(scenesTable.userId, userId),
+        eq(projectsTable.userId, userId),
+      ))
+      .limit(1);
+    if (!scene) {
+      res.status(404).json({ error: "Scene not found." });
+      return;
+    }
+
+    const keys = await db.select().from(providerKeysTable).where(and(
+      eq(providerKeysTable.userId, userId),
+      eq(providerKeysTable.serviceType, "transcription"),
+      eq(providerKeysTable.enabled, true),
+    )).orderBy(asc(providerKeysTable.priority), asc(providerKeysTable.createdAt));
+    const [settings] = await db.select().from(providerSettingsTable)
+      .where(eq(providerSettingsTable.userId, userId))
+      .limit(1);
+    const now = Date.now();
+    const supportsMode = (provider: string) =>
+      provider === "huggingface" ? mode === "transcribe" : ["openai", "whisper"].includes(provider);
+    const usable = keys.filter((key) =>
+      supportsMode(key.provider)
+      && key.status !== "invalid"
+      && (!key.cooldownUntil || key.cooldownUntil.getTime() <= now),
+    );
+    const selectedKey = keyId ? keys.find((key) => key.id === keyId) : undefined;
+    if (keyId && (!selectedKey || !selectedKey.enabled || !supportsMode(selectedKey.provider))) {
+      res.status(409).json({ error: "The selected key is disabled or does not support this task." });
+      return;
+    }
+    const selected = selectedKey && usable.some((key) => key.id === selectedKey.id) ? selectedKey : undefined;
+    const autoRotate = settings?.autoRotate ?? true;
+    if (selectedKey && !selected) {
+      const cooldownActive = Boolean(selectedKey.cooldownUntil && selectedKey.cooldownUntil.getTime() > now);
+      const selectedCanFailOver = selectedKey.status === "invalid"
+        || (cooldownActive && selectedKey.status === "rate_limited" && (settings?.rotateOnRateLimit ?? true))
+        || (cooldownActive && selectedKey.status === "quota_limited" && (settings?.rotateOnQuota ?? true));
+      if (!autoRotate || !selectedCanFailOver) {
+        res.status(409).json({ error: "The selected key is unavailable. Choose another key or enable failover for its current limit." });
+        return;
+      }
+    }
+    const candidates = selected
+      ? [selected, ...usable.filter((key) => key.id !== selected.id)]
+      : usable;
+    const ordered = settings?.fallbackProvider
+      ? [
+          ...candidates.filter((key) => key.provider !== settings.fallbackProvider),
+          ...candidates.filter((key) => key.provider === settings.fallbackProvider),
+        ]
+      : candidates;
+    const attemptLimit = autoRotate ? Math.max(1, Math.min(settings?.maxAttempts ?? 3, ordered.length)) : 1;
+    if (!ordered.length) {
+      res.status(409).json({ error: "Add an enabled Whisper or Hugging Face key under the transcription service type." });
+      return;
+    }
+
+    let lastError = "The configured transcription providers could not process this audio.";
+    for (const key of ordered.slice(0, attemptLimit)) {
+      try {
+        const result = await transcribeAudio(
+          key.provider,
+          decryptProviderKey(key.encryptedKey),
+          audio,
+          contentType,
+          mode as TranscriptionMode,
+          scene.language,
+        );
+        await db.update(providerKeysTable).set({
+          status: "valid",
+          usedCount: key.usedCount + 1,
+          cooldownUntil: null,
+          testMessage: "Last transcription request succeeded.",
+        }).where(eq(providerKeysTable.id, key.id));
+        res.json({ text: result.text, provider: key.provider, model: result.model });
+        return;
+      } catch (error) {
+        const classification = isProviderCallError(error)
+          ? classifyProviderResponse(error.providerStatus, error.responseBody)
+          : { status: "unavailable" as const, message: "The transcription provider could not process this audio." };
+        lastError = classification.message;
+        const cooldownUntil = ["rate_limited", "quota_limited"].includes(classification.status)
+          ? new Date(Date.now() + Math.max(60, settings?.retryDelaySeconds ?? 60) * 1000)
+          : null;
+        await db.update(providerKeysTable).set({
+          status: classification.status,
+          testMessage: classification.message,
+          cooldownUntil,
+        }).where(eq(providerKeysTable.id, key.id));
+        const mayRotate = classification.status === "invalid"
+          || (classification.status === "rate_limited" && (settings?.rotateOnRateLimit ?? true))
+          || (classification.status === "quota_limited" && (settings?.rotateOnQuota ?? true))
+          || (classification.status === "unavailable" && (settings?.rotateOnConnectionFailure ?? true));
+        if (!autoRotate || !mayRotate) break;
+        const delay = Math.min(settings?.retryDelaySeconds ?? 0, 10);
+        if (delay > 0) await new Promise((resolvePromise) => setTimeout(resolvePromise, delay * 1000));
+      }
+    }
+    res.status(502).json({ error: lastError });
+  },
+);
 
 router.get("/projects/:projectId/assets/:sceneId/:filename", async (req, res): Promise<void> => {
   const { projectId, sceneId, filename } = req.params;

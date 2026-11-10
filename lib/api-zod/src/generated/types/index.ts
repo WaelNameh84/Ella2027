@@ -6,8 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './audioTranscriptionInput';
+export * from './audioTranscriptionResult';
 export * from './characterProfile';
 export * from './exportInput';
+export * from './exportInputFormat';
 export * from './exportInputFps';
 export * from './exportInputResolution';
 export * from './exportResult';

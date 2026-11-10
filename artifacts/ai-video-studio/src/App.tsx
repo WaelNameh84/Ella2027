@@ -21,7 +21,7 @@ import { Route, Switch, Link, Redirect, useLocation, Router as WouterRouter } fr
 import {
   Aperture, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, ChevronDown, Clapperboard,
   Clock3, Copy, ExternalLink, Eye, EyeOff, Film, Globe2, Heart, ImagePlus, KeyRound, Languages,
-  LoaderCircle, LogOut, Moon, Pause, Plus, Search, Settings2, ShieldCheck, Sun, Trash2, WandSparkles, X,
+  LoaderCircle, LogOut, Mic, Moon, Pause, Plus, Search, Settings2, ShieldCheck, Sun, Trash2, WandSparkles, X,
 } from 'lucide-react';
 import NotFound from '@/pages/not-found';
 import { ErrorBoundary } from '@/components/error-boundary';
@@ -67,6 +67,15 @@ type AppCtx = { lang: Lang; setLang: (v: Lang) => void; dark: boolean; setDark: 
 const Context = createContext<AppCtx>({ lang: 'ar', setLang: () => {}, dark: false, setDark: () => {} });
 const useApp = () => useContext(Context);
 const tx = (lang: Lang, ar: string, en: string) => lang === 'ar' ? ar : en;
+
+function providerSupports(provider: string, service: string) {
+  if (service === 'text') return ['openai','gemini','anthropic','groq','openrouter','huggingface','mistral','cerebras','together','sambanova','deepseek'].includes(provider);
+  if (service === 'image') return ['openai','stability','replicate','huggingface'].includes(provider);
+  if (service === 'video') return provider === 'replicate';
+  if (service === 'voice') return ['elevenlabs','openai','openai-audio'].includes(provider);
+  if (service === 'transcription') return ['openai','whisper','huggingface'].includes(provider);
+  return true;
+}
 
 function ThemeLanguageProvider({ children }: { children: ReactNode }) {
   const [lang, setLang] = useState<Lang>(() => localStorage.getItem('studio-language') === 'en' ? 'en' : 'ar');
@@ -315,12 +324,12 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
   const [editProjectOpen, setEditProjectOpen] = useState(false);
   const [previewPlaying,setPreviewPlaying]=useState(false);
   const previewVideo=useRef<HTMLVideoElement|null>(null);
-  const [exportSettings,setExportSettings]=useState<{resolution:480|720|1080|2160;fps:24|25|30|60;includeSubtitles:boolean}>({resolution:1080,fps:30,includeSubtitles:true});
+  const [exportSettings,setExportSettings]=useState<{resolution:480|720|1080|2160;fps:24|25|30|60;includeSubtitles:boolean;format:'mp4'|'webm'}>({resolution:1080,fps:30,includeSubtitles:true,format:'mp4'});
   const completedJobsRef = useRef<Set<string>>(new Set());
   useEffect(() => { if (project?.scenes?.length && !selected) setSelected(project.scenes[0].id); }, [project, selected]);
   const scenes = [...(project?.scenes || [])].sort((a,b) => a.sortOrder-b.sortOrder);
   const activeScene = scenes.find(s => s.id === selected) || scenes[0];
-  const textProviderReady=Boolean(keysQuery.data?.some(key=>key.serviceType==='text'&&key.enabled&&(key.status==='valid'||key.status==='untested')));
+  const textProviderReady=Boolean(keysQuery.data?.some(key=>key.serviceType==='text'&&providerSupports(key.provider,'text')&&key.enabled&&(key.status==='valid'||key.status==='untested')));
   const refresh = () => { qc.invalidateQueries({queryKey:getGetProjectQueryKey(projectId)}); qc.invalidateQueries({queryKey:getListProjectsQueryKey()}); qc.invalidateQueries({queryKey:getGetStudioSummaryQueryKey()}); qc.invalidateQueries({queryKey:getListStudioJobsQueryKey()}); };
   useEffect(() => {
     const finished = projectJobsQuery.data?.filter(job => job.status === 'completed' && job.jobType !== 'export') || [];
@@ -334,9 +343,10 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
   const duration = scenes.reduce((sum,s)=>sum+s.durationSeconds,0);
   if (projectQuery.isLoading) return <AppFrame title={tx(lang,'تحميل المشروع','Loading project')}><div className="workspace-skeleton"><SkeletonBlock className="h-20"/><SkeletonBlock className="h-72"/><SkeletonBlock className="h-48"/></div></AppFrame>;
   if (projectQuery.isError || !project) return <AppFrame title={tx(lang,'المشروع','Project')}><StateError lang={lang} retry={()=>projectQuery.refetch()} /></AppFrame>;
-  const updateCurrent = (field: keyof Scene, value: string | number | string[]) => {
+  const updateCurrent = async (field: keyof Scene, value: string | number | string[] | null) => {
     if (!activeScene) return;
-    updateScene.mutate({projectId,sceneId:activeScene.id,data:{[field]:value} as SceneUpdate},{onSuccess:refresh});
+    await updateScene.mutateAsync({projectId,sceneId:activeScene.id,data:{[field]:value} as SceneUpdate});
+    refresh();
   };
   const reorder = (scene: Scene, step: number) => {
     const target = scenes.find(s=>s.sortOrder===scene.sortOrder+step) || scenes[scenes.indexOf(scene)+step];
@@ -370,12 +380,12 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
         </div>
          <div className="script-bar panel"><div className="script-symbol"><WandSparkles size={18}/></div><div className="script-copy"><b>{tx(lang,'حوّل الفكرة إلى سيناريو','Turn the idea into a storyboard')}</b><p>{textProviderReady ? tx(lang,'أنشئ مسودة مشاهد باستخدام مزوّد نص مضبوط.','Generate a scene draft using a configured text provider.') : tx(lang,'لا يوجد مفتاح نص جاهز؛ أضف مفتاحًا صالحًا قبل التوليد.','No available text provider. Add an enabled key before generating.')}</p><label className="checkline charge-consent"><input type="checkbox" checked={chargeApproved} onChange={e=>setChargeApproved(e.target.checked)}/>{tx(lang,'أوافق على احتمال احتساب رسوم من المزوّد الأساسي أو الاحتياطي.','I approve possible charges from the primary or fallback provider.')}</label></div><button disabled={!textProviderReady || generate.isPending || !chargeApproved || Boolean(currentJob?.status === 'running' || currentJob?.status === 'queued')} className="btn btn-primary" onClick={()=>generate.mutate({projectId,data:{providerKeyId:null,allowRotation:true,approvePotentialCharges:chargeApproved}},{onSuccess:refresh})} data-testid="button-generate-script">{generate.isPending ? <LoaderCircle size={16} className="animate-spin"/> : <WandSparkles size={16}/ >}{tx(lang,'توليد المشاهد','Generate scenes')}</button></div>
         {generate.isError && <div className="inline-error">{tx(lang,'تعذر بدء التوليد. تحقق من مفاتيح الخدمة وإعدادات التدوير.','Could not start generation. Check provider keys and rotation settings.')}</div>}
-         {currentJob && <div className="job-progress panel" role="status"><div className="job-progress-head"><div><b>{tx(lang,({script:'توليد السيناريو',export:'تصدير الفيديو',image:'توليد صورة',video:'توليد فيديو',voice:'توليد صوت'})[currentJob.jobType],({script:'Script generation',export:'Video export',image:'Image generation',video:'Video generation',voice:'Voice generation'})[currentJob.jobType])}</b><span className={`job-state job-${currentJob.status}`}>{tx(lang,currentJob.status==='queued'?'في الانتظار':currentJob.status==='running'?'قيد التنفيذ':currentJob.status==='completed'?'مكتملة':'فشلت',currentJob.status)}</span></div><Link href="/jobs" className="text-link">{tx(lang,'عرض المهام','View jobs')}</Link></div>{(currentJob.status==='queued'||currentJob.status==='running')&&<div className="job-progress-track"><span style={{width:`${currentJob.progress}%`}}/></div>}<p>{currentJob.error || currentJob.message}</p>{latestExportJob?.status==='completed'&&<a className="btn btn-primary" href={`${basePath}/api/projects/${projectId}/export/file`} download>{tx(lang,'تنزيل فيديو MP4','Download MP4')}<ArrowDown size={15}/></a>}</div>}
+         {currentJob && <div className="job-progress panel" role="status"><div className="job-progress-head"><div><b>{tx(lang,({script:'توليد السيناريو',export:'تصدير الفيديو',image:'توليد صورة',video:'توليد فيديو',voice:'توليد صوت'})[currentJob.jobType],({script:'Script generation',export:'Video export',image:'Image generation',video:'Video generation',voice:'Voice generation'})[currentJob.jobType])}</b><span className={`job-state job-${currentJob.status}`}>{tx(lang,currentJob.status==='queued'?'في الانتظار':currentJob.status==='running'?'قيد التنفيذ':currentJob.status==='completed'?'مكتملة':'فشلت',currentJob.status)}</span></div><Link href="/jobs" className="text-link">{tx(lang,'عرض المهام','View jobs')}</Link></div>{(currentJob.status==='queued'||currentJob.status==='running')&&<div className="job-progress-track"><span style={{width:`${currentJob.progress}%`}}/></div>}<p>{currentJob.error || currentJob.message}</p>{latestExportJob?.status==='completed'&&<a className="btn btn-primary" href={`${basePath}/api/projects/${projectId}/export/file`} download>{tx(lang,'تنزيل الفيديو','Download video')}<ArrowDown size={15}/></a>}</div>}
       </section>
       <aside className="scene-inspector panel">
         <div className="inspector-heading"><div><span className="eyebrow">{tx(lang,'محرر اللقطة','SHOT EDITOR')}</span><h3>{activeScene?.title || tx(lang,'اختر مشهدًا','Select a scene')}</h3></div>{activeScene && <div className="flex gap-1"><button className="btn btn-ghost !p-2" onClick={()=>reorder(activeScene,-1)} title={tx(lang,'تحريك للأعلى','Move up')}><ArrowUp size={15}/></button><button className="btn btn-ghost !p-2" onClick={()=>reorder(activeScene,1)} title={tx(lang,'تحريك للأسفل','Move down')}><ArrowDown size={15}/></button><button className="btn btn-ghost !p-2 text-destructive" onClick={()=>{if(window.confirm(tx(lang,'حذف هذا المشهد؟','Delete this scene?')))deleteScene.mutate({projectId,sceneId:activeScene.id},{onSuccess:()=>{setSelected(null);refresh()}})}} title={tx(lang,'حذف','Delete')}><Trash2 size={15}/></button></div>}</div>
-         {activeScene ? <><SceneFields key={activeScene.id} scene={activeScene} characters={project.characters||[]} lang={lang} onSave={(field,value)=>updateCurrent(field,value)} pending={updateScene.isPending}/><GenerationPanel projectId={projectId} scene={activeScene} keys={keysQuery.data || []} lang={lang} onQueued={refresh}/><SceneAssetHistory projectId={projectId} scene={activeScene} lang={lang}/></> : <div className="inspector-blank"><Film size={22}/><span>{tx(lang,'اختر مشهدًا من الخط الزمني أو أنشئ واحدًا.','Select a scene from the timeline or create one.')}</span></div>}
-         <div className="inspector-footer"><div className="export-settings"><label><span className="field-label">{tx(lang,'الدقة','Resolution')}</span><select className="studio-input" value={exportSettings.resolution} onChange={e=>setExportSettings(v=>({...v,resolution:Number(e.target.value) as 480|720|1080|2160}))}><option value={480}>480p</option><option value={720}>720p</option><option value={1080}>1080p</option><option value={2160}>4K</option></select></label><label><span className="field-label">{tx(lang,'معدل الإطارات','Frame rate')}</span><select className="studio-input" value={exportSettings.fps} onChange={e=>setExportSettings(v=>({...v,fps:Number(e.target.value) as 24|25|30|60}))}><option value={24}>24 fps</option><option value={25}>25 fps</option><option value={30}>30 fps</option><option value={60}>60 fps</option></select></label></div><label className="checkline export-subtitles"><input type="checkbox" checked={exportSettings.includeSubtitles} onChange={e=>setExportSettings(v=>({...v,includeSubtitles:e.target.checked}))}/>{tx(lang,'إضافة التعليق كنصوص ترجمة لكل مشهد','Include scene narration as subtitles')}</label><button onClick={()=>{if(window.confirm(tx(lang,'سيُرسل طلب تصدير إلى قائمة المهام. تابع؟','This queues a video export. Continue?')))exportProject.mutate({projectId,data:exportSettings},{onSuccess:refresh})}} className="btn btn-primary w-full" disabled={exportProject.isPending || scenes.length===0 || Boolean(currentJob?.status === 'running' || currentJob?.status === 'queued')} data-testid="button-export"><Clapperboard size={16}/>{exportProject.isPending ? tx(lang,'جارٍ تجهيز التصدير...','Queueing export...') : tx(lang,'تصدير الفيديو','Export video')}</button><p>{tx(lang,'يُصدّر MP4 بنسبة أبعاد المشروع، مع التعليق الصوتي وموسيقى الخلفية عند إضافتهما.','Exports MP4 in the project aspect ratio, including saved narration and background music.')}</p>{exportProject.isError && <span className="inline-error">{tx(lang,'تعذر بدء التصدير. تحقق من أن كل مشهد يحتوي صورة أو فيديو.','Could not start export. Make sure each scene has an image or video.')}</span>}</div>
+         {activeScene ? <><SceneFields key={activeScene.id} scene={activeScene} characters={project.characters||[]} lang={lang} onSave={(field,value)=>updateCurrent(field,value)} pending={updateScene.isPending}/><TranscriptionPanel projectId={projectId} sceneId={activeScene.id} language={project.language} keys={keysQuery.data || []} lang={lang}/><GenerationPanel projectId={projectId} scene={activeScene} keys={keysQuery.data || []} lang={lang} onQueued={refresh}/><SceneAssetHistory projectId={projectId} scene={activeScene} lang={lang}/></> : <div className="inspector-blank"><Film size={22}/><span>{tx(lang,'اختر مشهدًا من الخط الزمني أو أنشئ واحدًا.','Select a scene from the timeline or create one.')}</span></div>}
+         <div className="inspector-footer"><div className="export-settings"><label><span className="field-label">{tx(lang,'الدقة','Resolution')}</span><select className="studio-input" value={exportSettings.resolution} onChange={e=>setExportSettings(v=>({...v,resolution:Number(e.target.value) as 480|720|1080|2160}))}><option value={480}>480p</option><option value={720}>720p</option><option value={1080}>1080p</option><option value={2160}>4K</option></select></label><label><span className="field-label">{tx(lang,'معدل الإطارات','Frame rate')}</span><select className="studio-input" value={exportSettings.fps} onChange={e=>setExportSettings(v=>({...v,fps:Number(e.target.value) as 24|25|30|60}))}><option value={24}>24 fps</option><option value={25}>25 fps</option><option value={30}>30 fps</option><option value={60}>60 fps</option></select></label><label><span className="field-label">{tx(lang,'الصيغة','Format')}</span><select className="studio-input" value={exportSettings.format} onChange={e=>setExportSettings(v=>({...v,format:e.target.value as 'mp4'|'webm'}))}><option value="mp4">MP4</option><option value="webm">WebM</option></select></label></div><label className="checkline export-subtitles"><input type="checkbox" checked={exportSettings.includeSubtitles} onChange={e=>setExportSettings(v=>({...v,includeSubtitles:e.target.checked}))}/>{tx(lang,'إضافة التعليق كنصوص ترجمة لكل مشهد','Include scene narration as subtitles')}</label><button onClick={()=>{if(window.confirm(tx(lang,'سيُرسل طلب تصدير إلى قائمة المهام. تابع؟','This queues a video export. Continue?')))exportProject.mutate({projectId,data:exportSettings},{onSuccess:refresh})}} className="btn btn-primary w-full" disabled={exportProject.isPending || scenes.length===0 || Boolean(currentJob?.status === 'running' || currentJob?.status === 'queued')} data-testid="button-export"><Clapperboard size={16}/>{exportProject.isPending ? tx(lang,'جارٍ تجهيز التصدير...','Queueing export...') : tx(lang,'تصدير الفيديو','Export video')}</button><p>{tx(lang,'التصدير بنسبة أبعاد المشروع، مع التعليق الصوتي والموسيقى. قد يستغرق WebM وقتًا أطول.','Exports at the project aspect ratio with narration and music. WebM may take longer.')}</p>{exportProject.isError && <span className="inline-error">{tx(lang,'تعذر بدء التصدير. تحقق من أن كل مشهد يحتوي صورة أو فيديو.','Could not start export. Make sure each scene has an image or video.')}</span>}</div>
       </aside>
     </div>
     <CharacterProfiles projectId={projectId} characters={project.characters || []} onSave={data=>updateProject.mutateAsync({projectId,data}).then(()=>{refresh()})} pending={updateProject.isPending}/>
@@ -402,29 +412,69 @@ function JobsPage() {
 }
 
 function JobCard({ job, lang, retrying, onRetry }: { job: StudioJob; lang: Lang; retrying: boolean; onRetry: () => void }) {
-  const typeLabel = tx(lang,({script:'سيناريو وStoryboard',export:'تصدير MP4',image:'توليد صورة',video:'توليد فيديو',voice:'توليد صوت'})[job.jobType],({script:'Script and storyboard',export:'MP4 export',image:'Image generation',video:'Video generation',voice:'Voice generation'})[job.jobType]);
+  const typeLabel = tx(lang,({script:'سيناريو وStoryboard',export:'تصدير فيديو',image:'توليد صورة',video:'توليد فيديو',voice:'توليد صوت'})[job.jobType],({script:'Script and storyboard',export:'Video export',image:'Image generation',video:'Video generation',voice:'Voice generation'})[job.jobType]);
   const statusLabel = tx(lang,job.status==='queued'?'في الانتظار':job.status==='running'?'قيد التنفيذ':job.status==='completed'?'مكتملة':'فشلت',job.status);
   return <article className="job-card panel"><div className="job-progress-head"><div><b>{typeLabel}</b><span className={`job-state job-${job.status}`}>{statusLabel}</span></div><Link className="text-link" href={`/projects/${job.projectId}`}>{tx(lang,'فتح المشروع','Open project')}<ArrowLeft size={14}/></Link></div>
     {(job.status==='queued'||job.status==='running')&&<div className="job-progress-track"><span style={{width:`${job.progress}%`}}/></div>}
     <div className="job-card-meta"><span>{job.message}</span><time>{new Date(job.createdAt).toLocaleString(lang==='ar'?'ar':'en')}</time></div>
     {job.error&&<p className="job-error">{job.error}</p>}
-    {job.status==='completed'&&job.jobType==='export'&&<a className="btn btn-primary mt-3" href={`${basePath}/api/projects/${job.projectId}/export/file`} download>{tx(lang,'تنزيل MP4','Download MP4')}<ArrowDown size={15}/></a>}
+    {job.status==='completed'&&job.jobType==='export'&&<a className="btn btn-primary mt-3" href={`${basePath}/api/projects/${job.projectId}/export/file`} download>{tx(lang,'تنزيل الفيديو','Download video')}<ArrowDown size={15}/></a>}
     {job.status==='failed'&&<button className="btn btn-quiet mt-3" onClick={onRetry} disabled={retrying}><Clock3 size={15}/>{retrying?tx(lang,'جارٍ الإرسال...','Retrying...'):tx(lang,'إعادة المحاولة','Retry')}</button>}
   </article>;
 }
 
-function SceneFields({ scene, characters, lang, onSave, pending }: { scene: Scene; characters:CharacterProfile[]; lang: Lang; onSave: (field: keyof Scene, value: string | number | string[]) => void; pending: boolean }) {
+function SceneFields({ scene, characters, lang, onSave, pending }: { scene: Scene; characters:CharacterProfile[]; lang: Lang; onSave: (field: keyof Scene, value: string | number | string[] | null) => Promise<void>; pending: boolean }) {
   const [form,setForm] = useState({title:scene.title,description:scene.description,imagePrompt:scene.imagePrompt,narration:scene.narration,durationSeconds:scene.durationSeconds,shotType:scene.shotType,cameraMovement:scene.cameraMovement,location:scene.location,lighting:scene.lighting,clipStartSeconds:scene.clipStartSeconds,clipEndSeconds:scene.clipEndSeconds,playbackSpeed:scene.playbackSpeed,transition:scene.transition,voiceUrl:scene.voiceUrl||'',voiceVolume:scene.voiceVolume});
-  useEffect(()=>setForm({title:scene.title,description:scene.description,imagePrompt:scene.imagePrompt,narration:scene.narration,durationSeconds:scene.durationSeconds,shotType:scene.shotType,cameraMovement:scene.cameraMovement,location:scene.location,lighting:scene.lighting,clipStartSeconds:scene.clipStartSeconds,clipEndSeconds:scene.clipEndSeconds,playbackSpeed:scene.playbackSpeed,transition:scene.transition,voiceUrl:scene.voiceUrl||'',voiceVolume:scene.voiceVolume}),[scene.id]);
-  const field = (key: keyof typeof form, label: string, multiline = false) => <label className="inspector-field"><span className="field-label">{label}</span>{multiline ? <textarea className="studio-input" rows={key==='narration'?3:2} value={form[key] as string} onChange={e=>setForm(v=>({...v,[key]:e.target.value}))} onBlur={()=>form[key]!==scene[key]&&onSave(key,form[key] as string)} data-testid={`input-scene-${key}`} /> : <input className="studio-input" value={form[key] as string} onChange={e=>setForm(v=>({...v,[key]:e.target.value}))} onBlur={()=>form[key]!==scene[key]&&onSave(key,form[key] as string)} data-testid={`input-scene-${key}`} />}</label>;
-  const numberField=(key:'durationSeconds'|'clipStartSeconds'|'clipEndSeconds'|'playbackSpeed'|'voiceVolume',label:string,min:number,max?:number,step=1)=><label className="inspector-field"><span className="field-label">{label}</span><input type="number" min={min} max={max} step={step} className="studio-input" value={form[key]??''} onChange={e=>setForm(v=>({...v,[key]:e.target.value===''&&key==='clipEndSeconds'?null:Number(e.target.value)}))} onBlur={()=>form[key]!==scene[key]&&onSave(key,form[key] as number)} /></label>;
+  const [characterIds,setCharacterIds]=useState(scene.characterIds);
+  const [saveState,setSaveState]=useState<'saved'|'saving'|'error'>('saved');
+  const pendingFields=useRef<Partial<Record<keyof Scene,string|number|string[]|null>>>({});
+  const saveTimer=useRef<number|null>(null);
+  const saveInFlight=useRef(false);
+  const saveHandler=useRef(onSave);
+  useEffect(()=>{saveHandler.current=onSave},[onSave]);
+  useEffect(()=>{
+    setForm({title:scene.title,description:scene.description,imagePrompt:scene.imagePrompt,narration:scene.narration,durationSeconds:scene.durationSeconds,shotType:scene.shotType,cameraMovement:scene.cameraMovement,location:scene.location,lighting:scene.lighting,clipStartSeconds:scene.clipStartSeconds,clipEndSeconds:scene.clipEndSeconds,playbackSpeed:scene.playbackSpeed,transition:scene.transition,voiceUrl:scene.voiceUrl||'',voiceVolume:scene.voiceVolume});
+    setCharacterIds(scene.characterIds);
+    setSaveState('saved');
+  },[scene.id]);
+  const flushSave=async()=>{
+    if(saveTimer.current!==null){window.clearTimeout(saveTimer.current);saveTimer.current=null}
+    if(saveInFlight.current||!Object.keys(pendingFields.current).length)return;
+    saveInFlight.current=true;
+    const changes=pendingFields.current;
+    pendingFields.current={};
+    setSaveState('saving');
+    let failed=false;
+    try{
+      await Promise.all((Object.entries(changes) as [keyof Scene,string|number|string[]|null][]).map(([key,value])=>saveHandler.current(key,value)));
+      setSaveState('saved');
+    }catch{
+      failed=true;
+      pendingFields.current={...changes,...pendingFields.current};
+      setSaveState('error');
+    }finally{
+      saveInFlight.current=false;
+      if(Object.keys(pendingFields.current).length&&!failed){
+        saveTimer.current=window.setTimeout(()=>void flushSave(),300);
+      }
+    }
+  };
+  const queueSave=(key:keyof Scene,value:string|number|string[]|null)=>{
+    pendingFields.current={...pendingFields.current,[key]:value};
+    setSaveState('saving');
+    if(saveTimer.current!==null)window.clearTimeout(saveTimer.current);
+    saveTimer.current=window.setTimeout(()=>void flushSave(),700);
+  };
+  useEffect(()=>()=>{if(saveTimer.current!==null)window.clearTimeout(saveTimer.current);if(Object.keys(pendingFields.current).length)void flushSave()},[]);
+  const field = (key: keyof typeof form, label: string, multiline = false) => <label className="inspector-field"><span className="field-label">{label}</span>{multiline ? <textarea className="studio-input" rows={key==='narration'?3:2} value={form[key] as string} onChange={e=>{setForm(v=>({...v,[key]:e.target.value}));queueSave(key as keyof Scene,e.target.value)}} onBlur={()=>void flushSave()} data-testid={`input-scene-${key}`} /> : <input className="studio-input" value={form[key] as string} onChange={e=>{setForm(v=>({...v,[key]:e.target.value}));queueSave(key as keyof Scene,e.target.value)}} onBlur={()=>void flushSave()} data-testid={`input-scene-${key}`} />}</label>;
+  const numberField=(key:'durationSeconds'|'clipStartSeconds'|'clipEndSeconds'|'playbackSpeed'|'voiceVolume',label:string,min:number,max?:number,step=1)=><label className="inspector-field"><span className="field-label">{label}</span><input type="number" min={min} max={max} step={step} className="studio-input" value={form[key]??''} onChange={e=>{const value=e.target.value===''&&key==='clipEndSeconds'?null:Number(e.target.value);setForm(v=>({...v,[key]:value}));queueSave(key,value)}} onBlur={()=>void flushSave()} /></label>;
   return <div className="inspector-fields">{field('title',tx(lang,'اسم المشهد','Scene title'))}{numberField('durationSeconds',tx(lang,'المدة بالثواني','Duration (seconds)'),1,600)}{field('description',tx(lang,'وصف المشهد','Scene description'),true)}{field('imagePrompt',tx(lang,'موجّه الصورة','Visual prompt'),true)}{field('narration',tx(lang,'التعليق الصوتي','Narration'),true)}
-    <div className="form-two"><label><span className="field-label">{tx(lang,'نوع اللقطة','Shot type')}</span><select className="studio-input" value={form.shotType} onChange={e=>{setForm(v=>({...v,shotType:e.target.value}));onSave('shotType',e.target.value)}}><option value="">{tx(lang,'غير محدد','Unspecified')}</option>{['establishing','wide','medium','close-up','extreme-close-up','over-the-shoulder','POV','aerial'].map(x=><option key={x}>{x}</option>)}</select></label><label><span className="field-label">{tx(lang,'حركة الكاميرا','Camera movement')}</span><select className="studio-input" value={form.cameraMovement} onChange={e=>{setForm(v=>({...v,cameraMovement:e.target.value}));onSave('cameraMovement',e.target.value)}}><option value="">{tx(lang,'ثابتة','Static')}</option>{['pan','tilt','dolly-in','dolly-out','tracking','handheld','crane','orbit','zoom'].map(x=><option key={x}>{x}</option>)}</select></label></div>
+    <div className="form-two"><label><span className="field-label">{tx(lang,'نوع اللقطة','Shot type')}</span><select className="studio-input" value={form.shotType} onChange={e=>{setForm(v=>({...v,shotType:e.target.value}));queueSave('shotType',e.target.value)}} onBlur={()=>void flushSave()}><option value="">{tx(lang,'غير محدد','Unspecified')}</option>{['establishing','wide','medium','close-up','extreme-close-up','over-the-shoulder','POV','aerial'].map(x=><option key={x}>{x}</option>)}</select></label><label><span className="field-label">{tx(lang,'حركة الكاميرا','Camera movement')}</span><select className="studio-input" value={form.cameraMovement} onChange={e=>{setForm(v=>({...v,cameraMovement:e.target.value}));queueSave('cameraMovement',e.target.value)}} onBlur={()=>void flushSave()}><option value="">{tx(lang,'ثابتة','Static')}</option>{['pan','tilt','dolly-in','dolly-out','tracking','handheld','crane','orbit','zoom'].map(x=><option key={x}>{x}</option>)}</select></label></div>
     {field('location',tx(lang,'الموقع','Location'))}{field('lighting',tx(lang,'الإضاءة','Lighting'))}
-    {characters.length>0&&<fieldset className="character-assign"><legend className="field-label">{tx(lang,'الشخصيات في المشهد','Characters in scene')}</legend><div>{characters.map(c=><label className="checkline" key={c.id}><input type="checkbox" checked={scene.characterIds.includes(c.id)} onChange={e=>onSave('characterIds',e.target.checked?[...scene.characterIds,c.id]:scene.characterIds.filter(id=>id!==c.id))}/>{c.name||tx(lang,'شخصية بلا اسم','Unnamed character')}</label>)}</div></fieldset>}
+    {characters.length>0&&<fieldset className="character-assign"><legend className="field-label">{tx(lang,'الشخصيات في المشهد','Characters in scene')}</legend><div>{characters.map(c=><label className="checkline" key={c.id}><input type="checkbox" checked={characterIds.includes(c.id)} onChange={e=>{const next=e.target.checked?[...characterIds,c.id]:characterIds.filter(id=>id!==c.id);setCharacterIds(next);queueSave('characterIds',next)}}/>{c.name||tx(lang,'شخصية بلا اسم','Unnamed character')}</label>)}</div></fieldset>}
     <div className="form-two">{numberField('clipStartSeconds',tx(lang,'بداية المقطع','Clip in (s)'),0,undefined,.1)}{numberField('clipEndSeconds',tx(lang,'نهاية المقطع','Clip out (s)'),0,undefined,.1)}{numberField('playbackSpeed',tx(lang,'سرعة التشغيل','Playback speed'),.25,4,.05)}{numberField('voiceVolume',tx(lang,'مستوى الصوت','Voice volume %'),0,100)}</div>
-    {field('transition',tx(lang,'الانتقال','Transition'))}{field('voiceUrl',tx(lang,'رابط التعليق الصوتي','Voice asset URL'))}{scene.voiceUrl&&<audio className="audio-preview" src={scene.voiceUrl} controls aria-label={tx(lang,'معاينة التعليق الصوتي','Voice narration preview')}/>}
-    <div className="save-state">{pending ? <Busy text={tx(lang,'جارٍ الحفظ','Saving')} /> : <><span className="signal-dot"/>{tx(lang,'تُحفظ التغييرات عند مغادرة الحقل','Changes save when you leave a field')}</>}</div></div>;
+    <label className="inspector-field"><span className="field-label">{tx(lang,'الانتقال','Transition')}</span><select className="studio-input" value={form.transition||'cut'} onChange={e=>{setForm(v=>({...v,transition:e.target.value}));queueSave('transition',e.target.value)}} onBlur={()=>void flushSave()}><option value="cut">{tx(lang,'قطع مباشر','Cut')}</option><option value="fade">{tx(lang,'تلاشي','Fade')}</option><option value="dissolve">{tx(lang,'تداخل','Dissolve')}</option><option value="wipe">{tx(lang,'مسح جانبي','Wipe')}</option><option value="slide">{tx(lang,'انزلاق','Slide')}</option></select></label>{field('voiceUrl',tx(lang,'رابط التعليق الصوتي','Voice asset URL'))}{scene.voiceUrl&&<audio className="audio-preview" src={scene.voiceUrl} controls aria-label={tx(lang,'معاينة التعليق الصوتي','Voice narration preview')}/>}
+    <div className={`save-state ${saveState==='error'?'text-destructive':''}`}>{pending||saveState==='saving' ? <Busy text={tx(lang,'جارٍ الحفظ','Saving')} /> : saveState==='error' ? <><span>{tx(lang,'تعذر الحفظ تلقائيًا.','Auto-save failed.')}</span><button className="text-link" onClick={()=>void flushSave()}>{tx(lang,'أعد المحاولة','Retry')}</button></> : <><span className="signal-dot"/>{tx(lang,'تم الحفظ تلقائيًا','Saved automatically')}</>}</div></div>;
 }
 function CharacterProfiles({projectId,characters,onSave,pending}:{projectId:string;characters:CharacterProfile[];onSave:(data:{characters:CharacterProfile[]})=>Promise<void>;pending:boolean}) {
   const {lang}=useApp();
@@ -465,7 +515,7 @@ function GenerationPanel({projectId,scene,keys,lang,onQueued}:{projectId:string;
   const [mode,setMode]=useState<'text'|'image'>('image');
   const [approved,setApproved]=useState(false);
   const service=action==='image'?'image':action==='video'?'video':action==='voice'?'voice':null;
-  const readyKeys=keys.filter(key=>key.enabled&&key.serviceType===service&&(key.status==='valid'||key.status==='untested'));
+  const readyKeys=keys.filter(key=>key.enabled&&key.serviceType===service&&providerSupports(key.provider,service||'')&&(key.status==='valid'||key.status==='untested'));
   const activeKey=readyKeys.find(key=>key.id===providerId)||readyKeys[0];
   const busy=imageJob.isPending||videoJob.isPending||voiceJob.isPending;
   const close=()=>{setAction(null);setApproved(false);setModel('');setVoiceId('')};
@@ -478,7 +528,7 @@ function GenerationPanel({projectId,scene,keys,lang,onQueued}:{projectId:string;
   };
   const modelValid=action==='voice'?voiceId.trim().length>0:model.trim().length>0;
   return <div className="generation-tools"><div className="generation-heading"><span className="eyebrow">{tx(lang,'توليد الأصول','GENERATE ASSETS')}</span><Link href="/settings/providers" className="text-link">{tx(lang,'إعداد المزوّدين','Provider setup')}<ArrowLeft size={13}/></Link></div><div className="generation-buttons">
-    {(['image','video','voice'] as const).map(kind=>{const available=keys.some(key=>key.enabled&&key.serviceType===kind&&(key.status==='valid'||key.status==='untested'));return <button key={kind} className="btn btn-quiet" disabled={!available} onClick={()=>{setAction(kind);setProviderId('');setApproved(false)}} title={!available?tx(lang,'لا يوجد مفتاح مفعّل وغير متعطل لهذه الخدمة','No enabled, available key for this service'):undefined}>{kind==='image'?<ImagePlus size={15}/>:kind==='video'?<Film size={15}/>:<Languages size={15}/ >}{tx(lang,kind==='image'?'صورة':kind==='video'?'فيديو':'صوت',kind)}</button>})}
+    {(['image','video','voice'] as const).map(kind=>{const available=keys.some(key=>key.enabled&&key.serviceType===kind&&providerSupports(key.provider,kind)&&(key.status==='valid'||key.status==='untested'));return <button key={kind} className="btn btn-quiet" disabled={!available} onClick={()=>{setAction(kind);setProviderId('');setApproved(false)}} title={!available?tx(lang,'لا يوجد مفتاح مفعّل لمزوّد موصول بهذه المهمة','No enabled key for a provider currently connected to this task'):undefined}>{kind==='image'?<ImagePlus size={15}/>:kind==='video'?<Film size={15}/>:<Languages size={15}/ >}{tx(lang,kind==='image'?'صورة':kind==='video'?'فيديو':'صوت',kind)}</button>})}
   </div><p className="generation-note">{tx(lang,'المخرجات تظهر هنا بعد اكتمال المهمة؛ لا توجد نتائج تجريبية.','Completed outputs appear here after the job finishes. No sample assets are shown.')}</p>
   {(imageJob.isError||videoJob.isError||voiceJob.isError)&&<p className="inline-error">{tx(lang,'تعذر إرسال طلب التوليد. تحقّق من المفتاح وإعدادات المزوّد.','Could not queue generation. Check the provider key and settings.')}</p>}
   {action&&<Modal title={tx(lang,'تأكيد طلب التوليد','Confirm generation request')} subtitle={tx(lang,'قد تُحتسب رسوم على هذا الطلب، وقد يجرّب النظام مزوّدًا احتياطيًا آخر عند التعطل أو نفاد الحصة.','This request may incur charges. Automatic failover may also use another configured provider.')} onClose={close}><div className="form-stack">
@@ -493,6 +543,70 @@ function GenerationPanel({projectId,scene,keys,lang,onQueued}:{projectId:string;
   </div></Modal>}
   </div>;
 }
+
+function TranscriptionPanel({projectId,sceneId,language,keys,lang}:{projectId:string;sceneId:string;language:string;keys:ProviderKey[];lang:Lang}) {
+  const qc=useQueryClient();
+  const updateScene=useUpdateScene();
+  const [file,setFile]=useState<File|null>(null);
+  const [providerId,setProviderId]=useState('');
+  const [mode,setMode]=useState<'transcribe'|'translate'>('transcribe');
+  const [approved,setApproved]=useState(false);
+  const [busy,setBusy]=useState(false);
+  const [error,setError]=useState('');
+  const [draft,setDraft]=useState('');
+  const [providerUsed,setProviderUsed]=useState('');
+  const readyKeys=keys.filter(key=>key.enabled&&key.serviceType==='transcription'&&providerSupports(key.provider,'transcription')&&(key.status==='valid'||key.status==='untested'));
+  const activeKey=readyKeys.find(key=>key.id===providerId)||readyKeys[0];
+  const canTranslate=activeKey?.provider==='openai'||activeKey?.provider==='whisper';
+
+  useEffect(()=>{if(mode==='translate'&&!canTranslate)setMode('transcribe')},[mode,canTranslate]);
+
+  async function submit() {
+    if(!file||!activeKey||!approved||file.size>20*1024*1024)return;
+    setBusy(true);setError('');setDraft('');setProviderUsed('');
+    try {
+      const response=await fetch(`${basePath}/api/projects/${projectId}/scenes/${sceneId}/transcriptions`,{
+        method:'POST',
+        credentials:'same-origin',
+        headers:{'Content-Type':file.type||'application/octet-stream','X-Provider-Key-ID':activeKey.id,'X-Transcription-Mode':mode,'X-Approve-Potential-Charges':'true'},
+        body:file,
+      });
+      const result=await response.json().catch(()=>({})) as {text?:string;provider?:string;model?:string;error?:string};
+      if(!response.ok)throw new Error(result.error||tx(lang,'تعذرت معالجة الملف.','The audio could not be processed.'));
+      if(!result.text?.trim())throw new Error(tx(lang,'لم يُرجع المزوّد نصًا.','The provider returned no transcript.'));
+      setDraft(result.text);setProviderUsed(`${result.provider||activeKey.provider} · ${result.model||''}`);
+    } catch(caught) {
+      setError(caught instanceof Error?caught.message:tx(lang,'حدث خطأ غير متوقع.','An unexpected error occurred.'));
+    } finally {setBusy(false)}
+  }
+
+  async function saveTranscript() {
+    try {
+      await updateScene.mutateAsync({projectId,sceneId,data:{narration:draft}});
+      await qc.invalidateQueries({queryKey:getGetProjectQueryKey(projectId)});
+      setDraft('');
+      setFile(null);
+    } catch {
+      setError(tx(lang,'تعذر حفظ النص في المشهد. أعد المحاولة.','Could not save the transcript to this scene. Try again.'));
+    }
+  }
+
+  return <section className="transcription-panel">
+    <div className="generation-heading"><span className="eyebrow">{tx(lang,'تفريغ الصوت والترجمة','WHISPER TRANSCRIPTION')}</span><Mic size={15}/></div>
+    <p className="generation-note">{tx(lang,'ارفع مقطعًا صوتيًا لتحويله إلى نص مراجَع. لا يُحفَظ الملف الصوتي هنا؛ يُرسَل مباشرةً إلى المزوّد الذي تختاره.','Upload audio to create editable text. The audio is not stored here; it is sent directly to the provider you choose.')}</p>
+    {!readyKeys.length?<div className="transcription-empty"><span>{tx(lang,'أضف مفتاح Whisper أو Hugging Face في نوع خدمة التفريغ.','Add a Whisper or Hugging Face key with the transcription service type.')}</span><Link className="text-link" href="/settings/providers">{tx(lang,'إعداد المفاتيح','Set up keys')}<ArrowLeft size={13}/></Link></div>:<>
+      <label className="inspector-field"><span className="field-label">{tx(lang,'ملف صوتي · حد 20 MB','Audio file · 20 MB limit')}</span><input className="studio-input" type="file" accept="audio/*" onChange={event=>{setFile(event.target.files?.[0]||null);setDraft('');setError('')}} /></label>
+      {readyKeys.length>1&&<label className="inspector-field"><span className="field-label">{tx(lang,'مزوّد التفريغ','Transcription provider')}</span><select className="studio-input" value={activeKey?.id||''} onChange={event=>setProviderId(event.target.value)}>{readyKeys.map(key=><option value={key.id} key={key.id}>{key.label} · {key.provider}</option>)}</select></label>}
+      <label className="inspector-field"><span className="field-label">{tx(lang,'العملية','Action')}</span><select className="studio-input" value={mode} onChange={event=>setMode(event.target.value as 'transcribe'|'translate')}><option value="transcribe">{tx(lang,`تفريغ باللغة: ${language}`,`Transcribe: ${language}`)}</option><option value="translate" disabled={!canTranslate}>{tx(lang,'ترجمة الصوت إلى الإنجليزية','Translate audio to English')}</option></select></label>
+      <label className="checkline charge-consent"><input type="checkbox" checked={approved} onChange={event=>setApproved(event.target.checked)}/>{tx(lang,'أوافق على إرسال الصوت للمزوّد المحدد، وقد يُرسل لمزوّد احتياطي عند تفعيل التدوير. قد تُحتسب رسوم.','I approve sending audio to this provider and, if rotation is enabled, a fallback provider. Charges may apply.')}</label>
+      <button className="btn btn-quiet w-full" onClick={()=>void submit()} disabled={!file||!approved||busy||!activeKey||file.size>20*1024*1024}>{busy?<LoaderCircle size={15} className="animate-spin"/>:<Mic size={15}/ >}{tx(lang,'تفريغ الصوت','Transcribe audio')}</button>
+      {file&&file.size>20*1024*1024&&<p className="inline-error">{tx(lang,'حجم الملف يتجاوز حد 20 MB.','The file exceeds the 20 MB limit.')}</p>}
+      {error&&<p className="inline-error">{error}</p>}
+      {draft&&<div className="transcript-result"><label className="inspector-field"><span className="field-label">{tx(lang,'راجع النص قبل إضافته للترجمة','Review before using as subtitles')}</span><textarea className="studio-input" rows={5} value={draft} onChange={event=>setDraft(event.target.value)}/></label><small>{providerUsed}</small><button className="btn btn-primary w-full" onClick={()=>void saveTranscript()} disabled={updateScene.isPending||!draft.trim()}>{updateScene.isPending?<LoaderCircle size={15} className="animate-spin"/>:<Check size={15}/ >}{tx(lang,'حفظ النص في ترجمة المشهد','Save as scene subtitles')}</button></div>}
+    </>}
+  </section>;
+}
+
 function SceneAssetHistory({projectId,scene,lang}:{projectId:string;scene:Scene;lang:Lang}) {
   const qc=useQueryClient(),restore=useUpdateScene();
   const versions=scene.assetHistory||[];

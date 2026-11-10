@@ -1092,12 +1092,15 @@ router.post("/projects/:projectId/export", async (req, res): Promise<void> => {
       parsed.data.fps,
       project.aspectRatio,
       parsed.data.includeSubtitles,
+      project.musicUrl,
+      project.musicVolume,
+      parsed.data.format ?? "mp4",
     );
     const downloadUrl = `/api/projects/${project.id}/export/file`;
     await db.update(projectsTable).set({
       exportPath: outputPath,
       exportUrl: downloadUrl,
-      exportContentType: "video/mp4",
+      exportContentType: parsed.data.format === "webm" ? "video/webm" : "video/mp4",
       status: "completed",
       progress: 100,
     }).where(eq(projectsTable.id, project.id));
@@ -1105,8 +1108,8 @@ router.post("/projects/:projectId/export", async (req, res): Promise<void> => {
       status: "completed",
       downloadUrl,
       message: parsed.data.includeSubtitles
-        ? "MP4 export finished with scene narration subtitles and the selected audio tracks."
-        : "MP4 export finished with the selected scene voice and soundtrack tracks.",
+        ? `${parsed.data.format === "webm" ? "WebM" : "MP4"} export finished with scene narration subtitles and the selected audio tracks.`
+        : `${parsed.data.format === "webm" ? "WebM" : "MP4"} export finished with the selected scene voice and soundtrack tracks.`,
     }));
   } catch (error) {
     const message = error instanceof Error ? error.message : "Video export failed.";
@@ -1133,7 +1136,8 @@ router.get("/projects/:projectId/export/file", async (req, res): Promise<void> =
     res.status(404).json({ error: "Export file not found." });
     return;
   }
-  res.download(path, `${project.title.replace(/[^a-zA-Z0-9_-]+/g, "-") || "video"}.mp4`, (error) => {
+  const extension = project.exportContentType === "video/webm" ? "webm" : "mp4";
+  res.download(path, `${project.title.replace(/[^a-zA-Z0-9_-]+/g, "-") || "video"}.${extension}`, (error) => {
     if (error && !res.headersSent) res.status(404).json({ error: "Export file not found." });
   });
 });

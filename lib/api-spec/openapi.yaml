@@ -302,6 +302,54 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/StudioJob"
+  /projects/{projectId}/scenes/{sceneId}/transcriptions:
+    post:
+      operationId: transcribeSceneAudio
+      tags: [projects]
+      summary: Transcribe or translate uploaded audio into scene text
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: sceneId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: X-Provider-Key-ID
+          in: header
+          required: false
+          schema: { type: string, format: uuid }
+        - name: X-Transcription-Mode
+          in: header
+          required: true
+          schema: { type: string, enum: [transcribe, translate] }
+        - name: X-Approve-Potential-Charges
+          in: header
+          required: true
+          schema: { type: boolean }
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              $ref: "#/components/schemas/AudioTranscriptionInput"
+          audio/*:
+            schema:
+              $ref: "#/components/schemas/AudioTranscriptionInput"
+      responses:
+        "200":
+          description: Transcription result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AudioTranscriptionResult"
+        "400":
+          description: Invalid upload or missing cost confirmation
+        "409":
+          description: No eligible transcription key
+        "502":
+          description: All configured transcription providers failed
   /projects/{projectId}/jobs/export:
     parameters:
       - name: projectId
@@ -974,12 +1022,23 @@ components:
         pricingNote: { type: string }
         officialUrl: { type: string, format: uri }
       required: [name, category, access, pricingNote, officialUrl]
+    AudioTranscriptionInput:
+      type: string
+      description: Raw audio bytes sent with the audio media type.
+    AudioTranscriptionResult:
+      type: object
+      properties:
+        text: { type: string }
+        provider: { type: string }
+        model: { type: string }
+      required: [text, provider, model]
     ExportInput:
       type: object
       properties:
         resolution: { type: integer, enum: [480, 720, 1080, 2160] }
         fps: { type: integer, enum: [24, 25, 30, 60] }
         includeSubtitles: { type: boolean }
+        format: { type: string, enum: [mp4, webm] }
       required: [resolution, fps, includeSubtitles]
     ExportResult:
       type: object

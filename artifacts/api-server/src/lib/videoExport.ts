@@ -19,6 +19,7 @@ type ExportScene = {
   clipStartSeconds: number;
   clipEndSeconds: number | null;
   playbackSpeed: number;
+  transition: string;
 };
 
 function isPrivateAddress(address: string): boolean {
@@ -141,6 +142,7 @@ export async function renderMp4(
   includeSubtitles: boolean,
   musicUrl: string | null = null,
   musicVolume = 0,
+  format: "mp4" | "webm" = "mp4",
 ): Promise<string> {
   if (!scenes.length) throw new Error("Add scenes before exporting.");
   if (scenes.some((scene) => !scene.assetUrl || !["image", "video"].includes(scene.assetType ?? ""))) {
@@ -172,9 +174,10 @@ export async function renderMp4(
   const userDir = resolve("generated-artifacts/ai-video-studio/exports", userId.replace(/[^a-zA-Z0-9_-]/g, "_"));
   await mkdir(workDir, { recursive: true });
   await mkdir(userDir, { recursive: true });
-  const finalPath = join(userDir, `${projectId}.mp4`);
+  const finalPath = join(userDir, `${projectId}.${format}`);
   const concatenatedPath = join(workDir, "video-track.mp4");
   const segmentList: string[] = [];
+  const sceneDurations: number[] = [];
   let totalDuration = 0;
 
   try {
@@ -196,6 +199,7 @@ export async function renderMp4(
       const playbackSpeed = Math.max(0.25, Math.min(4, scene.playbackSpeed || 1));
       const duration = Math.max(1, Math.min(600, clipRange / playbackSpeed));
       totalDuration += duration;
+      sceneDurations.push(duration);
       const narration = scene.narration.trim().replaceAll("-->", "—>").replace(/\r\n?/g, "\n");
       const subtitlePath = join(workDir, `subtitle-${index}.srt`);
       if (includeSubtitles && narration) {
@@ -245,19 +249,68 @@ export async function renderMp4(
       segmentList.push(segmentPath);
     }
 
-    const concatFile = join(workDir, "concat.txt");
-    await writeFile(
-      concatFile,
-      segmentList.map((path) => `file '${path.replaceAll("'", "'\\''")}'`).join("\n"),
-    );
-    await runFfmpeg([
-      "-f", "concat",
-      "-safe", "0",
-      "-i", concatFile,
-      "-c", "copy",
-      "-movflags", "+faststart",
-      concatenatedPath,
-    ]);
+    const transitionNames: Record<string, string> = {
+      fade: "fade",
+      dissolve: "dissolve",
+      wipe: "wipeleft",
+      slide: "slideleft",
+    };
+    let renderedDuration = totalDuration;
+    const hasTransitions = scenes.slice(1).some((scene) => transitionNames[scene.transition]);
+    if (hasTransitions && segmentList.length > 1) {
+      const filters: string[] = [];
+      let videoLabel = "0:v:0";
+      let audioLabel = "0:a:0";
+      let accumulatedDuration = sceneDurations[0];
+      for (let index = 1; index < segmentList.length; index += 1) {
+        const nextVideoLabel = `v${index}`;
+        const nextAudioLabel = `a${index}`;
+        const transition = transitionNames[scenes[index].transition];
+        if (transition) {
+          const duration = Math.max(0.1, Math.min(0.5, sceneDurations[index - 1] / 2, sceneDurations[index] / 2));
+          const offset = Math.max(0, accumulatedDuration - duration);
+          filters.push(`[${videoLabel}][${index}:v:0]xfade=transition=${transition}:duration=${duration}:offset=${offset}[${nextVideoLabel}]`);
+          filters.push(`[${audioLabel}][${index}:a:0]acrossfade=d=${duration}:c1=tri:c2=tri[${nextAudioLabel}]`);
+          accumulatedDuration += sceneDurations[index] - duration;
+        } else {
+          filters.push(`[${videoLabel}][${index}:v:0]concat=n=2:v=1:a=0[${nextVideoLabel}]`);
+          filters.push(`[${audioLabel}][${index}:a:0]concat=n=2:v=0:a=1[${nextAudioLabel}]`);
+          accumulatedDuration += sceneDurations[index];
+        }
+        videoLabel = nextVideoLabel;
+        audioLabel = nextAudioLabel;
+      }
+      renderedDuration = accumulatedDuration;
+      await runFfmpeg([
+        ...segmentList.flatMap((path) => ["-i", path]),
+        "-filter_complex", filters.join(";"),
+        "-map", `[${videoLabel}]`,
+        "-map", `[${audioLabel}]`,
+        "-t", String(renderedDuration),
+        "-c:v", "libx264",
+        "-preset", "veryfast",
+        "-pix_fmt", "yuv420p",
+        "-c:a", "aac",
+        "-ar", "48000",
+        "-ac", "2",
+        "-movflags", "+faststart",
+        concatenatedPath,
+      ]);
+    } else {
+      const concatFile = join(workDir, "concat.txt");
+      await writeFile(
+        concatFile,
+        segmentList.map((path) => `file '${path.replaceAll("'", "'\\''")}'`).join("\n"),
+      );
+      await runFfmpeg([
+        "-f", "concat",
+        "-safe", "0",
+        "-i", concatFile,
+        "-c", "copy",
+        "-movflags", "+faststart",
+        concatenatedPath,
+      ]);
+    }
     if (musicUrl && musicVolume > 0) {
       const music = await mediaBytes(musicUrl, projectId);
       if (!music.contentType.startsWith("audio/")) {
@@ -272,15 +325,29 @@ export async function renderMp4(
         "-filter_complex", `[0:a]volume=1[voice];[1:a]volume=${Math.max(0, Math.min(1, musicVolume / 100))}[music];[voice][music]amix=inputs=2:duration=first:dropout_transition=2[a]`,
         "-map", "0:v:0",
         "-map", "[a]",
-        "-t", String(totalDuration),
-        "-c:v", "copy",
-        "-c:a", "aac",
-        "-b:a", "192k",
-        "-movflags", "+faststart",
+        "-t", String(renderedDuration),
+        ...(format === "webm"
+          ? ["-c:v", "libvpx-vp9", "-crf", "32", "-b:v", "0", "-row-mt", "1", "-cpu-used", "5", "-c:a", "libopus", "-b:a", "128k"]
+          : ["-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart"]),
         finalPath,
       ]);
     } else {
-      await writeFile(finalPath, await readFile(concatenatedPath));
+      if (format === "webm") {
+        await runFfmpeg([
+          "-i", concatenatedPath,
+          "-t", String(renderedDuration),
+          "-c:v", "libvpx-vp9",
+          "-crf", "32",
+          "-b:v", "0",
+          "-row-mt", "1",
+          "-cpu-used", "5",
+          "-c:a", "libopus",
+          "-b:a", "128k",
+          finalPath,
+        ]);
+      } else {
+        await writeFile(finalPath, await readFile(concatenatedPath));
+      }
     }
     return finalPath;
   } finally {

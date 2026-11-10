@@ -25,6 +25,16 @@ export const providerDefinitions: Record<string, ProviderDefinition> = {
     chatModel: "gpt-4o-mini",
     chatMode: "openai",
   },
+  "openai-audio": {
+    label: "OpenAI Audio",
+    officialUrl: "https://platform.openai.com/api-keys",
+    testUrl: () => "https://api.openai.com/v1/models",
+  },
+  whisper: {
+    label: "OpenAI Whisper",
+    officialUrl: "https://platform.openai.com/api-keys",
+    testUrl: () => "https://api.openai.com/v1/models",
+  },
   gemini: {
     label: "Google Gemini",
     officialUrl: "https://aistudio.google.com/app/apikey",
@@ -169,8 +179,6 @@ export const providerCatalog = [
   })),
   { id: "runway", name: "Runway", officialUrl: "https://dev.runwayml.com/", canGenerateScript: false },
   { id: "azure-speech", name: "Azure Speech", officialUrl: "https://portal.azure.com/", canGenerateScript: false },
-  { id: "openai-audio", name: "OpenAI Audio", officialUrl: "https://platform.openai.com/api-keys", canGenerateScript: false },
-  { id: "whisper", name: "Whisper", officialUrl: "https://platform.openai.com/api-keys", canGenerateScript: false },
   { id: "google-speech", name: "Google Speech-to-Text", officialUrl: "https://console.cloud.google.com/apis/credentials", canGenerateScript: false },
   { id: "musicgen", name: "MusicGen", officialUrl: "https://github.com/facebookresearch/audiocraft", canGenerateScript: false },
 ];

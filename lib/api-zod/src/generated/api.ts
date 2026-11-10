@@ -902,6 +902,27 @@ export const QueueProjectScriptResponse = zod.object({
 
 
 /**
+ * @summary Transcribe or translate uploaded audio into scene text
+ */
+export const TranscribeSceneAudioParams = zod.object({
+  "projectId": zod.coerce.string().uuid(),
+  "sceneId": zod.coerce.string().uuid()
+})
+
+export const TranscribeSceneAudioHeader = zod.object({
+  "X-Provider-Key-ID": zod.string().uuid().optional(),
+  "X-Transcription-Mode": zod.enum(['transcribe', 'translate']),
+  "X-Approve-Potential-Charges": zod.boolean()
+})
+
+export const TranscribeSceneAudioResponse = zod.object({
+  "text": zod.string(),
+  "provider": zod.string(),
+  "model": zod.string()
+})
+
+
+/**
  * @summary Queue project video export
  */
 export const QueueProjectExportParams = zod.object({
@@ -911,7 +932,8 @@ export const QueueProjectExportParams = zod.object({
 export const QueueProjectExportBody = zod.object({
   "resolution": zod.union([zod.literal(480),zod.literal(720),zod.literal(1080),zod.literal(2160)]),
   "fps": zod.union([zod.literal(24),zod.literal(25),zod.literal(30),zod.literal(60)]),
-  "includeSubtitles": zod.boolean()
+  "includeSubtitles": zod.boolean(),
+  "format": zod.enum(['mp4', 'webm']).optional()
 })
 
 export const queueProjectExportResponseProgressMin = 0;
@@ -1314,7 +1336,8 @@ export const ExportProjectParams = zod.object({
 export const ExportProjectBody = zod.object({
   "resolution": zod.union([zod.literal(480),zod.literal(720),zod.literal(1080),zod.literal(2160)]),
   "fps": zod.union([zod.literal(24),zod.literal(25),zod.literal(30),zod.literal(60)]),
-  "includeSubtitles": zod.boolean()
+  "includeSubtitles": zod.boolean(),
+  "format": zod.enum(['mp4', 'webm']).optional()
 })
 
 export const ExportProjectResponse = zod.object({

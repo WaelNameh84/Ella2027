@@ -704,6 +704,17 @@ export interface FreeTool {
   officialUrl: string;
 }
 
+/**
+ * Raw audio bytes sent with the audio media type.
+ */
+export type AudioTranscriptionInput = string;
+
+export interface AudioTranscriptionResult {
+  text: string;
+  provider: string;
+  model: string;
+}
+
 export type ExportInputResolution = typeof ExportInputResolution[keyof typeof ExportInputResolution];
 
 
@@ -724,10 +735,19 @@ export const ExportInputFps = {
   NUMBER_60: 60,
 } as const;
 
+export type ExportInputFormat = typeof ExportInputFormat[keyof typeof ExportInputFormat];
+
+
+export const ExportInputFormat = {
+  mp4: 'mp4',
+  webm: 'webm',
+} as const;
+
 export interface ExportInput {
   resolution: ExportInputResolution;
   fps: ExportInputFps;
   includeSubtitles: boolean;
+  format?: ExportInputFormat;
 }
 
 export interface ExportResult {

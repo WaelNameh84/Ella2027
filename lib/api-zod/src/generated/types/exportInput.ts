@@ -5,6 +5,7 @@
  * AI Video Studio API
  * OpenAPI spec version: 0.1.0
  */
+import type { ExportInputFormat } from './exportInputFormat';
 import type { ExportInputFps } from './exportInputFps';
 import type { ExportInputResolution } from './exportInputResolution';
 
@@ -12,4 +13,5 @@ export interface ExportInput {
   resolution: ExportInputResolution;
   fps: ExportInputFps;
   includeSubtitles: boolean;
+  format?: ExportInputFormat;
 }

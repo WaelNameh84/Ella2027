@@ -25,6 +25,7 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AudioTranscriptionResult,
   ExportInput,
   ExportResult,
   FreeTool,
@@ -1442,6 +1443,97 @@ export const useQueueProjectScript = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getQueueProjectScriptMutationOptions(options), queryClient);
+    }
+
+export const getTranscribeSceneAudioUrl = (projectId: string,
+    sceneId: string,) => {
+
+
+
+
+  return `/api/projects/${projectId}/scenes/${sceneId}/transcriptions`
+}
+
+/**
+ * @summary Transcribe or translate uploaded audio into scene text
+ */
+export const transcribeSceneAudio = async (projectId: string,
+    sceneId: string,
+    transcribeSceneAudioBody: Blob, options?: Parameters<typeof customFetch>[1]): Promise<AudioTranscriptionResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<AudioTranscriptionResult>(getTranscribeSceneAudioUrl(projectId,sceneId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/octet-stream', ...getHeaders(options?.headers) },
+    body: transcribeSceneAudioBody
+  }
+);}
+
+
+
+
+
+export const getTranscribeSceneAudioMutationKey = () => ['transcribeSceneAudio'] as const;
+
+export const getTranscribeSceneAudioMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof transcribeSceneAudio>>, TError,TranscribeSceneAudioMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof transcribeSceneAudio>>, TError,TranscribeSceneAudioMutationVariables, TContext> => {
+
+const mutationKey = getTranscribeSceneAudioMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof transcribeSceneAudio>>, TranscribeSceneAudioMutationVariables> = (props) => {
+          const {projectId,sceneId,data} = props ?? {};
+
+          return  transcribeSceneAudio(projectId,sceneId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type TranscribeSceneAudioMutationResult = NonNullable<Awaited<ReturnType<typeof transcribeSceneAudio>>>
+    export type TranscribeSceneAudioMutationBody = BodyType<Blob>
+    export type TranscribeSceneAudioMutationError = ErrorType<void>
+    export type TranscribeSceneAudioMutationVariables = {projectId: string;sceneId: string;data: BodyType<Blob>}
+
+    /**
+ * @summary Transcribe or translate uploaded audio into scene text
+ */
+export const useTranscribeSceneAudio = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof transcribeSceneAudio>>, TError,TranscribeSceneAudioMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof transcribeSceneAudio>>,
+        TError,
+        TranscribeSceneAudioMutationVariables,
+        TContext
+      > => {
+      return useMutation(getTranscribeSceneAudioMutationOptions(options), queryClient);
     }
 
 export const getQueueProjectExportUrl = (projectId: string,) => {
