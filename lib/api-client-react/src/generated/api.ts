@@ -1631,6 +1631,95 @@ export const useQueueProjectExport = <TError = ErrorType<unknown>,
       return useMutation(getQueueProjectExportMutationOptions(options), queryClient);
     }
 
+export const getRenderProjectPreviewUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/projects/${projectId}/preview`
+}
+
+/**
+ * @summary Render a low-resolution project preview
+ */
+export const renderProjectPreview = async (projectId: string,
+    exportInput?: ExportInput, options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<Blob>(getRenderProjectPreviewUrl(projectId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(exportInput)
+  }
+);}
+
+
+
+
+
+export const getRenderProjectPreviewMutationKey = () => ['renderProjectPreview'] as const;
+
+export const getRenderProjectPreviewMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof renderProjectPreview>>, TError,RenderProjectPreviewMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof renderProjectPreview>>, TError,RenderProjectPreviewMutationVariables, TContext> => {
+
+const mutationKey = getRenderProjectPreviewMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof renderProjectPreview>>, RenderProjectPreviewMutationVariables> = (props) => {
+          const {projectId,data} = props ?? {};
+
+          return  renderProjectPreview(projectId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RenderProjectPreviewMutationResult = NonNullable<Awaited<ReturnType<typeof renderProjectPreview>>>
+    export type RenderProjectPreviewMutationBody = BodyType<ExportInput> | undefined
+    export type RenderProjectPreviewMutationError = ErrorType<void>
+    export type RenderProjectPreviewMutationVariables = {projectId: string;data?: BodyType<ExportInput>}
+
+    /**
+ * @summary Render a low-resolution project preview
+ */
+export const useRenderProjectPreview = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof renderProjectPreview>>, TError,RenderProjectPreviewMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof renderProjectPreview>>,
+        TError,
+        RenderProjectPreviewMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRenderProjectPreviewMutationOptions(options), queryClient);
+    }
+
 export const getListStudioJobsUrl = (params?: ListStudioJobsParams,) => {
   const normalizedParams = new URLSearchParams();
 

@@ -376,6 +376,40 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/StudioJob"
+  /projects/{projectId}/preview:
+    parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: renderProjectPreview
+      tags: [studio]
+      summary: Render a low-resolution project preview
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExportInput"
+      responses:
+        "200":
+          description: Rendered MP4 preview
+          content:
+            video/mp4:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Invalid preview options
+        "404":
+          description: Project not found
+        "409":
+          description: Scene media is incomplete
+        "422":
+          description: Preview render failed
   /jobs:
     get:
       operationId: listStudioJobs
@@ -939,6 +973,9 @@ components:
         description: { type: string }
         imagePrompt: { type: string }
         narration: { type: string }
+        subtitleText: { type: ["string", "null"] }
+        subtitleStartSeconds: { type: number, minimum: 0, maximum: 600 }
+        subtitleEndSeconds: { type: ["number", "null"], minimum: 0, maximum: 600 }
         durationSeconds: { type: integer }
         assetUrl: { type: ["string", "null"] }
         assetType: { type: ["string", "null"] }
@@ -958,7 +995,7 @@ components:
           items: { $ref: "#/components/schemas/SceneAssetVersion" }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
-      required: [id, projectId, sortOrder, title, description, imagePrompt, narration, durationSeconds, assetUrl, assetType, shotType, cameraMovement, location, lighting, characterIds, voiceUrl, voiceVolume, clipStartSeconds, clipEndSeconds, playbackSpeed, transition, assetHistory, createdAt, updatedAt]
+      required: [id, projectId, sortOrder, title, description, imagePrompt, narration, subtitleText, subtitleStartSeconds, subtitleEndSeconds, durationSeconds, assetUrl, assetType, shotType, cameraMovement, location, lighting, characterIds, voiceUrl, voiceVolume, clipStartSeconds, clipEndSeconds, playbackSpeed, transition, assetHistory, createdAt, updatedAt]
     SceneAssetVersion:
       type: object
       properties:
@@ -976,6 +1013,9 @@ components:
         description: { type: string }
         imagePrompt: { type: string }
         narration: { type: string }
+        subtitleText: { type: ["string", "null"] }
+        subtitleStartSeconds: { type: number, minimum: 0, maximum: 600 }
+        subtitleEndSeconds: { type: ["number", "null"], minimum: 0, maximum: 600 }
         durationSeconds: { type: integer, minimum: 1, maximum: 600 }
         assetUrl: { type: ["string", "null"], format: uri-reference }
         assetType: { type: ["string", "null"], enum: [image, video, audio, null] }
@@ -999,6 +1039,9 @@ components:
         description: { type: string }
         imagePrompt: { type: string }
         narration: { type: string }
+        subtitleText: { type: ["string", "null"] }
+        subtitleStartSeconds: { type: number, minimum: 0, maximum: 600 }
+        subtitleEndSeconds: { type: ["number", "null"], minimum: 0, maximum: 600 }
         durationSeconds: { type: integer, minimum: 1, maximum: 600 }
         assetUrl: { type: ["string", "null"], format: uri-reference }
         assetType: { type: ["string", "null"], enum: [image, video, audio, null] }
@@ -1202,6 +1245,7 @@ components:
         includeSubtitles: { type: boolean }
         format: { type: string, enum: [mp4, webm] }
         codec: { type: string, enum: [h264, hevc] }
+        subtitleStyle: { type: string, enum: [classic, outline, pill], default: classic }
       required: [resolution, fps, includeSubtitles]
     ExportResult:
       type: object

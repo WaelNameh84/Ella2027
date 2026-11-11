@@ -10,7 +10,7 @@
 - `artifacts/api-server/src/routes/`: حراسة الطلبات الخارجية، إعدادات المستخدم، وواجهات النسخ الاحتياطي عند الحاجة.
 - `artifacts/api-server/src/lib/studioJobs.ts`: تحقق إضافي قبل تنفيذ مهام المزوّدين في الخلفية.
 - `artifacts/api-server/src/lib/videoExport.ts`: إدراج ترجمة قابلة للضبط في ملف الفيديو.
-- `lib/db/src/schema/studio.ts`: حفظ إعداد وضع الإنفاق وتفاصيل الترجمة إن تطلّب التصميم ذلك؛ يجب أن يبقى تعديل المخطط قابلاً للتطبيق عبر أداة Drizzle الحالية.
+- `lib/db/src/schema/studio.ts`: حفظ وضع الإنفاق ونص الترجمة المستقل وتوقيت بدايتها/نهايتها؛ تُطبّق الأعمدة عبر أداة Drizzle الحالية.
 - `lib/api-spec/openapi.yaml` ومخرجات `lib/api-client-react` و`lib/api-zod`: عقد API والأنواع المولّدة.
 
 ## ترتيب الدفعات

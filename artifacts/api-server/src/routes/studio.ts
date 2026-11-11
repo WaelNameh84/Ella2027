@@ -236,6 +236,9 @@ function sceneDto(scene: typeof scenesTable.$inferSelect) {
     description: scene.description,
     imagePrompt: scene.imagePrompt,
     narration: scene.narration,
+    subtitleText: scene.subtitleText,
+    subtitleStartSeconds: scene.subtitleStartSeconds,
+    subtitleEndSeconds: scene.subtitleEndSeconds,
     durationSeconds: scene.durationSeconds,
     assetUrl: scene.assetUrl,
     assetType: scene.assetType,
@@ -1120,6 +1123,8 @@ router.post("/projects/:projectId/export", async (req, res): Promise<void> => {
       project.musicVolume,
       parsed.data.format ?? "mp4",
       parsed.data.codec ?? "h264",
+      project.id,
+      parsed.data.subtitleStyle ?? "classic",
     );
     const downloadUrl = `/api/projects/${project.id}/export/file`;
     await db.update(projectsTable).set({
@@ -1149,6 +1154,11 @@ router.post("/projects/:projectId/preview", async (req, res): Promise<void> => {
     res.status(400).json({ error: params.error.message });
     return;
   }
+  const previewOptions = ExportProjectBody.safeParse(req.body && Object.keys(req.body).length ? req.body : { resolution: 480, fps: 24, includeSubtitles: false });
+  if (!previewOptions.success) {
+    res.status(400).json({ error: previewOptions.error.message });
+    return;
+  }
   const userId = userIdOf(res);
   const project = await projectForUser(params.data.projectId, userId);
   if (!project) {
@@ -1163,7 +1173,7 @@ router.post("/projects/:projectId/preview", async (req, res): Promise<void> => {
   const previewId = `${project.id}-preview-${randomUUID()}`;
   let previewPath: string | null = null;
   try {
-    previewPath = await renderMp4(userId, project.id, scenes, 480, 24, project.aspectRatio, false, project.musicUrl, project.musicVolume, "mp4", "h264", previewId);
+    previewPath = await renderMp4(userId, project.id, scenes, 480, 24, project.aspectRatio, previewOptions.data.includeSubtitles, project.musicUrl, project.musicVolume, "mp4", "h264", previewId, previewOptions.data.subtitleStyle ?? "classic");
     const bytes = await readFile(previewPath);
     res.setHeader("Content-Type", "video/mp4");
     res.setHeader("Content-Disposition", `inline; filename="ella-preview.mp4"`);

@@ -18,6 +18,19 @@ export interface SceneInput {
   description: string;
   imagePrompt: string;
   narration: string;
+  /** @nullable */
+  subtitleText?: string | null;
+  /**
+     * @minimum 0
+     * @maximum 600
+     */
+  subtitleStartSeconds?: number;
+  /**
+     * @minimum 0
+     * @maximum 600
+     * @nullable
+     */
+  subtitleEndSeconds?: number | null;
   /**
      * @minimum 1
      * @maximum 600

@@ -11,6 +11,9 @@ type ExportScene = {
   id: string;
   title: string;
   narration: string;
+  subtitleText: string | null;
+  subtitleStartSeconds: number;
+  subtitleEndSeconds: number | null;
   assetUrl: string | null;
   assetType: string | null;
   durationSeconds: number;
@@ -164,6 +167,7 @@ export async function renderMp4(
   format: "mp4" | "webm" = "mp4",
   codec: "h264" | "hevc" = "h264",
   outputProjectId = projectId,
+  subtitleStyle: "classic" | "outline" | "pill" = "classic",
 ): Promise<string> {
   if (!scenes.length) throw new Error("Add scenes before exporting.");
   if (scenes.some((scene) => !scene.assetUrl || !["image", "video"].includes(scene.assetType ?? ""))) {
@@ -223,13 +227,17 @@ export async function renderMp4(
       const duration = Math.max(1, Math.min(600, clipRange / playbackSpeed));
       totalDuration += duration;
       sceneDurations.push(duration);
-      const narration = scene.narration.trim().replaceAll("-->", "—>").replace(/\r\n?/g, "\n");
+      const caption = (scene.subtitleText === null ? scene.narration : scene.subtitleText).trim().replaceAll("-->", "—>").replace(/\r\n?/g, "\n");
       const subtitlePath = join(workDir, `subtitle-${index}.srt`);
-      if (includeSubtitles && narration) {
-        const endTime = Math.max(1, Math.round(duration * 1000));
+      if (includeSubtitles && caption) {
+        const startSeconds = scene.subtitleStartSeconds ?? 0;
+        const endSeconds = scene.subtitleEndSeconds ?? duration;
+        if (startSeconds < 0 || startSeconds >= duration || endSeconds <= startSeconds || endSeconds > duration) {
+          throw new Error(`Scene ${index + 1} has an invalid subtitle time range.`);
+        }
         await writeFile(
           subtitlePath,
-          `1\n${formatSubtitleTime(0)} --> ${formatSubtitleTime(endTime)}\n${narration}\n`,
+          `1\n${formatSubtitleTime(Math.round(startSeconds * 1000))} --> ${formatSubtitleTime(Math.round(endSeconds * 1000))}\n${caption}\n`,
           "utf8",
         );
       }
@@ -245,10 +253,16 @@ export async function renderMp4(
         voicePath = join(workDir, `voice-${index}.${voice.contentType.includes("wav") ? "wav" : "mp3"}`);
         await writeFile(voicePath, voice.bytes);
       }
-      const baseVideoFilter = includeSubtitles && narration
-        ? `${ffmpegFilter(width, height, fps)},subtitles=filename=${escapeFilterPath(subtitlePath)}:force_style='FontName=DejaVu Sans,FontSize=22,Outline=2,Shadow=1,Alignment=2,MarginV=36'`
-        : ffmpegFilter(width, height, fps);
-      const videoFilter = `${baseVideoFilter},setpts=PTS/${playbackSpeed}`;
+      const subtitleStyles = {
+        classic: "FontName=DejaVu Sans,FontSize=22,PrimaryColour=&H00FFFFFF,OutlineColour=&H00101010,Outline=2,Shadow=1,Alignment=2,MarginV=36",
+        outline: "FontName=DejaVu Sans,FontSize=25,Bold=1,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,Outline=3,Shadow=1,Alignment=2,MarginV=42",
+        pill: "FontName=DejaVu Sans,FontSize=22,PrimaryColour=&H00FFFFFF,BorderStyle=3,BackColour=&H99000000,Outline=0,Shadow=0,Alignment=2,MarginV=40",
+      } as const;
+      const selectedSubtitleStyle = subtitleStyles[subtitleStyle] ?? subtitleStyles.classic;
+      const subtitleFilter = includeSubtitles && caption
+        ? `,subtitles=filename=${escapeFilterPath(subtitlePath)}:force_style='${selectedSubtitleStyle}'`
+        : "";
+      const videoFilter = `${ffmpegFilter(width, height, fps)},setpts=PTS/${playbackSpeed}${subtitleFilter}`;
       const audioInput = voicePath
         ? ["-i", voicePath]
         : ["-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000"];

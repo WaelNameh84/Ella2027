@@ -44,6 +44,7 @@ type JobInput = {
   includeSubtitles?: boolean;
   format?: "mp4" | "webm";
   codec?: "h264" | "hevc";
+  subtitleStyle?: "classic" | "outline" | "pill";
   sceneId?: string;
   model?: string;
   mode?: "text" | "image";
@@ -766,6 +767,8 @@ async function processExportJob(job: typeof studioJobsTable.$inferSelect): Promi
     project.musicVolume,
     input.format ?? "mp4",
     input.codec ?? "h264",
+    project.id,
+    input.subtitleStyle ?? "classic",
   );
   const downloadUrl = `/api/projects/${project.id}/export/file`;
   await db.transaction(async (tx) => {

@@ -26,6 +26,7 @@ export * from './exportInputCodec';
 export * from './exportInputFormat';
 export * from './exportInputFps';
 export * from './exportInputResolution';
+export * from './exportInputSubtitleStyle';
 export * from './exportResult';
 export * from './freeTool';
 export * from './healthStatus';

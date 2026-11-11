@@ -229,6 +229,12 @@ export const getProjectResponseOneCharactersItemVoiceDescriptionMax = 1000;
 export const getProjectResponseOneMusicVolumeMin = 0;
 export const getProjectResponseOneMusicVolumeMax = 100;
 
+export const getProjectResponseTwoScenesItemSubtitleStartSecondsMin = 0;
+export const getProjectResponseTwoScenesItemSubtitleStartSecondsMax = 600;
+
+export const getProjectResponseTwoScenesItemSubtitleEndSecondsMin = 0;
+export const getProjectResponseTwoScenesItemSubtitleEndSecondsMax = 600;
+
 export const getProjectResponseTwoScenesItemVoiceVolumeMin = 0;
 export const getProjectResponseTwoScenesItemVoiceVolumeMax = 100;
 
@@ -276,6 +282,9 @@ export const GetProjectResponse = zod.object({
   "description": zod.string(),
   "imagePrompt": zod.string(),
   "narration": zod.string(),
+  "subtitleText": zod.string().nullable(),
+  "subtitleStartSeconds": zod.number().min(getProjectResponseTwoScenesItemSubtitleStartSecondsMin).max(getProjectResponseTwoScenesItemSubtitleStartSecondsMax),
+  "subtitleEndSeconds": zod.number().min(getProjectResponseTwoScenesItemSubtitleEndSecondsMin).max(getProjectResponseTwoScenesItemSubtitleEndSecondsMax).nullable(),
   "durationSeconds": zod.number().int(),
   "assetUrl": zod.string().nullable(),
   "assetType": zod.string().nullable(),
@@ -420,6 +429,12 @@ export const createSceneBodySortOrderMin = 0;
 
 export const createSceneBodyTitleMax = 160;
 
+export const createSceneBodySubtitleStartSecondsMin = 0;
+export const createSceneBodySubtitleStartSecondsMax = 600;
+
+export const createSceneBodySubtitleEndSecondsMin = 0;
+export const createSceneBodySubtitleEndSecondsMax = 600;
+
 export const createSceneBodyDurationSecondsMax = 600;
 
 export const createSceneBodyShotTypeMax = 100;
@@ -452,6 +467,9 @@ export const CreateSceneBody = zod.object({
   "description": zod.string(),
   "imagePrompt": zod.string(),
   "narration": zod.string(),
+  "subtitleText": zod.string().nullish(),
+  "subtitleStartSeconds": zod.number().min(createSceneBodySubtitleStartSecondsMin).max(createSceneBodySubtitleStartSecondsMax).optional(),
+  "subtitleEndSeconds": zod.number().min(createSceneBodySubtitleEndSecondsMin).max(createSceneBodySubtitleEndSecondsMax).nullish(),
   "durationSeconds": zod.number().int().min(1).max(createSceneBodyDurationSecondsMax),
   "assetUrl": zod.string().nullish(),
   "assetType": zod.union([zod.literal('image'),zod.literal('video'),zod.literal('audio'),zod.literal(null)]).nullish(),
@@ -467,6 +485,12 @@ export const CreateSceneBody = zod.object({
   "playbackSpeed": zod.number().min(createSceneBodyPlaybackSpeedMin).max(createSceneBodyPlaybackSpeedMax).optional(),
   "transition": zod.string().max(createSceneBodyTransitionMax).optional()
 })
+
+export const createSceneResponseSubtitleStartSecondsMin = 0;
+export const createSceneResponseSubtitleStartSecondsMax = 600;
+
+export const createSceneResponseSubtitleEndSecondsMin = 0;
+export const createSceneResponseSubtitleEndSecondsMax = 600;
 
 export const createSceneResponseVoiceVolumeMin = 0;
 export const createSceneResponseVoiceVolumeMax = 100;
@@ -488,6 +512,9 @@ export const CreateSceneResponse = zod.object({
   "description": zod.string(),
   "imagePrompt": zod.string(),
   "narration": zod.string(),
+  "subtitleText": zod.string().nullable(),
+  "subtitleStartSeconds": zod.number().min(createSceneResponseSubtitleStartSecondsMin).max(createSceneResponseSubtitleStartSecondsMax),
+  "subtitleEndSeconds": zod.number().min(createSceneResponseSubtitleEndSecondsMin).max(createSceneResponseSubtitleEndSecondsMax).nullable(),
   "durationSeconds": zod.number().int(),
   "assetUrl": zod.string().nullable(),
   "assetType": zod.string().nullable(),
@@ -526,6 +553,12 @@ export const updateSceneBodySortOrderMin = 0;
 
 export const updateSceneBodyTitleMax = 160;
 
+export const updateSceneBodySubtitleStartSecondsMin = 0;
+export const updateSceneBodySubtitleStartSecondsMax = 600;
+
+export const updateSceneBodySubtitleEndSecondsMin = 0;
+export const updateSceneBodySubtitleEndSecondsMax = 600;
+
 export const updateSceneBodyDurationSecondsMax = 600;
 
 export const updateSceneBodyShotTypeMax = 100;
@@ -558,6 +591,9 @@ export const UpdateSceneBody = zod.object({
   "description": zod.string().optional(),
   "imagePrompt": zod.string().optional(),
   "narration": zod.string().optional(),
+  "subtitleText": zod.string().nullish(),
+  "subtitleStartSeconds": zod.number().min(updateSceneBodySubtitleStartSecondsMin).max(updateSceneBodySubtitleStartSecondsMax).optional(),
+  "subtitleEndSeconds": zod.number().min(updateSceneBodySubtitleEndSecondsMin).max(updateSceneBodySubtitleEndSecondsMax).nullish(),
   "durationSeconds": zod.number().int().min(1).max(updateSceneBodyDurationSecondsMax).optional(),
   "assetUrl": zod.string().nullish(),
   "assetType": zod.union([zod.literal('image'),zod.literal('video'),zod.literal('audio'),zod.literal(null)]).nullish(),
@@ -573,6 +609,12 @@ export const UpdateSceneBody = zod.object({
   "playbackSpeed": zod.number().min(updateSceneBodyPlaybackSpeedMin).max(updateSceneBodyPlaybackSpeedMax).optional(),
   "transition": zod.string().max(updateSceneBodyTransitionMax).optional()
 })
+
+export const updateSceneResponseSubtitleStartSecondsMin = 0;
+export const updateSceneResponseSubtitleStartSecondsMax = 600;
+
+export const updateSceneResponseSubtitleEndSecondsMin = 0;
+export const updateSceneResponseSubtitleEndSecondsMax = 600;
 
 export const updateSceneResponseVoiceVolumeMin = 0;
 export const updateSceneResponseVoiceVolumeMax = 100;
@@ -594,6 +636,9 @@ export const UpdateSceneResponse = zod.object({
   "description": zod.string(),
   "imagePrompt": zod.string(),
   "narration": zod.string(),
+  "subtitleText": zod.string().nullable(),
+  "subtitleStartSeconds": zod.number().min(updateSceneResponseSubtitleStartSecondsMin).max(updateSceneResponseSubtitleStartSecondsMax),
+  "subtitleEndSeconds": zod.number().min(updateSceneResponseSubtitleEndSecondsMin).max(updateSceneResponseSubtitleEndSecondsMax).nullable(),
   "durationSeconds": zod.number().int(),
   "assetUrl": zod.string().nullable(),
   "assetType": zod.string().nullable(),
@@ -801,6 +846,12 @@ export const generateProjectScriptResponseOneCharactersItemVoiceDescriptionMax =
 export const generateProjectScriptResponseOneMusicVolumeMin = 0;
 export const generateProjectScriptResponseOneMusicVolumeMax = 100;
 
+export const generateProjectScriptResponseTwoScenesItemSubtitleStartSecondsMin = 0;
+export const generateProjectScriptResponseTwoScenesItemSubtitleStartSecondsMax = 600;
+
+export const generateProjectScriptResponseTwoScenesItemSubtitleEndSecondsMin = 0;
+export const generateProjectScriptResponseTwoScenesItemSubtitleEndSecondsMax = 600;
+
 export const generateProjectScriptResponseTwoScenesItemVoiceVolumeMin = 0;
 export const generateProjectScriptResponseTwoScenesItemVoiceVolumeMax = 100;
 
@@ -848,6 +899,9 @@ export const GenerateProjectScriptResponse = zod.object({
   "description": zod.string(),
   "imagePrompt": zod.string(),
   "narration": zod.string(),
+  "subtitleText": zod.string().nullable(),
+  "subtitleStartSeconds": zod.number().min(generateProjectScriptResponseTwoScenesItemSubtitleStartSecondsMin).max(generateProjectScriptResponseTwoScenesItemSubtitleStartSecondsMax),
+  "subtitleEndSeconds": zod.number().min(generateProjectScriptResponseTwoScenesItemSubtitleEndSecondsMin).max(generateProjectScriptResponseTwoScenesItemSubtitleEndSecondsMax).nullable(),
   "durationSeconds": zod.number().int(),
   "assetUrl": zod.string().nullable(),
   "assetType": zod.string().nullable(),
@@ -955,12 +1009,15 @@ export const QueueProjectExportParams = zod.object({
   "projectId": zod.coerce.string().uuid()
 })
 
+export const queueProjectExportBodySubtitleStyleDefault = `classic`;
+
 export const QueueProjectExportBody = zod.object({
   "resolution": zod.union([zod.literal(480),zod.literal(720),zod.literal(1080),zod.literal(2160)]),
   "fps": zod.union([zod.literal(24),zod.literal(25),zod.literal(30),zod.literal(60)]),
   "includeSubtitles": zod.boolean(),
   "format": zod.enum(['mp4', 'webm']).optional(),
-  "codec": zod.enum(['h264', 'hevc']).optional()
+  "codec": zod.enum(['h264', 'hevc']).optional(),
+  "subtitleStyle": zod.enum(['classic', 'outline', 'pill']).default(queueProjectExportBodySubtitleStyleDefault)
 })
 
 export const queueProjectExportResponseProgressMin = 0;
@@ -985,6 +1042,27 @@ export const QueueProjectExportResponse = zod.object({
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
+
+
+/**
+ * @summary Render a low-resolution project preview
+ */
+export const RenderProjectPreviewParams = zod.object({
+  "projectId": zod.coerce.string().uuid()
+})
+
+export const renderProjectPreviewBodySubtitleStyleDefault = `classic`;
+
+export const RenderProjectPreviewBody = zod.object({
+  "resolution": zod.union([zod.literal(480),zod.literal(720),zod.literal(1080),zod.literal(2160)]),
+  "fps": zod.union([zod.literal(24),zod.literal(25),zod.literal(30),zod.literal(60)]),
+  "includeSubtitles": zod.boolean(),
+  "format": zod.enum(['mp4', 'webm']).optional(),
+  "codec": zod.enum(['h264', 'hevc']).optional(),
+  "subtitleStyle": zod.enum(['classic', 'outline', 'pill']).default(renderProjectPreviewBodySubtitleStyleDefault)
+})
+
+export const RenderProjectPreviewResponse = zod.unknown()
 
 
 /**
@@ -1487,12 +1565,15 @@ export const ExportProjectParams = zod.object({
   "projectId": zod.coerce.string().uuid()
 })
 
+export const exportProjectBodySubtitleStyleDefault = `classic`;
+
 export const ExportProjectBody = zod.object({
   "resolution": zod.union([zod.literal(480),zod.literal(720),zod.literal(1080),zod.literal(2160)]),
   "fps": zod.union([zod.literal(24),zod.literal(25),zod.literal(30),zod.literal(60)]),
   "includeSubtitles": zod.boolean(),
   "format": zod.enum(['mp4', 'webm']).optional(),
-  "codec": zod.enum(['h264', 'hevc']).optional()
+  "codec": zod.enum(['h264', 'hevc']).optional(),
+  "subtitleStyle": zod.enum(['classic', 'outline', 'pill']).default(exportProjectBodySubtitleStyleDefault)
 })
 
 export const ExportProjectResponse = zod.object({

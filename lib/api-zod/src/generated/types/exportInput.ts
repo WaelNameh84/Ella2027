@@ -9,6 +9,7 @@ import type { ExportInputCodec } from './exportInputCodec';
 import type { ExportInputFormat } from './exportInputFormat';
 import type { ExportInputFps } from './exportInputFps';
 import type { ExportInputResolution } from './exportInputResolution';
+import type { ExportInputSubtitleStyle } from './exportInputSubtitleStyle';
 
 export interface ExportInput {
   resolution: ExportInputResolution;
@@ -16,4 +17,5 @@ export interface ExportInput {
   includeSubtitles: boolean;
   format?: ExportInputFormat;
   codec?: ExportInputCodec;
+  subtitleStyle?: ExportInputSubtitleStyle;
 }

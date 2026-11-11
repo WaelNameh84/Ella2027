@@ -238,6 +238,19 @@ export interface Scene {
   description: string;
   imagePrompt: string;
   narration: string;
+  /** @nullable */
+  subtitleText: string | null;
+  /**
+     * @minimum 0
+     * @maximum 600
+     */
+  subtitleStartSeconds: number;
+  /**
+     * @minimum 0
+     * @maximum 600
+     * @nullable
+     */
+  subtitleEndSeconds: number | null;
   durationSeconds: number;
   /** @nullable */
   assetUrl: string | null;
@@ -385,6 +398,19 @@ export interface SceneInput {
   description: string;
   imagePrompt: string;
   narration: string;
+  /** @nullable */
+  subtitleText?: string | null;
+  /**
+     * @minimum 0
+     * @maximum 600
+     */
+  subtitleStartSeconds?: number;
+  /**
+     * @minimum 0
+     * @maximum 600
+     * @nullable
+     */
+  subtitleEndSeconds?: number | null;
   /**
      * @minimum 1
      * @maximum 600
@@ -450,6 +476,19 @@ export interface SceneUpdate {
   description?: string;
   imagePrompt?: string;
   narration?: string;
+  /** @nullable */
+  subtitleText?: string | null;
+  /**
+     * @minimum 0
+     * @maximum 600
+     */
+  subtitleStartSeconds?: number;
+  /**
+     * @minimum 0
+     * @maximum 600
+     * @nullable
+     */
+  subtitleEndSeconds?: number | null;
   /**
      * @minimum 1
      * @maximum 600
@@ -904,12 +943,22 @@ export const ExportInputCodec = {
   hevc: 'hevc',
 } as const;
 
+export type ExportInputSubtitleStyle = typeof ExportInputSubtitleStyle[keyof typeof ExportInputSubtitleStyle];
+
+
+export const ExportInputSubtitleStyle = {
+  classic: 'classic',
+  outline: 'outline',
+  pill: 'pill',
+} as const;
+
 export interface ExportInput {
   resolution: ExportInputResolution;
   fps: ExportInputFps;
   includeSubtitles: boolean;
   format?: ExportInputFormat;
   codec?: ExportInputCodec;
+  subtitleStyle?: ExportInputSubtitleStyle;
 }
 
 export interface ExportResult {

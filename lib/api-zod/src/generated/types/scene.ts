@@ -15,6 +15,19 @@ export interface Scene {
   description: string;
   imagePrompt: string;
   narration: string;
+  /** @nullable */
+  subtitleText: string | null;
+  /**
+     * @minimum 0
+     * @maximum 600
+     */
+  subtitleStartSeconds: number;
+  /**
+     * @minimum 0
+     * @maximum 600
+     * @nullable
+     */
+  subtitleEndSeconds: number | null;
   durationSeconds: number;
   /** @nullable */
   assetUrl: string | null;
