@@ -95,6 +95,83 @@ function checkedReplicateModel(model: string): string {
   return model;
 }
 
+function checkedFalModel(model: string): string {
+  if (!/^[a-z0-9-]+(?:\/[a-z0-9._-]+){1,4}$/i.test(model)) {
+    throw new Error("Enter a fal model endpoint ID from its official model page.");
+  }
+  return model;
+}
+
+function checkedFalQueueUrl(value: unknown, field: string): string {
+  if (typeof value !== "string") {
+    throw new Error(`fal.ai did not return a valid ${field}.`);
+  }
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error(`fal.ai returned an invalid ${field}.`);
+  }
+  if (url.origin !== "https://queue.fal.run" || url.username || url.password || url.hash) {
+    throw new Error(`fal.ai returned an unsafe ${field}.`);
+  }
+  return url.toString();
+}
+
+async function falPrediction(
+  key: string,
+  model: string,
+  input: Record<string, unknown>,
+  maxWaitMs = 10 * 60_000,
+): Promise<Record<string, unknown>> {
+  const endpoint = checkedFalModel(model);
+  const submitResponse = await fetch(`https://queue.fal.run/${endpoint}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Key ${key}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(input),
+    signal: AbortSignal.timeout(90_000),
+    redirect: "error",
+  });
+  const submission = await readJson(submitResponse);
+  let status = typeof submission.status === "string" ? submission.status : "IN_QUEUE";
+  const statusUrl = checkedFalQueueUrl(submission.status_url, "status URL");
+  const responseUrl = checkedFalQueueUrl(submission.response_url, "result URL");
+  const deadline = Date.now() + maxWaitMs;
+
+  while (status === "IN_QUEUE" || status === "IN_PROGRESS") {
+    if (Date.now() >= deadline) {
+      throw new Error("fal.ai is still processing this video. Check the job before submitting it again.");
+    }
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 4_000));
+    const poll = await fetch(statusUrl, {
+      headers: { Authorization: `Key ${key}` },
+      signal: AbortSignal.timeout(30_000),
+      redirect: "error",
+    });
+    const update = await readJson(poll);
+    status = typeof update.status === "string" ? update.status : "";
+    if (status === "FAILED" || status === "ERROR") {
+      throw new Error("fal.ai could not generate this video. Check the model, prompt, and account limits.");
+    }
+    if (status !== "IN_QUEUE" && status !== "IN_PROGRESS" && status !== "COMPLETED") {
+      throw new Error("fal.ai returned an unrecognized video job status.");
+    }
+  }
+  if (status !== "COMPLETED") {
+    throw new Error("fal.ai did not complete this video request.");
+  }
+
+  const resultResponse = await fetch(responseUrl, {
+    headers: { Authorization: `Key ${key}` },
+    signal: AbortSignal.timeout(90_000),
+    redirect: "error",
+  });
+  return readJson(resultResponse);
+}
+
 async function replicatePrediction(
   key: string,
   model: string,
@@ -246,13 +323,33 @@ export async function generateVideo(
   model: string,
   prompt: string,
   referenceImage?: string,
+  durationSeconds = 5,
+  aspectRatio = "16:9",
 ): Promise<Buffer> {
+  if (provider === "fal") {
+    const input: Record<string, unknown> = {
+      prompt,
+      prompt_expansion_mode: "balanced",
+      duration: Math.min(15, Math.max(2, durationSeconds)),
+      resolution: "768P",
+      aspect_ratio: ["16:9", "9:16", "1:1", "4:3", "3:4", "21:9"].includes(aspectRatio)
+        ? aspectRatio
+        : "16:9",
+    };
+    if (referenceImage) input.image_url = referenceImage;
+    const result = await falPrediction(key, model, input);
+    const video = result.video as { url?: unknown } | undefined;
+    if (typeof video?.url !== "string" || !video.url.startsWith("https://")) {
+      throw new Error("fal.ai completed without returning a downloadable video URL.");
+    }
+    return downloadPublicHttps(video.url, 250 * 1024 * 1024);
+  }
+
   if (provider !== "replicate") {
-    throw new Error("Video generation is currently connected through Replicate. Add a Replicate video key to continue.");
+    throw new Error("Video generation is currently connected through Replicate and fal.ai.");
   }
   const input: Record<string, unknown> = {
     prompt,
-    duration: 5,
     prompt_optimizer: true,
   };
   if (referenceImage) input.first_frame_image = referenceImage;

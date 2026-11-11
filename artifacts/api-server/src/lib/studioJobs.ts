@@ -121,7 +121,7 @@ function safeJobError(error: unknown): string {
 
 function supportsJob(provider: string, jobType: JobKind): boolean {
   if (jobType === "image") return ["openai", "stability", "replicate", "huggingface"].includes(provider);
-  if (jobType === "video") return provider === "replicate";
+  if (jobType === "video") return ["replicate", "fal"].includes(provider);
   if (jobType === "voice") return ["elevenlabs", "openai", "openai-audio"].includes(provider);
   return false;
 }
@@ -660,9 +660,25 @@ async function processVideoJob(job: typeof studioJobsTable.$inferSelect): Promis
       progress: 20,
       message: "Generating a video clip. The provider may take several minutes.",
     });
-    const model = input.model?.includes("/") ? input.model : "minimax/video-01";
-    const video = await callMediaProvider(job, "video", input.providerKeyId, "provider_request", (provider, key) =>
-      generateVideo(provider, key, model, prompt, reference ?? undefined));
+    const requestedModel = input.model?.trim() ?? "";
+    const video = await callMediaProvider(job, "video", input.providerKeyId, "provider_request", (provider, key) => {
+      const falDefault = input.mode === "image"
+        ? "minimax/h3-max/image-to-video"
+        : "minimax/h3-max/text-to-video";
+      const segments = requestedModel.split("/").filter(Boolean).length;
+      const model = provider === "fal"
+        ? (segments >= 3 ? requestedModel : falDefault)
+        : (segments === 2 ? requestedModel : "minimax/video-01");
+      return generateVideo(
+        provider,
+        key,
+        model,
+        prompt,
+        reference ?? undefined,
+        scene.durationSeconds,
+        project.aspectRatio,
+      );
+    });
     const savedAsset = await saveGeneratedAsset(project.id, scene.id, "video", video);
     assets = [{
       id: savedAsset.id,

@@ -108,6 +108,22 @@ export const providerDefinitions: Record<string, ProviderDefinition> = {
     chatModel: "Meta-Llama-3.3-70B-Instruct",
     chatMode: "openai",
   },
+  nvidia: {
+    label: "NVIDIA NIM",
+    officialUrl: "https://build.nvidia.com/settings",
+    testUrl: () => "https://integrate.api.nvidia.com/v1/models",
+    chatUrl: "https://integrate.api.nvidia.com/v1/chat/completions",
+    chatModel: "nvidia/llama-3.1-70b-instruct",
+    chatMode: "openai",
+  },
+  cohere: {
+    label: "Cohere",
+    officialUrl: "https://dashboard.cohere.com/api-keys",
+    testUrl: () => "https://api.cohere.com/v1/models?endpoint=chat&default_only=true",
+    chatUrl: "https://api.cohere.ai/compatibility/v1/chat/completions",
+    chatModel: "command-r7b-12-2024",
+    chatMode: "openai",
+  },
   deepseek: {
     label: "DeepSeek",
     officialUrl: "https://platform.deepseek.com/api_keys",
@@ -130,6 +146,7 @@ export const providerDefinitions: Record<string, ProviderDefinition> = {
     label: "fal.ai",
     officialUrl: "https://fal.ai/dashboard/keys",
     testUrl: () => "https://api.fal.ai/v1/models",
+    testHeaders: (key) => ({ Authorization: `Key ${key}` }),
   },
   elevenlabs: {
     label: "ElevenLabs",
