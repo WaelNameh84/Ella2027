@@ -256,7 +256,10 @@ function TrackEditor({
       !Number.isFinite(value) ||
       value < min ||
       value > max ||
-      (key === "durationSeconds" && !Number.isInteger(value))
+      ((key === "durationSeconds" ||
+        key === "clipStartSeconds" ||
+        key === "clipEndSeconds") &&
+        !Number.isInteger(value))
     ) {
       setMessage(text.badNumber);
       return;
@@ -362,7 +365,6 @@ function TrackEditor({
           "clipStartSeconds",
           0,
           600,
-          0.1,
         )}
         {numberField(
           text.clipOut,
@@ -371,7 +373,7 @@ function TrackEditor({
           "clipEndSeconds",
           0,
           600,
-          0.1,
+          1,
           true,
         )}
         {numberField(

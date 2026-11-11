@@ -81,6 +81,17 @@ function nullableNumber(
     : number(value, label, min, max);
 }
 
+function nullableInteger(
+  value: unknown,
+  label: string,
+  min: number,
+  max: number,
+): number | null {
+  return value === null || value === undefined
+    ? null
+    : number(value, label, min, max, true);
+}
+
 function nullableText(value: unknown, label: string): string | null {
   if (value === null || value === undefined || value === "") return null;
   return text(value, label, 4_096);
@@ -203,7 +214,7 @@ function parseScene(value: unknown, index: number): SceneBackup {
   ) {
     throw new Error(`Scene ${sceneNumber} has invalid character references.`);
   }
-  const clipEndSeconds = nullableNumber(
+  const clipEndSeconds = nullableInteger(
     row.clipEndSeconds,
     `Scene ${sceneNumber} clip end`,
     0,

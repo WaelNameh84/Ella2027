@@ -213,7 +213,7 @@ export const CreateProjectResponse = zod.object({
  * @summary Get a project and its scenes
  */
 export const GetProjectParams = zod.object({
-  "projectId": zod.coerce.string().uuid()
+  "projectId": zod.string().uuid()
 })
 
 export const getProjectResponseOneCharactersItemIdMax = 100;
@@ -316,7 +316,7 @@ export const GetProjectResponse = zod.object({
  * @summary Update project details
  */
 export const UpdateProjectParams = zod.object({
-  "projectId": zod.coerce.string().uuid()
+  "projectId": zod.string().uuid()
 })
 
 export const updateProjectBodyTitleMax = 160;
@@ -412,7 +412,7 @@ export const UpdateProjectResponse = zod.object({
  * @summary Delete a project
  */
 export const DeleteProjectParams = zod.object({
-  "projectId": zod.coerce.string().uuid()
+  "projectId": zod.string().uuid()
 })
 
 export const DeleteProjectResponse = zod.void()
@@ -422,7 +422,7 @@ export const DeleteProjectResponse = zod.void()
  * @summary Add a scene
  */
 export const CreateSceneParams = zod.object({
-  "projectId": zod.coerce.string().uuid()
+  "projectId": zod.string().uuid()
 })
 
 export const createSceneBodySortOrderMin = 0;
@@ -545,8 +545,8 @@ export const CreateSceneResponse = zod.object({
  * @summary Update a scene
  */
 export const UpdateSceneParams = zod.object({
-  "projectId": zod.coerce.string().uuid(),
-  "sceneId": zod.coerce.string().uuid()
+  "projectId": zod.string().uuid(),
+  "sceneId": zod.string().uuid()
 })
 
 export const updateSceneBodySortOrderMin = 0;
@@ -669,8 +669,8 @@ export const UpdateSceneResponse = zod.object({
  * @summary Delete a scene
  */
 export const DeleteSceneParams = zod.object({
-  "projectId": zod.coerce.string().uuid(),
-  "sceneId": zod.coerce.string().uuid()
+  "projectId": zod.string().uuid(),
+  "sceneId": zod.string().uuid()
 })
 
 export const DeleteSceneResponse = zod.void()
@@ -680,8 +680,8 @@ export const DeleteSceneResponse = zod.void()
  * @summary Queue image generation for a scene
  */
 export const QueueSceneImageGenerationParams = zod.object({
-  "projectId": zod.coerce.string().uuid(),
-  "sceneId": zod.coerce.string().uuid()
+  "projectId": zod.string().uuid(),
+  "sceneId": zod.string().uuid()
 })
 
 export const queueSceneImageGenerationBodyModelMax = 200;
@@ -724,8 +724,8 @@ export const QueueSceneImageGenerationResponse = zod.object({
  * @summary Queue text-to-video or image-to-video generation
  */
 export const QueueSceneVideoGenerationParams = zod.object({
-  "projectId": zod.coerce.string().uuid(),
-  "sceneId": zod.coerce.string().uuid()
+  "projectId": zod.string().uuid(),
+  "sceneId": zod.string().uuid()
 })
 
 export const queueSceneVideoGenerationBodyModelMax = 200;
@@ -767,8 +767,8 @@ export const QueueSceneVideoGenerationResponse = zod.object({
  * @summary Queue spoken narration generation for a scene
  */
 export const QueueSceneVoiceGenerationParams = zod.object({
-  "projectId": zod.coerce.string().uuid(),
-  "sceneId": zod.coerce.string().uuid()
+  "projectId": zod.string().uuid(),
+  "sceneId": zod.string().uuid()
 })
 
 export const queueSceneVoiceGenerationBodyVoiceIdMax = 120;
@@ -809,7 +809,7 @@ export const QueueSceneVoiceGenerationResponse = zod.object({
  * @summary Generate a script and storyboard using a configured provider
  */
 export const GenerateProjectScriptParams = zod.object({
-  "projectId": zod.coerce.string().uuid()
+  "projectId": zod.string().uuid()
 })
 
 export const generateProjectScriptBodyAllowRotationDefault = true;
@@ -933,7 +933,7 @@ export const GenerateProjectScriptResponse = zod.object({
  * @summary Queue script and storyboard generation
  */
 export const QueueProjectScriptParams = zod.object({
-  "projectId": zod.coerce.string().uuid()
+  "projectId": zod.string().uuid()
 })
 
 export const queueProjectScriptBodyAllowRotationDefault = true;
@@ -985,8 +985,8 @@ export const QueueProjectScriptResponse = zod.object({
  * @summary Transcribe or translate uploaded audio into scene text
  */
 export const TranscribeSceneAudioParams = zod.object({
-  "projectId": zod.coerce.string().uuid(),
-  "sceneId": zod.coerce.string().uuid()
+  "projectId": zod.string().uuid(),
+  "sceneId": zod.string().uuid()
 })
 
 export const TranscribeSceneAudioHeader = zod.object({
@@ -1006,7 +1006,7 @@ export const TranscribeSceneAudioResponse = zod.object({
  * @summary Queue project video export
  */
 export const QueueProjectExportParams = zod.object({
-  "projectId": zod.coerce.string().uuid()
+  "projectId": zod.string().uuid()
 })
 
 export const queueProjectExportBodySubtitleStyleDefault = `classic`;
@@ -1048,7 +1048,7 @@ export const QueueProjectExportResponse = zod.object({
  * @summary Render a low-resolution project preview
  */
 export const RenderProjectPreviewParams = zod.object({
-  "projectId": zod.coerce.string().uuid()
+  "projectId": zod.string().uuid()
 })
 
 export const renderProjectPreviewBodySubtitleStyleDefault = `classic`;
@@ -1069,7 +1069,7 @@ export const RenderProjectPreviewResponse = zod.unknown()
  * @summary List the current user's processing jobs
  */
 export const ListStudioJobsQueryParams = zod.object({
-  "projectId": zod.coerce.string().uuid().optional()
+  "projectId": zod.string().uuid().optional()
 })
 
 export const listStudioJobsResponseProgressMin = 0;
@@ -1101,7 +1101,7 @@ export const ListStudioJobsResponse = zod.array(ListStudioJobsResponseItem)
  * @summary Retry a failed processing job
  */
 export const RetryStudioJobParams = zod.object({
-  "jobId": zod.coerce.string().uuid()
+  "jobId": zod.string().uuid()
 })
 
 export const retryStudioJobBodyApprovePotentialChargesDefault = false;
@@ -1185,7 +1185,7 @@ export const updateAdminUserPathUserIdMax = 255;
 
 
 export const UpdateAdminUserParams = zod.object({
-  "userId": zod.coerce.string().min(1).max(updateAdminUserPathUserIdMax)
+  "userId": zod.string().min(1).max(updateAdminUserPathUserIdMax)
 })
 
 export const UpdateAdminUserBody = zod.object({
@@ -1314,7 +1314,7 @@ export const CreateProviderKeyResponse = zod.object({
  * @summary Update provider key metadata or replace its secret
  */
 export const UpdateProviderKeyParams = zod.object({
-  "keyId": zod.coerce.string().uuid()
+  "keyId": zod.string().uuid()
 })
 
 export const updateProviderKeyBodyLabelMax = 120;
@@ -1352,7 +1352,7 @@ export const UpdateProviderKeyResponse = zod.object({
  * @summary Delete a provider key
  */
 export const DeleteProviderKeyParams = zod.object({
-  "keyId": zod.coerce.string().uuid()
+  "keyId": zod.string().uuid()
 })
 
 export const DeleteProviderKeyResponse = zod.void()
@@ -1362,7 +1362,7 @@ export const DeleteProviderKeyResponse = zod.void()
  * @summary Test one provider key with a minimal request
  */
 export const TestProviderKeyParams = zod.object({
-  "keyId": zod.coerce.string().uuid()
+  "keyId": zod.string().uuid()
 })
 
 export const TestProviderKeyResponse = zod.object({
@@ -1448,7 +1448,7 @@ export const searchFreeMediaQueryPageDefault = 1;
 
 
 export const SearchFreeMediaQueryParams = zod.object({
-  "q": zod.coerce.string(),
+  "q": zod.string(),
   "mediaType": zod.enum(['image', 'video', 'audio']).default(searchFreeMediaQueryMediaTypeDefault),
   "source": zod.enum(['openverse', 'wikimedia', 'archive', 'pexels', 'pixabay', 'unsplash']).default(searchFreeMediaQuerySourceDefault),
   "orientation": zod.enum(['landscape', 'portrait', 'square']).optional(),
@@ -1539,7 +1539,7 @@ export const CreateFavoriteMediaResponse = zod.object({
  * @summary Remove a saved media item
  */
 export const DeleteFavoriteMediaParams = zod.object({
-  "favoriteId": zod.coerce.string().uuid()
+  "favoriteId": zod.string().uuid()
 })
 
 export const DeleteFavoriteMediaResponse = zod.void()
@@ -1562,7 +1562,7 @@ export const ListFreeToolsResponse = zod.array(ListFreeToolsResponseItem)
  * @summary Render a project timeline to a downloadable video
  */
 export const ExportProjectParams = zod.object({
-  "projectId": zod.coerce.string().uuid()
+  "projectId": zod.string().uuid()
 })
 
 export const exportProjectBodySubtitleStyleDefault = `classic`;
@@ -1587,7 +1587,7 @@ export const ExportProjectResponse = zod.object({
  * @summary Download the latest completed project video
  */
 export const DownloadProjectExportParams = zod.object({
-  "projectId": zod.coerce.string().uuid()
+  "projectId": zod.string().uuid()
 })
 
 export const DownloadProjectExportResponse = zod.unknown()
