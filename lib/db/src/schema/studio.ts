@@ -112,6 +112,7 @@ export const providerKeysTable = pgTable("studio_provider_keys", {
 
 export const providerSettingsTable = pgTable("studio_provider_settings", {
   userId: text("user_id").primaryKey(),
+  freeMode: boolean("free_mode").notNull().default(true),
   autoRotate: boolean("auto_rotate").notNull().default(true),
   rotateOnQuota: boolean("rotate_on_quota").notNull().default(true),
   rotateOnRateLimit: boolean("rotate_on_rate_limit").notNull().default(true),

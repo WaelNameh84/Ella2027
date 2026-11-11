@@ -1114,6 +1114,7 @@ components:
     ProviderSettings:
       type: object
       properties:
+        freeMode: { type: boolean, default: true }
         autoRotate: { type: boolean }
         rotateOnQuota: { type: boolean }
         rotateOnRateLimit: { type: boolean }
@@ -1121,7 +1122,7 @@ components:
         maxAttempts: { type: integer, minimum: 1, maximum: 10 }
         retryDelaySeconds: { type: integer, minimum: 0, maximum: 300 }
         fallbackProvider: { type: ["string", "null"] }
-      required: [autoRotate, rotateOnQuota, rotateOnRateLimit, rotateOnConnectionFailure, maxAttempts, retryDelaySeconds, fallbackProvider]
+      required: [freeMode, autoRotate, rotateOnQuota, rotateOnRateLimit, rotateOnConnectionFailure, maxAttempts, retryDelaySeconds, fallbackProvider]
     MediaSearchResponse:
       type: object
       properties:
@@ -1200,6 +1201,7 @@ components:
         fps: { type: integer, enum: [24, 25, 30, 60] }
         includeSubtitles: { type: boolean }
         format: { type: string, enum: [mp4, webm] }
+        codec: { type: string, enum: [h264, hevc] }
       required: [resolution, fps, includeSubtitles]
     ExportResult:
       type: object

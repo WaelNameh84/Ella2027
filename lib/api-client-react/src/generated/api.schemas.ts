@@ -497,11 +497,20 @@ export interface ScriptGenerationInput {
   providerKeyId?: string | null;
   allowRotation: boolean;
   approvePotentialCharges: boolean;
-  /** Number of scenes to create. */
+  /**
+     * @minimum 1
+     * @maximum 24
+     */
   sceneCount?: number;
-  /** Default duration for each scene, in seconds. */
+  /**
+     * @minimum 1
+     * @maximum 600
+     */
   sceneDurationSeconds?: number;
-  /** Visual direction applied to every scene. */
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
   sceneStyle?: string;
 }
 
@@ -723,6 +732,7 @@ export interface ProviderTestResult {
 }
 
 export interface ProviderSettings {
+  freeMode: boolean;
   autoRotate: boolean;
   rotateOnQuota: boolean;
   rotateOnRateLimit: boolean;
@@ -885,8 +895,14 @@ export const ExportInputFormat = {
   mp4: 'mp4',
   webm: 'webm',
 } as const;
+
 export type ExportInputCodec = typeof ExportInputCodec[keyof typeof ExportInputCodec];
-export const ExportInputCodec = { h264: 'h264', hevc: 'hevc' } as const;
+
+
+export const ExportInputCodec = {
+  h264: 'h264',
+  hevc: 'hevc',
+} as const;
 
 export interface ExportInput {
   resolution: ExportInputResolution;

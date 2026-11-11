@@ -18,6 +18,7 @@ import {
 import { renderMp4 } from "./videoExport";
 import { generateNarration, generateStill, generateVideo, isProviderCallError } from "./mediaGeneration";
 import { readGeneratedAsset, saveGeneratedAsset } from "./studioAssets";
+import { isZeroSpendMode, ZERO_SPEND_ERROR } from "./spendingGuard";
 
 type SceneDraft = {
   title: string;
@@ -792,6 +793,9 @@ async function processNextJob(): Promise<void> {
   const job = await claimNextJob();
   if (!job) return;
   try {
+    if (job.jobType !== "export" && await isZeroSpendMode(job.userId)) {
+      throw new Error(ZERO_SPEND_ERROR);
+    }
     if (job.jobType === "script") {
       await processScriptJob(job);
     } else if (job.jobType === "export") {

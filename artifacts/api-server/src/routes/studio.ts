@@ -75,6 +75,7 @@ import {
 } from "../lib/providerRegistry";
 import { renderMp4 } from "../lib/videoExport";
 import { searchMediaCatalog } from "../lib/mediaCatalog";
+import { isZeroSpendMode, ZERO_SPEND_ERROR } from "../lib/spendingGuard";
 
 const router: IRouter = Router();
 const mediaProviders = [
@@ -658,6 +659,10 @@ router.post("/provider-keys/:keyId/test", async (req, res): Promise<void> => {
     return;
   }
   const userId = userIdOf(res);
+  if (await isZeroSpendMode(userId)) {
+    res.status(403).json({ error: ZERO_SPEND_ERROR });
+    return;
+  }
   const [row] = await db.select().from(providerKeysTable)
     .where(and(eq(providerKeysTable.id, params.data.keyId), eq(providerKeysTable.userId, userId)))
     .limit(1);
@@ -716,6 +721,10 @@ router.post("/projects/:projectId/jobs/script", async (req, res): Promise<void> 
     return;
   }
   const userId = userIdOf(res);
+  if (await isZeroSpendMode(userId)) {
+    res.status(403).json({ error: ZERO_SPEND_ERROR });
+    return;
+  }
   const project = await projectForUser(params.data.projectId, userId);
   if (!project) {
     res.status(404).json({ error: "Project not found." });
@@ -814,6 +823,10 @@ router.post("/jobs/:jobId/retry", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Job not found." });
     return;
   }
+  if (job.jobType !== "export" && await isZeroSpendMode(userId)) {
+    res.status(403).json({ error: ZERO_SPEND_ERROR });
+    return;
+  }
   if (job.status !== "failed") {
     res.status(409).json({ error: "Only failed jobs can be retried." });
     return;
@@ -855,6 +868,10 @@ router.post("/projects/:projectId/generate-script", async (req, res): Promise<vo
     return;
   }
   const userId = userIdOf(res);
+  if (await isZeroSpendMode(userId)) {
+    res.status(403).json({ error: ZERO_SPEND_ERROR });
+    return;
+  }
   const project = await projectForUser(params.data.projectId, userId);
   if (!project) {
     res.status(404).json({ error: "Project not found." });
@@ -996,9 +1013,14 @@ router.get("/media/search", async (req, res): Promise<void> => {
     return;
   }
   const { q, mediaType, source, page, orientation } = parsed.data;
+  const userId = userIdOf(res);
+  if ((await isZeroSpendMode(userId)) && ["pexels", "pixabay", "unsplash"].includes(source ?? "openverse")) {
+    res.status(403).json({ error: "Free mode permits public media catalogs only: Openverse, Wikimedia Commons, and Internet Archive." });
+    return;
+  }
   try {
     const result = await searchMediaCatalog({
-      userId: userIdOf(res),
+      userId,
       q,
       mediaType: mediaType ?? "image",
       source: source ?? "openverse",

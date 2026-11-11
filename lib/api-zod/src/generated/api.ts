@@ -768,14 +768,24 @@ export const GenerateProjectScriptParams = zod.object({
 })
 
 export const generateProjectScriptBodyAllowRotationDefault = true;
+export const generateProjectScriptBodySceneCountDefault = 6;
+export const generateProjectScriptBodySceneCountMax = 24;
+
+export const generateProjectScriptBodySceneDurationSecondsDefault = 8;
+export const generateProjectScriptBodySceneDurationSecondsMax = 600;
+
+export const generateProjectScriptBodySceneStyleDefault = `Cinematic`;
+export const generateProjectScriptBodySceneStyleMax = 200;
+
+
 
 export const GenerateProjectScriptBody = zod.object({
   "providerKeyId": zod.string().uuid().nullish(),
   "allowRotation": zod.boolean().default(generateProjectScriptBodyAllowRotationDefault),
   "approvePotentialCharges": zod.boolean(),
-  "sceneCount": zod.number().int().min(1).max(24).default(6),
-  "sceneDurationSeconds": zod.number().int().min(1).max(600).default(8),
-  "sceneStyle": zod.string().min(1).max(200).default("Cinematic")
+  "sceneCount": zod.number().int().min(1).max(generateProjectScriptBodySceneCountMax).default(generateProjectScriptBodySceneCountDefault),
+  "sceneDurationSeconds": zod.number().int().min(1).max(generateProjectScriptBodySceneDurationSecondsMax).default(generateProjectScriptBodySceneDurationSecondsDefault),
+  "sceneStyle": zod.string().min(1).max(generateProjectScriptBodySceneStyleMax).default(generateProjectScriptBodySceneStyleDefault)
 })
 
 export const generateProjectScriptResponseOneCharactersItemIdMax = 100;
@@ -873,14 +883,24 @@ export const QueueProjectScriptParams = zod.object({
 })
 
 export const queueProjectScriptBodyAllowRotationDefault = true;
+export const queueProjectScriptBodySceneCountDefault = 6;
+export const queueProjectScriptBodySceneCountMax = 24;
+
+export const queueProjectScriptBodySceneDurationSecondsDefault = 8;
+export const queueProjectScriptBodySceneDurationSecondsMax = 600;
+
+export const queueProjectScriptBodySceneStyleDefault = `Cinematic`;
+export const queueProjectScriptBodySceneStyleMax = 200;
+
+
 
 export const QueueProjectScriptBody = zod.object({
   "providerKeyId": zod.string().uuid().nullish(),
   "allowRotation": zod.boolean().default(queueProjectScriptBodyAllowRotationDefault),
   "approvePotentialCharges": zod.boolean(),
-  "sceneCount": zod.number().int().min(1).max(24).default(6),
-  "sceneDurationSeconds": zod.number().int().min(1).max(600).default(8),
-  "sceneStyle": zod.string().min(1).max(200).default("Cinematic")
+  "sceneCount": zod.number().int().min(1).max(queueProjectScriptBodySceneCountMax).default(queueProjectScriptBodySceneCountDefault),
+  "sceneDurationSeconds": zod.number().int().min(1).max(queueProjectScriptBodySceneDurationSecondsMax).default(queueProjectScriptBodySceneDurationSecondsDefault),
+  "sceneStyle": zod.string().min(1).max(queueProjectScriptBodySceneStyleMax).default(queueProjectScriptBodySceneStyleDefault)
 })
 
 export const queueProjectScriptResponseProgressMin = 0;
@@ -1278,6 +1298,7 @@ export const TestProviderKeyResponse = zod.object({
 /**
  * @summary Get key rotation preferences
  */
+export const getProviderSettingsResponseFreeModeDefault = true;
 export const getProviderSettingsResponseMaxAttemptsMax = 10;
 
 export const getProviderSettingsResponseRetryDelaySecondsMin = 0;
@@ -1286,6 +1307,7 @@ export const getProviderSettingsResponseRetryDelaySecondsMax = 300;
 
 
 export const GetProviderSettingsResponse = zod.object({
+  "freeMode": zod.boolean().default(getProviderSettingsResponseFreeModeDefault),
   "autoRotate": zod.boolean(),
   "rotateOnQuota": zod.boolean(),
   "rotateOnRateLimit": zod.boolean(),
@@ -1299,6 +1321,7 @@ export const GetProviderSettingsResponse = zod.object({
 /**
  * @summary Update key rotation preferences
  */
+export const updateProviderSettingsBodyFreeModeDefault = true;
 export const updateProviderSettingsBodyMaxAttemptsMax = 10;
 
 export const updateProviderSettingsBodyRetryDelaySecondsMin = 0;
@@ -1307,6 +1330,7 @@ export const updateProviderSettingsBodyRetryDelaySecondsMax = 300;
 
 
 export const UpdateProviderSettingsBody = zod.object({
+  "freeMode": zod.boolean().default(updateProviderSettingsBodyFreeModeDefault),
   "autoRotate": zod.boolean(),
   "rotateOnQuota": zod.boolean(),
   "rotateOnRateLimit": zod.boolean(),
@@ -1316,6 +1340,7 @@ export const UpdateProviderSettingsBody = zod.object({
   "fallbackProvider": zod.string().nullable()
 })
 
+export const updateProviderSettingsResponseFreeModeDefault = true;
 export const updateProviderSettingsResponseMaxAttemptsMax = 10;
 
 export const updateProviderSettingsResponseRetryDelaySecondsMin = 0;
@@ -1324,6 +1349,7 @@ export const updateProviderSettingsResponseRetryDelaySecondsMax = 300;
 
 
 export const UpdateProviderSettingsResponse = zod.object({
+  "freeMode": zod.boolean().default(updateProviderSettingsResponseFreeModeDefault),
   "autoRotate": zod.boolean(),
   "rotateOnQuota": zod.boolean(),
   "rotateOnRateLimit": zod.boolean(),

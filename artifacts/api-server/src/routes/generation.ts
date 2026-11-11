@@ -24,6 +24,7 @@ import { classifyProviderResponse } from "../lib/providerRegistry";
 import { isProviderCallError } from "../lib/mediaGeneration";
 import { transcribeAudio, type TranscriptionMode } from "../lib/transcription";
 import { generatedAssetContentType, generatedAssetPath } from "../lib/studioAssets";
+import { isZeroSpendMode, ZERO_SPEND_ERROR } from "../lib/spendingGuard";
 
 const router: IRouter = Router();
 
@@ -121,6 +122,10 @@ router.post("/projects/:projectId/scenes/:sceneId/jobs/image", async (req, res):
     return;
   }
   const userId = userIdOf(res);
+  if (await isZeroSpendMode(userId)) {
+    res.status(403).json({ error: ZERO_SPEND_ERROR });
+    return;
+  }
   if (!(await sceneOwnerExists(params.data.projectId, params.data.sceneId, userId))) {
     res.status(404).json({ error: "Scene not found." });
     return;
@@ -150,6 +155,10 @@ router.post("/projects/:projectId/scenes/:sceneId/jobs/video", async (req, res):
     return;
   }
   const userId = userIdOf(res);
+  if (await isZeroSpendMode(userId)) {
+    res.status(403).json({ error: ZERO_SPEND_ERROR });
+    return;
+  }
   if (!(await sceneOwnerExists(params.data.projectId, params.data.sceneId, userId))) {
     res.status(404).json({ error: "Scene not found." });
     return;
@@ -191,6 +200,10 @@ router.post("/projects/:projectId/scenes/:sceneId/jobs/voice", async (req, res):
     return;
   }
   const userId = userIdOf(res);
+  if (await isZeroSpendMode(userId)) {
+    res.status(403).json({ error: ZERO_SPEND_ERROR });
+    return;
+  }
   const [scene] = await db.select().from(scenesTable).where(and(
     eq(scenesTable.id, params.data.sceneId),
     eq(scenesTable.projectId, params.data.projectId),
@@ -223,6 +236,10 @@ router.post(
   async (req, res): Promise<void> => {
     const { projectId, sceneId } = req.params;
     const userId = userIdOf(res);
+    if (await isZeroSpendMode(userId)) {
+      res.status(403).json({ error: ZERO_SPEND_ERROR });
+      return;
+    }
     const modeHeader = req.headers["x-transcription-mode"];
     const mode = modeHeader === "translate" ? "translate" : modeHeader === "transcribe" ? "transcribe" : null;
     const keyId = req.headers["x-provider-key-id"] ?? "";

@@ -5,8 +5,8 @@
  * AI Video Studio API
  * OpenAPI spec version: 0.1.0
  */
+import type { ExportInputCodec } from './exportInputCodec';
 import type { ExportInputFormat } from './exportInputFormat';
-export type ExportInputCodec = 'h264' | 'hevc';
 import type { ExportInputFps } from './exportInputFps';
 import type { ExportInputResolution } from './exportInputResolution';
 

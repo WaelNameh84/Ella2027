@@ -7,6 +7,7 @@
  */
 
 export interface ProviderSettings {
+  freeMode: boolean;
   autoRotate: boolean;
   rotateOnQuota: boolean;
   rotateOnRateLimit: boolean;

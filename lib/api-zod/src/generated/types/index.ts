@@ -22,6 +22,7 @@ export * from './audioTranscriptionInput';
 export * from './audioTranscriptionResult';
 export * from './characterProfile';
 export * from './exportInput';
+export * from './exportInputCodec';
 export * from './exportInputFormat';
 export * from './exportInputFps';
 export * from './exportInputResolution';

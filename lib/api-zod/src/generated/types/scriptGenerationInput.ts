@@ -11,7 +11,19 @@ export interface ScriptGenerationInput {
   providerKeyId?: string | null;
   allowRotation: boolean;
   approvePotentialCharges: boolean;
+  /**
+     * @minimum 1
+     * @maximum 24
+     */
   sceneCount?: number;
+  /**
+     * @minimum 1
+     * @maximum 600
+     */
   sceneDurationSeconds?: number;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
   sceneStyle?: string;
 }
