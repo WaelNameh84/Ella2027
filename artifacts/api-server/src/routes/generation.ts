@@ -23,7 +23,7 @@ import { decryptProviderKey } from "../lib/secretVault";
 import { classifyProviderResponse } from "../lib/providerRegistry";
 import { isProviderCallError } from "../lib/mediaGeneration";
 import { transcribeAudio, type TranscriptionMode } from "../lib/transcription";
-import { generatedAssetContentType, generatedAssetPath } from "../lib/studioAssets";
+import { generatedAssetContentType, generatedAssetPath, readGeneratedAsset, saveGeneratedAsset, type GeneratedAssetKind } from "../lib/studioAssets";
 import { isZeroSpendMode, ZERO_SPEND_ERROR } from "../lib/spendingGuard";
 
 const router: IRouter = Router();
@@ -401,6 +401,104 @@ router.get("/projects/:projectId/assets/:sceneId/:filename", async (req, res): P
   res.sendFile(path, (error) => {
     if (error && !res.headersSent) res.status(404).json({ error: "Asset file not found." });
   });
+});
+
+router.post("/projects/:projectId/scenes/:sceneId/assets/clone", async (req, res): Promise<void> => {
+  const { projectId, sceneId } = req.params;
+  const userId = userIdOf(res);
+  if (!/^[a-f0-9-]{36}$/i.test(projectId) || !/^[a-f0-9-]{36}$/i.test(sceneId)) {
+    res.status(400).json({ error: "Invalid target project or scene." });
+    return;
+  }
+  const [targetProject] = await db.select({ id: projectsTable.id }).from(projectsTable).where(and(
+    eq(projectsTable.id, projectId),
+    eq(projectsTable.userId, userId),
+  )).limit(1);
+  const [targetScene] = await db.select({ id: scenesTable.id }).from(scenesTable).where(and(
+    eq(scenesTable.id, sceneId),
+    eq(scenesTable.projectId, projectId),
+    eq(scenesTable.userId, userId),
+  )).limit(1);
+  if (!targetProject || !targetScene) {
+    res.status(404).json({ error: "Target scene not found." });
+    return;
+  }
+
+  const body = req.body && typeof req.body === "object" && !Array.isArray(req.body)
+    ? req.body as Record<string, unknown>
+    : {};
+  const cloneUrl = async (value: unknown, kind: GeneratedAssetKind): Promise<string | null> => {
+    if (value === null || value === undefined || value === "") return null;
+    if (typeof value !== "string" || value.length > 4_096) throw new Error("Invalid media URL.");
+    if (!value.startsWith("/api/projects/")) return value;
+    const match = /^\/api\/projects\/([a-f0-9-]{36})\/assets\/([a-f0-9-]{36})\/([a-f0-9-]{36})\.(png|mp4|mp3)$/i.exec(value);
+    if (!match) throw new Error("Invalid local media reference.");
+    const [, sourceProjectId, sourceSceneId, , extension] = match;
+    const expectedExtension = kind === "image" ? "png" : kind === "video" ? "mp4" : "mp3";
+    if (extension.toLowerCase() !== expectedExtension) throw new Error("The media type does not match its file.");
+    const [sourceProject] = await db.select({ id: projectsTable.id }).from(projectsTable).where(and(
+      eq(projectsTable.id, sourceProjectId),
+      eq(projectsTable.userId, userId),
+    )).limit(1);
+    const [sourceScene] = await db.select({ id: scenesTable.id }).from(scenesTable).where(and(
+      eq(scenesTable.id, sourceSceneId),
+      eq(scenesTable.projectId, sourceProjectId),
+      eq(scenesTable.userId, userId),
+    )).limit(1);
+    if (!sourceProject || !sourceScene) throw new Error("The source media is not owned by this account.");
+    const bytes = await readGeneratedAsset(value, sourceProjectId, sourceSceneId);
+    if (!bytes) throw new Error("The source media file is no longer available on this server.");
+    if (bytes.byteLength > 40 * 1024 * 1024) throw new Error("The source media file exceeds the 40 MB import limit.");
+    const saved = await saveGeneratedAsset(projectId, sceneId, kind, bytes);
+    return saved.url;
+  };
+
+  try {
+    const incomingHistory = body.assetHistory === undefined ? [] : body.assetHistory;
+    if (!Array.isArray(incomingHistory) || incomingHistory.length > 50) {
+      res.status(400).json({ error: "Invalid asset history." });
+      return;
+    }
+    const assetType = body.assetType;
+    const assetKind: GeneratedAssetKind = assetType === "video" ? "video" : assetType === "audio" ? "voice" : "image";
+    const assetUrl = await cloneUrl(body.assetUrl, assetKind);
+    const voiceUrl = await cloneUrl(body.voiceUrl, "voice");
+    const assetHistory = await Promise.all(incomingHistory.map(async (entry) => {
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) throw new Error("Invalid asset history item.");
+      const version = entry as Record<string, unknown>;
+      if (typeof version.id !== "string" || typeof version.prompt !== "string" || typeof version.createdAt !== "string" || !["image", "video"].includes(String(version.type))) {
+        throw new Error("Invalid asset history item.");
+      }
+      const type = version.type as "image" | "video";
+      const url = await cloneUrl(version.url, type);
+      if (!url) throw new Error("Invalid asset history URL.");
+      return {
+        id: version.id.slice(0, 160),
+        url,
+        type,
+        prompt: version.prompt.slice(0, 20_000),
+        createdAt: version.createdAt,
+      };
+    }));
+    const [updated] = await db.update(scenesTable).set({
+      assetUrl,
+      voiceUrl,
+      assetHistory,
+      updatedAt: new Date(),
+    }).where(and(
+      eq(scenesTable.id, sceneId),
+      eq(scenesTable.projectId, projectId),
+      eq(scenesTable.userId, userId),
+    )).returning({ id: scenesTable.id });
+    if (!updated) {
+      res.status(404).json({ error: "Target scene not found." });
+      return;
+    }
+    res.json({ assetUrl, voiceUrl, assetHistory });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not copy the local media.";
+    res.status(message.includes("not owned") ? 403 : message.includes("not available") ? 409 : 400).json({ error: message });
+  }
 });
 
 export default router;

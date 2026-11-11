@@ -19,19 +19,20 @@ import {
   useListAdminUsers, getListAdminUsersQueryKey, useListAdminJobs, getListAdminJobsQueryKey,
   useListAdminProviderKeys, getListAdminProviderKeysQueryKey, useUpdateAdminUser,
 } from '@workspace/api-client-react';
-import type { Project, ProjectInput, Scene, SceneUpdate, ProviderKey, ProviderSettings, MediaResult, MediaFavorite, StudioJob, CharacterProfile, AdminUser, AdminUserUpdate } from '@workspace/api-client-react';
+import type { Project, ProjectDetail, ProjectInput, Scene, SceneInput, SceneUpdate, ProviderKey, ProviderSettings, MediaResult, MediaFavorite, StudioJob, CharacterProfile, AdminUser, AdminUserUpdate } from '@workspace/api-client-react';
 import { Route, Switch, Link, Redirect, useLocation, Router as WouterRouter } from 'wouter';
 import {
   Aperture, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, ChevronDown, Clapperboard,
   Clock3, Copy, ExternalLink, Eye, EyeOff, Film, Globe2, Heart, ImagePlus, KeyRound, Languages,
   LoaderCircle, LogOut, Mic, Moon, Pause, Plus, Search, Settings2, ShieldCheck, Sun, Trash2, UserRound, WandSparkles, X,
-  Activity, AlertTriangle, Ban, CheckCircle2, CircleUserRound, RefreshCw, Share2, Shield, Users,
+  Activity, AlertTriangle, Ban, CheckCircle2, CircleUserRound, Download, FileUp, RefreshCw, Share2, Shield, Users,
 } from 'lucide-react';
 import NotFound from '@/pages/not-found';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { FilmTimeline } from '@/components/film-timeline';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { downloadProjectBackup, PROJECT_BACKUP_MAX_BYTES, parseProjectBackup } from '@/lib/project-backup';
 
 const queryClient = new QueryClient();
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
@@ -301,12 +302,12 @@ function Dashboard() {
   </AppFrame>;
 }
 
-function ProjectCard({ project, onDelete }: { project: Project; onDelete?: (id: string) => void }) {
+function ProjectCard({ project, onDelete, onExport, exporting = false }: { project: Project; onDelete?: (id: string) => void; onExport?: (id: string) => void; exporting?: boolean }) {
   const { lang } = useApp();
   const date = new Date(project.updatedAt).toLocaleDateString(lang === 'ar' ? 'ar' : 'en', { month: 'short', day: 'numeric' });
   return <article className="project-card panel">
     <Link href={`/projects/${project.id}`} className="project-thumb"><div className="thumb-shape thumb-a" /><div className="thumb-shape thumb-b" /><span>{project.aspectRatio}</span><div className="thumb-count">{String(project.sceneCount).padStart(2,'0')} {tx(lang, 'مشاهد', 'SCENES')}</div></Link>
-    <div className="project-card-content"><div className="flex items-start justify-between gap-2"><Link href={`/projects/${project.id}`} className="project-title">{project.title}</Link>{onDelete && <button className="btn btn-ghost !p-1.5 text-muted-foreground" onClick={() => onDelete(project.id)} title={tx(lang,'حذف','Delete')} data-testid={`delete-project-${project.id}`}><Trash2 size={15} /></button>}</div><p>{project.idea}</p><div className="project-meta"><span><i className={`status-dot status-${project.status}`} />{project.status}</span><span>{date}</span></div></div>
+    <div className="project-card-content"><div className="flex items-start justify-between gap-2"><Link href={`/projects/${project.id}`} className="project-title">{project.title}</Link><div className="flex shrink-0 items-center gap-1">{onExport && <button className="btn btn-ghost !p-1.5 text-muted-foreground" onClick={() => onExport(project.id)} disabled={exporting} title={tx(lang,'تنزيل نسخة JSON','Download JSON backup')} aria-label={tx(lang,'تنزيل نسخة احتياطية','Download backup')} data-testid={`backup-project-${project.id}`}>{exporting?<LoaderCircle size={15} className="animate-spin"/>:<Download size={15}/>}</button>}{onDelete && <button className="btn btn-ghost !p-1.5 text-muted-foreground" onClick={() => onDelete(project.id)} title={tx(lang,'حذف','Delete')} data-testid={`delete-project-${project.id}`}><Trash2 size={15} /></button>}</div></div><p>{project.idea}</p><div className="project-meta"><span><i className={`status-dot status-${project.status}`} />{project.status}</span><span>{date}</span></div></div>
   </article>;
 }
 
@@ -489,10 +490,94 @@ function Projects() {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [createdProjectId, setCreatedProjectId] = useState<string | null>(null);
+  const [backupExportingId, setBackupExportingId] = useState<string | null>(null);
+  const [backupImporting, setBackupImporting] = useState(false);
+  const [backupProgress, setBackupProgress] = useState('');
+  const importFileRef = useRef<HTMLInputElement | null>(null);
   const list = useMemo(() => (q.data || []).filter(p => `${p.title} ${p.idea}`.toLowerCase().includes(search.toLowerCase())), [q.data, search]);
   const textProviderReady = Boolean(keysQuery.data?.some(key => key.serviceType === 'text' && providerSupports(key.provider, 'text') && key.enabled && (key.status === 'valid' || key.status === 'untested')));
   const freeMode = settingsQuery.data?.freeMode ?? true;
   const afterChange = () => { qc.invalidateQueries({ queryKey: getListProjectsQueryKey() }); qc.invalidateQueries({ queryKey: getGetStudioSummaryQueryKey() }); };
+  const exportBackup = async (projectId: string) => {
+    setBackupExportingId(projectId);
+    setBackupProgress('');
+    try {
+      const response = await fetch(`${basePath}/api/projects/${projectId}`, { credentials: 'include' });
+      if (!response.ok) throw new Error(tx(lang, 'تعذر تحميل المشروع للنسخ.', 'Could not load the project for backup.'));
+      const project = await response.json() as ProjectDetail;
+      downloadProjectBackup(project);
+      setBackupProgress(tx(lang, `بدأ تنزيل نسخة «${project.title}».`, `Backup download started for “${project.title}”.`));
+    } catch (error) {
+      setBackupProgress(error instanceof Error ? error.message : tx(lang, 'تعذر إنشاء النسخة الاحتياطية.', 'Could not create the backup.'));
+    } finally {
+      setBackupExportingId(null);
+    }
+  };
+  const importBackupFile = async (file: File) => {
+    setBackupImporting(true);
+    setBackupProgress('');
+    let importedProjectId: string | null = null;
+    let unavailableLocalMediaCount = 0;
+    try {
+      if (file.size > PROJECT_BACKUP_MAX_BYTES) throw new Error(tx(lang, 'حجم ملف النسخة يتجاوز 10 MB.', 'The backup file exceeds 10 MB.'));
+      const backup = parseProjectBackup(JSON.parse(await file.text()));
+      const createdProject = await create.mutateAsync({ data: backup.project });
+      importedProjectId = createdProject.id;
+      for (const [index, scene] of backup.scenes.entries()) {
+        setBackupProgress(tx(lang, `استيراد المشهد ${index + 1} من ${backup.scenes.length}…`, `Importing scene ${index + 1} of ${backup.scenes.length}…`));
+        const { assetHistory, ...sceneFields } = scene;
+        const sceneData: SceneInput = {
+          ...sceneFields,
+          assetUrl: scene.assetUrl?.startsWith('/api/projects/') ? null : scene.assetUrl,
+          voiceUrl: scene.voiceUrl?.startsWith('/api/projects/') ? null : scene.voiceUrl,
+        };
+        const createdScene = await createScene.mutateAsync({ projectId: importedProjectId, data: sceneData });
+        const hasLocalAsset = [scene.assetUrl, scene.voiceUrl, ...assetHistory.map((version) => version.url)]
+          .some((url) => typeof url === 'string' && url.startsWith('/api/projects/'));
+        if (hasLocalAsset || assetHistory.length) {
+          const response = await fetch(`${basePath}/api/projects/${importedProjectId}/scenes/${createdScene.id}/assets/clone`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ assetUrl: scene.assetUrl, assetType: scene.assetType, voiceUrl: scene.voiceUrl, assetHistory }),
+          });
+          if (!response.ok) {
+            const externalHistory = assetHistory.filter((version) => !version.url.startsWith('/api/projects/'));
+            const retry = await fetch(`${basePath}/api/projects/${importedProjectId}/scenes/${createdScene.id}/assets/clone`, {
+              method: 'POST',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                assetUrl: scene.assetUrl?.startsWith('/api/projects/') ? null : scene.assetUrl,
+                assetType: scene.assetType,
+                voiceUrl: scene.voiceUrl?.startsWith('/api/projects/') ? null : scene.voiceUrl,
+                assetHistory: externalHistory,
+              }),
+            });
+            if (!retry.ok) {
+              const result = await retry.json().catch(() => ({})) as { error?: string };
+              throw new Error(result.error || tx(lang, 'تعذر استعادة أحد ملفات الوسائط.', 'A media file could not be restored.'));
+            }
+            unavailableLocalMediaCount++;
+          }
+        }
+      }
+      afterChange();
+      setBackupProgress(unavailableLocalMediaCount
+        ? tx(lang, `اكتمل الاستيراد، لكن لم تتوفر وسائط محلية في ${unavailableLocalMediaCount} مشهد؛ استُوردت هذه المشاهد دون رابط مكسور.`, `Import complete. Local media was unavailable for ${unavailableLocalMediaCount} scene(s), so those broken references were omitted.`)
+        : tx(lang, 'اكتمل الاستيراد؛ فُتح المشروع الجديد.', 'Import complete; the new project is open.'));
+      if (unavailableLocalMediaCount) window.alert(tx(lang, `تم استيراد المشروع، لكن بعض الوسائط المولّدة محليًا لم تعد موجودة على هذا الخادم. عدد المشاهد المتأثرة: ${unavailableLocalMediaCount}. تم استيرادها دون روابط مكسورة.`, `The project was imported, but some generated media is no longer available on this server. Affected scenes: ${unavailableLocalMediaCount}. They were imported without broken links.`));
+      setLocation(`/projects/${importedProjectId}`);
+    } catch (error) {
+      if (importedProjectId) {
+        try { await remove.mutateAsync({ projectId: importedProjectId }); } catch { /* keep the original error visible */ }
+        afterChange();
+      }
+      setBackupProgress(error instanceof Error ? error.message : tx(lang, 'تعذر استيراد ملف النسخة.', 'Could not import the backup file.'));
+    } finally {
+      setBackupImporting(false);
+    }
+  };
   const startStory = (projectId: string) => generate.mutate({ projectId, data: { providerKeyId: null, allowRotation: true, approvePotentialCharges: true } }, {
     onSuccess: () => {
       afterChange();
@@ -533,9 +618,10 @@ function Projects() {
       if (approvePotentialCharges) startStory(project.id);
     } });
   };
-  return <AppFrame title={tx(lang,'المشاريع','Projects')}><div className="page-toolbar"><div><span className="eyebrow">{tx(lang,'أرشيف الإنتاج','PRODUCTION ARCHIVE')}</span><h2>{tx(lang,'كل القصص التي بدأت.', 'Every story you started.')}</h2><p>{tx(lang,'مشاريعك وسيناريوهاتك محفوظة في مكان واحد.', 'Your projects and storyboards, kept in one place.')}</p></div><button onClick={() => setOpen(true)} className="btn btn-primary" data-testid="button-new-project"><Plus size={17}/>{tx(lang,'مشروع جديد','New project')}</button></div>
+  return <AppFrame title={tx(lang,'المشاريع','Projects')}><div className="page-toolbar"><div><span className="eyebrow">{tx(lang,'أرشيف الإنتاج','PRODUCTION ARCHIVE')}</span><h2>{tx(lang,'كل القصص التي بدأت.', 'Every story you started.')}</h2><p>{tx(lang,'مشاريعك وسيناريوهاتك محفوظة في مكان واحد.', 'Your projects and storyboards, kept in one place.')}</p></div><div className="flex flex-wrap gap-2"><input ref={importFileRef} className="sr-only" type="file" accept="application/json,.json" onChange={event=>{const file=event.target.files?.[0];event.target.value='';if(file)void importBackupFile(file)}}/><button onClick={()=>importFileRef.current?.click()} className="btn btn-quiet" disabled={backupImporting} data-testid="button-import-project-backup">{backupImporting?<LoaderCircle size={16} className="animate-spin"/>:<FileUp size={16}/ >}{tx(lang,'استيراد JSON','Import JSON')}</button><button onClick={() => setOpen(true)} className="btn btn-primary" data-testid="button-new-project"><Plus size={17}/>{tx(lang,'مشروع جديد','New project')}</button></div></div>
+    {backupProgress&&<p className="save-state mt-2" role="status">{backupProgress}</p>}
     <div className="list-controls"><label className="searchbox"><Search size={17}/><input value={search} onChange={e => setSearch(e.target.value)} placeholder={tx(lang,'ابحث في مشاريعك','Search projects')} data-testid="input-project-search" /></label><span className="result-count">{q.data?.length ?? '—'} {tx(lang,'مشروع','projects')}</span></div>
-    {q.isLoading ? <div className="project-grid">{[1,2,3].map(n=><SkeletonBlock key={n} className="h-52" />)}</div> : q.isError ? <StateError lang={lang} retry={() => q.refetch()} /> : list.length ? <div className="project-grid">{list.map(p=><ProjectCard key={p.id} project={p} onDelete={id => { if (window.confirm(tx(lang,'هل تريد حذف المشروع وكل مشاهده؟','Delete this project and all its scenes?'))) remove.mutate({projectId:id},{onSuccess:()=>{afterChange();qc.invalidateQueries({queryKey:getGetProjectQueryKey(id)});}}); }} />)}</div> : <Empty title={search ? tx(lang,'لا توجد مطابقة','No matching projects') : tx(lang,'ابدأ بمشهد أول','Start with a first frame')} body={search ? tx(lang,'جرّب كلمات بحث أخرى.','Try another search term.') : tx(lang,'أنشئ مشروعًا ليصبح لديك مكان لصياغة الفكرة وبناء المشاهد.','Create a project to shape the idea and build your scenes.')} action={!search && <button className="btn btn-primary" onClick={() => setOpen(true)}><Plus size={16}/>{tx(lang,'إنشاء أول مشروع','Create your first project')}</button>} />}
+    {q.isLoading ? <div className="project-grid">{[1,2,3].map(n=><SkeletonBlock key={n} className="h-52" />)}</div> : q.isError ? <StateError lang={lang} retry={() => q.refetch()} /> : list.length ? <div className="project-grid">{list.map(p=><ProjectCard key={p.id} project={p} onExport={exportBackup} exporting={backupExportingId===p.id} onDelete={id => { if (window.confirm(tx(lang,'هل تريد حذف المشروع وكل مشاهده؟','Delete this project and all its scenes?'))) remove.mutate({projectId:id},{onSuccess:()=>{afterChange();qc.invalidateQueries({queryKey:getGetProjectQueryKey(id)});}}); }} />)}</div> : <Empty title={search ? tx(lang,'لا توجد مطابقة','No matching projects') : tx(lang,'ابدأ بمشهد أول','Start with a first frame')} body={search ? tx(lang,'جرّب كلمات بحث أخرى.','Try another search term.') : tx(lang,'أنشئ مشروعًا ليصبح لديك مكان لصياغة الفكرة وبناء المشاهد.','Create a project to shape the idea and build your scenes.')} action={!search && <button className="btn btn-primary" onClick={() => setOpen(true)}><Plus size={16}/>{tx(lang,'إنشاء أول مشروع','Create your first project')}</button>} />}
     {open && <ProjectForm onClose={() => { setOpen(false); setCreatedProjectId(null); }} pending={create.isPending || generate.isPending || createScene.isPending} freeMode={freeMode} textProviderReady={textProviderReady} checkingProvider={keysQuery.isLoading} generationError={generate.isError && Boolean(createdProjectId)} projectCreated={Boolean(createdProjectId)} onOpenCreated={createdProjectId ? () => { setOpen(false); setCreatedProjectId(null); setLocation(`/projects/${createdProjectId}`); } : undefined} onSave={saveProjectAndWriteStory} />}
   </AppFrame>;
 }
@@ -707,7 +793,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
           <div className="preview-controls"><button className="play-button" aria-label={previewPlaying?tx(lang,'إيقاف المعاينة','Pause preview'):tx(lang,'تشغيل المعاينة','Play preview')} disabled={activeScene?.assetType!=='video'} onClick={()=>{const player=previewVideo.current;if(!player)return;if(player.paused)void player.play();else player.pause()}}>{previewPlaying?<Pause size={12}/>:<span />}</button><span className="small-mono">{tx(lang,'المشهد','Scene')} {activeScene?String(activeScene.sortOrder+1).padStart(2,'0'):'—'} / {String(scenes.length).padStart(2,'0')} · {formatTime(duration)}</span><div className="control-spacer"/><span className="eyebrow">{scenes.length} {tx(lang,'مشاهد','SCENES')}</span></div>
         </div>
         <div className="timeline-panel panel"><div className="section-heading !mb-4"><div><span className="eyebrow">{tx(lang,'خط الإنتاج','EDIT TIMELINE')}</span><h3>{tx(lang,'ترتيب المشاهد','Scene sequence')}</h3></div><button className="btn btn-quiet" onClick={()=>createScene.mutate({projectId,data:{sortOrder:scenes.length,title:tx(lang,`مشهد ${scenes.length+1}`,`Scene ${scenes.length+1}`),description:'',imagePrompt:'',narration:'',durationSeconds:6,assetUrl:null,assetType:null}},{onSuccess:s=>{refresh();setSelected(s.id)}})} disabled={createScene.isPending}><Plus size={16}/>{tx(lang,'إضافة مشهد','Add scene')}</button></div>
-           {scenes.length === 0 ? <div className="timeline-empty"><span className="timeline-empty-line"/><span>{tx(lang,'لم تُنشأ مشاهد بعد','No scenes yet')}</span><button className="text-link" onClick={()=>createScene.mutate({projectId,data:{sortOrder:0,title:tx(lang,'المشهد الأول','Scene one'),description:'',imagePrompt:'',narration:'',durationSeconds:6}},{onSuccess:s=>{refresh();setSelected(s.id)}})}>{tx(lang,'أضف أول مشهد','Add the first scene')}</button></div> : <FilmTimeline scenes={scenes} selectedId={activeScene?.id ?? null} musicUrl={project.musicUrl} lang={lang} onSelect={setSelected} onReorder={(source,target)=>void reorderDrop(source,target)} />}
+           {scenes.length === 0 ? <div className="timeline-empty"><span className="timeline-empty-line"/><span>{tx(lang,'لم تُنشأ مشاهد بعد','No scenes yet')}</span><button className="text-link" onClick={()=>createScene.mutate({projectId,data:{sortOrder:0,title:tx(lang,'المشهد الأول','Scene one'),description:'',imagePrompt:'',narration:'',durationSeconds:6}},{onSuccess:s=>{refresh();setSelected(s.id)}})}>{tx(lang,'أضف أول مشهد','Add the first scene')}</button></div> : <FilmTimeline scenes={scenes} selectedId={activeScene?.id ?? null} musicUrl={project.musicUrl} musicVolume={project.musicVolume} lang={lang} previewing={previewing} onPreview={()=>void requestPreview()} onSelect={setSelected} onReorder={(source,target)=>void reorderDrop(source,target)} onSaveScene={(sceneId,data)=>updateScene.mutateAsync({projectId,sceneId,data}).then(()=>{refresh()})} onSaveProject={data=>updateProject.mutateAsync({projectId,data}).then(()=>{refresh()})} />}
         </div>
           {freeMode && scenes.length===0 && <div className="script-bar panel"><div className="script-symbol"><ShieldCheck size={18}/></div><div className="script-copy"><b>{tx(lang,'أنشئ Storyboard بلا تكلفة','Create a no-cost storyboard')}</b><p>{tx(lang,'اختر قالبًا محليًا لإضافة خمس مشاهد قابلة للتحرير دون استدعاء مزوّد.','Choose a local template to add five editable scenes without calling a provider.')}</p><div className="flex flex-wrap gap-2 mt-3">{projectTemplates.slice(0,5).map(item=><button key={item.id} className="btn btn-quiet" disabled={createScene.isPending} onClick={()=>{const seeds=buildFreeTemplateScenes(item.id,project.idea,lang,project.visualStyle,project.durationSeconds);void (async()=>{for(const [index,seed] of seeds.entries())await createScene.mutateAsync({projectId,data:{...seed,sortOrder:index}});refresh();})();}}>{tx(lang,item.ar,item.en)}</button>)}</div></div></div>}
          {scenes.length ? <div className="script-bar panel" role="status" data-testid="story-scenes-ready"><div className="script-symbol"><Check size={18}/></div><div className="script-copy"><b>{tx(lang,'المشاهد موجودة بالفعل','Scenes already exist')}</b><p>{tx(lang,'تابع تعديل المشاهد من الخط الزمني. لا يمكن بدء تأليف جديد فوق مشاهد موجودة.','Continue editing these scenes in the timeline. A new storyboard cannot be generated over existing scenes.')}</p></div></div> : !freeMode && <><div className="script-bar panel"><div className="script-symbol"><WandSparkles size={18}/></div><div className="script-copy"><b>{tx(lang,'حوّل الفكرة إلى سيناريو','Turn the idea into a storyboard')}</b><p>{textProviderReady ? tx(lang,'أنشئ مسودة مشاهد باستخدام مزوّد نص مضبوط.','Generate a scene draft using a configured text provider.') : tx(lang,'لا يوجد مفتاح نص جاهز؛ أضف مفتاحًا صالحًا قبل التوليد.','No available text provider. Add an enabled key before generating.')}</p><label className="checkline charge-consent"><input type="checkbox" checked={chargeApproved} onChange={e=>setChargeApproved(e.target.checked)}/>{tx(lang,'أوافق على احتمال احتساب رسوم من المزوّد الأساسي أو الاحتياطي.','I approve possible charges from the primary or fallback provider.')}</label><div className="form-two mt-3"><label><span className="field-label">{tx(lang,'عدد المشاهد','Number of scenes')}</span><input className="studio-input" type="number" min="1" max="24" value={scriptSettings.sceneCount} onChange={e=>setScriptSettings(v=>({...v,sceneCount:Math.max(1,Math.min(24,Number(e.target.value)||1))}))} /></label><label><span className="field-label">{tx(lang,'مدة كل مشهد (ثانية)','Seconds per scene')}</span><input className="studio-input" type="number" min="1" max="600" value={scriptSettings.sceneDurationSeconds} onChange={e=>setScriptSettings(v=>({...v,sceneDurationSeconds:Math.max(1,Math.min(600,Number(e.target.value)||1))}))} /></label><label><span className="field-label">{tx(lang,'أسلوب المشاهد','Scene style')}</span><select className="studio-input" value={scriptSettings.sceneStyle} onChange={e=>setScriptSettings(v=>({...v,sceneStyle:e.target.value}))}>{visualStyles.map(([value,ar])=><option key={value} value={value}>{tx(lang,ar,value)}</option>)}</select></label></div></div><button disabled={!textProviderReady || generate.isPending || !chargeApproved || Boolean(currentJob?.status === 'running' || currentJob?.status === 'queued')} className="btn btn-primary" onClick={()=>generate.mutate({projectId,data:{providerKeyId:null,allowRotation:true,approvePotentialCharges:chargeApproved,...scriptSettings}},{onSuccess:refresh})} data-testid="button-generate-script">{generate.isPending ? <LoaderCircle size={16} className="animate-spin"/> : <WandSparkles size={16}/ >}{tx(lang,'توليد المشاهد','Generate scenes')}</button></div>
