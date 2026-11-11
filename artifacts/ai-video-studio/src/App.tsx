@@ -388,10 +388,11 @@ function buildFreeTemplateScenes(templateId:string,idea:string,lang:Lang,visualS
     narration:beat[3], durationSeconds:Math.max(1,base+(index<extra?1:0)),
   }));
 }
-function ProjectForm({ onClose, initial, onSave, pending, freeMode = true, textProviderReady = false, checkingProvider = false, generationError = false, projectCreated = false, onOpenCreated }: { onClose: () => void; initial?: Partial<ProjectInput>; onSave: (data: ProjectInput, approvePotentialCharges?: boolean, templateId?: string) => void; pending: boolean; freeMode?: boolean; textProviderReady?: boolean; checkingProvider?: boolean; generationError?: boolean; projectCreated?: boolean; onOpenCreated?: () => void }) {
+function ProjectForm({ onClose, initial, onSave, pending, freeMode = true, textProviderReady = false, checkingProvider = false, generationError = false, projectCreated = false, onOpenCreated }: { onClose: () => void; initial?: Partial<ProjectInput>; onSave: (data: ProjectInput, approvePotentialCharges?: boolean, templateId?: string, mode?: 'auto' | 'manual') => void; pending: boolean; freeMode?: boolean; textProviderReady?: boolean; checkingProvider?: boolean; generationError?: boolean; projectCreated?: boolean; onOpenCreated?: () => void }) {
   const { lang } = useApp();
   const [form, setForm] = useState<ProjectInput>({ ...blankProject, ...initial });
   const [template, setTemplate] = useState('');
+  const [mode, setMode] = useState<'auto' | 'manual'>('auto');
   const [customLanguage, setCustomLanguage] = useState('');
   const [approvePotentialCharges, setApprovePotentialCharges] = useState(false);
   const selectedTemplate = projectTemplates.find(item => item.id === template);
@@ -412,17 +413,26 @@ function ProjectForm({ onClose, initial, onSave, pending, freeMode = true, textP
       audience: selectedTemplate ? (lang === 'ar' ? 'الجمهور العام' : selectedTemplate.audience) : (lang === 'ar' ? 'الجمهور العام' : 'General audience'),
       visualStyle: selectedTemplate?.visualStyle ?? (lang === 'ar' ? 'سينمائي' : 'Cinematic'),
       aspectRatio: selectedTemplate?.aspectRatio ?? '16:9',
-    }, !editing && !selectedTemplate && approvePotentialCharges, !editing ? selectedTemplate?.id : undefined);
+    }, !editing && !selectedTemplate && approvePotentialCharges, !editing ? selectedTemplate?.id : undefined, mode);
   };
-  const canSubmit = editing || (Boolean(form.idea.trim()) && (Boolean(selectedTemplate) || (!freeMode && textProviderReady && approvePotentialCharges)));
+  const canSubmit = editing || (Boolean(form.idea.trim()) && (mode === 'manual' || Boolean(selectedTemplate) || (!freeMode && textProviderReady && approvePotentialCharges)));
   return <Modal onClose={onClose} title={editing ? tx(lang,'تعديل تفاصيل المشروع','Edit project details') : tx(lang, 'فكرتك إلى قصة', 'Turn your idea into a story')} subtitle={editing ? tx(lang, 'عدّل تفاصيل المشروع ومشاهده.', 'Update the project details.') : tx(lang, 'اكتب فكرة قصيرة، وسنؤلف منها القصة والمشاهد.', 'Write a short idea and we’ll turn it into a story and scenes.')}>
     <form onSubmit={e => { e.preventDefault(); submit(); }} className="form-stack">
       {!editing ? <>
-        <label><span className="field-label">{tx(lang,'ابدأ بقالب مجاني','Start with a free template')}</span><select className="studio-input" value={template} onChange={e=>{const id=e.target.value;setTemplate(id);const preset=projectTemplates.find(item=>item.id===id);if(preset)setForm(old=>({...old,videoType:preset.videoType,durationSeconds:preset.durationSeconds,aspectRatio:preset.aspectRatio,visualStyle:preset.visualStyle,audience:lang==='ar'?'الجمهور العام':preset.audience}));}}><option value="">{tx(lang,'اختر قالبًا أو استخدم الكتابة بالذكاء الاصطناعي','Choose a template or use AI writing')}</option>{projectTemplates.map(item=><option key={item.id} value={item.id}>{tx(lang,item.ar,item.en)}</option>)}</select></label>
-        {freeMode && !selectedTemplate && <div className="service-purpose-hint is-unavailable"><b>{tx(lang,'وضع صفر المصاريف مفعّل','Zero-spend mode is on')}</b><span>{tx(lang,'اختر قالبًا جاهزًا لإنشاء المشاهد دون أي طلب إلى مزوّد خارجي.','Choose a built-in template to create scenes without calling an external provider.')}</span></div>}
-        {selectedTemplate && <div className="service-purpose-hint"><b>{tx(lang,'قالب محلي مجاني','Free local storyboard')}</b><span>{tx(lang,'سيُنشئ خمس مشاهد قابلة للتعديل محليًا. أضف صورك أو استخدم مصادر الوسائط العامة.','Creates five editable scenes locally. Add your own images or use public media sources.')}</span></div>}
+        <div className="workflow-mode-grid" role="radiogroup" aria-label={tx(lang,'طريقة إنشاء الفيديو','Video creation mode')}>
+          <button type="button" className={`workflow-mode-card ${mode === 'auto' ? 'is-selected' : ''}`} onClick={() => setMode('auto')} role="radio" aria-checked={mode === 'auto'}>
+            <WandSparkles size={19}/><strong>{tx(lang,'تلقائي','Automatic')}</strong><span>{tx(lang,'أعطيه فكرة قصيرة، فيؤلف القصة ويجهز المشاهد والصوت والترجمة والتصدير.','Give it a short idea and it builds the story, scenes, voice, subtitles, and export.')}</span>
+          </button>
+          <button type="button" className={`workflow-mode-card ${mode === 'manual' ? 'is-selected' : ''}`} onClick={() => setMode('manual')} role="radio" aria-checked={mode === 'manual'}>
+            <Settings2 size={19}/><strong>{tx(lang,'يدوي','Manual')}</strong><span>{tx(lang,'أنشئ المشروع ثم أضف النصوص والوسائط وعدّل كل مشهد بنفسك.','Create the project, then add text, media, and edit every scene yourself.')}</span>
+          </button>
+        </div>
+        {mode === 'manual' && <div className="service-purpose-hint"><b>{tx(lang,'تحكم كامل','Full control')}</b><span>{tx(lang,'سيُفتح المشروع مباشرة بدون تأليف أو توليد تلقائي. يمكنك إضافة المشاهد والنصوص والوسائط يدويًا.','The project opens without automatic writing or generation. Add scenes, text, and media yourself.')}</span></div>}
+        {mode === 'auto' && <label><span className="field-label">{tx(lang,'ابدأ بقالب مجاني (اختياري)','Start with a free template (optional)')}</span><select className="studio-input" value={template} onChange={e=>{const id=e.target.value;setTemplate(id);const preset=projectTemplates.find(item=>item.id===id);if(preset)setForm(old=>({...old,videoType:preset.videoType,durationSeconds:preset.durationSeconds,aspectRatio:preset.aspectRatio,visualStyle:preset.visualStyle,audience:lang==='ar'?'الجمهور العام':preset.audience}));}}><option value="">{tx(lang,'اختر قالبًا أو استخدم الكتابة بالذكاء الاصطناعي','Choose a template or use AI writing')}</option>{projectTemplates.map(item=><option key={item.id} value={item.id}>{tx(lang,item.ar,item.en)}</option>)}</select></label>}
+        {mode === 'auto' && freeMode && !selectedTemplate && <div className="service-purpose-hint is-unavailable"><b>{tx(lang,'وضع صفر المصاريف مفعّل','Zero-spend mode is on')}</b><span>{tx(lang,'اختر قالبًا جاهزًا لإنشاء المشاهد دون أي طلب إلى مزوّد خارجي.','Choose a built-in template to create scenes without calling an external provider.')}</span></div>}
+        {mode === 'auto' && selectedTemplate && <div className="service-purpose-hint"><b>{tx(lang,'قالب محلي مجاني','Free local storyboard')}</b><span>{tx(lang,'سيُنشئ خمس مشاهد قابلة للتعديل محليًا. أضف صورك أو استخدم مصادر الوسائط العامة.','Creates five editable scenes locally. Add your own images or use public media sources.')}</span></div>}
         <label><span className="field-label">{tx(lang,'فكرتك','Your idea')}</span><textarea required maxLength={1500} rows={5} className="studio-input resize-y" value={form.idea} onChange={e => update('idea',e.target.value)} placeholder={tx(lang,'مثال: طفل يجد رسالة قديمة تقوده إلى سرّ في قريته…','Example: A child finds an old letter that leads to a secret in their village…')} data-testid="input-project-idea" disabled={projectCreated} autoFocus /></label>
-        {!selectedTemplate && !freeMode && (checkingProvider ? <Busy text={tx(lang,'جارٍ التحقق من مفتاح الكتابة…','Checking your writing key…')} /> : !textProviderReady ? <div className="service-purpose-hint is-unavailable"><b>{tx(lang,'لا يوجد مفتاح كتابة جاهز','No text-generation key is ready')}</b><span>{tx(lang,'أضف مفتاحًا مفعّلًا لمزوّد نص، ثم ارجع لبدء القصة.','Enable a text provider key, then return to start the story.')}</span><Link href="/settings/providers" className="text-link">{tx(lang,'إعداد مفاتيح الخدمات','Set up provider keys')}<ArrowLeft size={14}/></Link></div> : <label className="checkline charge-consent"><input type="checkbox" checked={approvePotentialCharges} disabled={projectCreated} onChange={e=>setApprovePotentialCharges(e.target.checked)} data-testid="checkbox-story-charge-consent"/>{tx(lang,'أوافق على إرسال الفكرة لمزوّد النص؛ قد تُحتسب رسوم حسب خطتي.','I agree to send this idea to my text provider; charges may apply.')}</label>)}
+        {mode === 'auto' && !selectedTemplate && !freeMode && (checkingProvider ? <Busy text={tx(lang,'جارٍ التحقق من مفتاح الكتابة…','Checking your writing key…')} /> : !textProviderReady ? <div className="service-purpose-hint is-unavailable"><b>{tx(lang,'لا يوجد مفتاح كتابة جاهز','No text-generation key is ready')}</b><span>{tx(lang,'أضف مفتاحًا مفعّلًا لمزوّد نص، ثم ارجع لبدء القصة.','Enable a text provider key, then return to start the story.')}</span><Link href="/settings/providers" className="text-link">{tx(lang,'إعداد مفاتيح الخدمات','Set up provider keys')}<ArrowLeft size={14}/></Link></div> : <label className="checkline charge-consent"><input type="checkbox" checked={approvePotentialCharges} disabled={projectCreated} onChange={e=>setApprovePotentialCharges(e.target.checked)} data-testid="checkbox-story-charge-consent"/>{tx(lang,'أوافق على إرسال الفكرة لمزوّد النص؛ قد تُحتسب رسوم حسب خطتي.','I agree to send this idea to my text provider; charges may apply.')}</label>)}
         {generationError && <div className="inline-error" role="alert">{tx(lang,'تم حفظ الفكرة، لكن تعذّر بدء تأليف القصة. أعد المحاولة أو افتح المشروع.','Your idea was saved, but story generation could not start. Retry or open the project.')}{onOpenCreated && <button type="button" className="text-link mt-2" onClick={onOpenCreated}>{tx(lang,'فتح المشروع','Open project')}<ArrowLeft size={14}/></button>}</div>}
       </> : <>
         <label><span className="field-label">{tx(lang,'عنوان المشروع','Project title')}</span><input required maxLength={160} className="studio-input" value={form.title} onChange={e => update('title',e.target.value)} placeholder={tx(lang,'مثال: ذاكرة البحر','e.g. Memory of the sea')} data-testid="input-project-title" /></label>
@@ -466,13 +476,14 @@ function Projects() {
       setLocation(`/projects/${projectId}`);
     },
   });
-  const saveProjectAndWriteStory = (data: ProjectInput, approvePotentialCharges = false, templateId?: string) => {
+  const saveProjectAndWriteStory = (data: ProjectInput, approvePotentialCharges = false, templateId?: string, mode: 'auto' | 'manual' = 'auto') => {
     if (createdProjectId) {
       startStory(createdProjectId);
       return;
     }
     create.mutate({ data }, { onSuccess: project => {
       afterChange();
+      if (mode === 'auto') window.localStorage.setItem(`ella:auto:${project.id}`, 'pending');
       if (templateId) {
         const seeds = buildFreeTemplateScenes(templateId, data.idea, lang, data.visualStyle, data.durationSeconds);
         void (async () => {
@@ -486,6 +497,11 @@ function Projects() {
             setLocation(`/projects/${project.id}`);
           }
         })();
+        return;
+      }
+      if (mode === 'manual') {
+        setOpen(false);
+        setLocation(`/projects/${project.id}`);
         return;
       }
       setCreatedProjectId(project.id);
@@ -573,7 +589,62 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
   }, [projectJobsQuery.data]);
   const currentJob = projectJobsQuery.data?.find(job => job.status === 'queued' || job.status === 'running') ?? projectJobsQuery.data?.[0];
   const latestExportJob = projectJobsQuery.data?.find(job => job.jobType === 'export');
+  const autoMarker = typeof window !== 'undefined' ? window.localStorage.getItem(`ella:auto:${projectId}`) : null;
+  const autoMode = Boolean(autoMarker);
+  const autoImageJob = useQueueSceneImageGeneration();
+  const autoVideoJob = useQueueSceneVideoGeneration();
+  const autoVoiceJob = useQueueSceneVoiceGeneration();
+  const autoStartedRef = useRef(false);
+  const autoExportedRef = useRef(false);
   const duration = scenes.reduce((sum,s)=>sum+s.durationSeconds,0);
+  const autoKeys = useMemo(() => ({
+    image: keysQuery.data?.find(key => key.enabled && key.serviceType === 'image' && providerSupports(key.provider, 'image') && (key.status === 'valid' || key.status === 'untested')),
+    video: keysQuery.data?.find(key => key.enabled && key.serviceType === 'video' && providerSupports(key.provider, 'video') && (key.status === 'valid' || key.status === 'untested')),
+    voice: keysQuery.data?.find(key => key.enabled && key.serviceType === 'voice' && providerSupports(key.provider, 'voice') && (key.status === 'valid' || key.status === 'untested')),
+  }), [keysQuery.data]);
+  useEffect(() => {
+    if (!autoMode || autoMarker !== 'pending' || freeMode || !scenes.length || autoStartedRef.current) return;
+    const scriptRunning = projectJobsQuery.data?.some(job => job.jobType === 'script' && (job.status === 'queued' || job.status === 'running'));
+    if (scriptRunning || !autoKeys.image || !autoKeys.video || !autoKeys.voice) return;
+    autoStartedRef.current = true;
+    void (async () => {
+      let image = 0, video = 0, voice = 0;
+      for (const scene of scenes) {
+        try {
+          if (!scene.assetUrl || scene.assetType !== 'image') {
+            await autoImageJob.mutateAsync({projectId, sceneId: scene.id, data: {providerKeyId: autoKeys.image!.id, model: autoKeys.image!.provider === 'huggingface' ? 'black-forest-labs/FLUX.1-schnell' : 'dall-e-3', outputs: 1, resolution: 1024, approvePotentialCharges: true}});
+            image++;
+          }
+        } catch { /* the failed job remains visible for retry */ }
+        try {
+          if (scene.assetType !== 'video') {
+            await autoVideoJob.mutateAsync({projectId, sceneId: scene.id, data: {providerKeyId: autoKeys.video!.id, model: defaultVideoModel(autoKeys.video!.provider, 'text') || 'minimax/video-01', mode: 'text', approvePotentialCharges: true}});
+            video++;
+          }
+        } catch { /* the failed job remains visible for retry */ }
+        try {
+          if (!scene.voiceUrl) {
+            const voiceId = autoKeys.voice!.provider === 'elevenlabs' ? 'EXAVITQu4vr4xnSDxMaL' : 'alloy';
+            await autoVoiceJob.mutateAsync({projectId, sceneId: scene.id, data: {providerKeyId: autoKeys.voice!.id, voiceId, approvePotentialCharges: true}});
+            voice++;
+          }
+        } catch { /* the failed job remains visible for retry */ }
+      }
+      window.localStorage.setItem(`ella:auto:${projectId}`, JSON.stringify({scenes: scenes.length, image, video, voice}));
+      refresh();
+    })();
+  }, [autoMode, autoMarker, freeMode, scenes.length, projectId, autoKeys.image?.id, autoKeys.video?.id, autoKeys.voice?.id, projectJobsQuery.data]);
+  useEffect(() => {
+    if (!autoMode || !scenes.length || autoExportedRef.current) return;
+    const marker = window.localStorage.getItem(`ella:auto:${projectId}`);
+    if (!marker || marker === 'pending') return;
+    const completed = projectJobsQuery.data?.filter(job => job.status === 'completed') || [];
+    const enough = (['image', 'video', 'voice'] as const).every(type => completed.filter(job => job.jobType === type).length >= scenes.length);
+    const active = projectJobsQuery.data?.some(job => job.status === 'queued' || job.status === 'running');
+    if (!enough || active || latestExportJob) return;
+    autoExportedRef.current = true;
+    exportProject.mutate({projectId, data: {resolution: 1080, fps: 30, includeSubtitles: true, format: 'mp4', codec: 'h264', subtitleStyle: 'classic'}}, {onSuccess: refresh});
+  }, [autoMode, scenes.length, projectId, projectJobsQuery.data, latestExportJob?.id]);
   const exportPreflight=buildExportPreflight(scenes,project?.durationSeconds??0,exportSettings.includeSubtitles,lang);
   const scenesReadyForExport=exportPreflight.errors.length===0;
   if (projectQuery.isLoading) return <AppFrame title={tx(lang,'تحميل المشروع','Loading project')}><div className="workspace-skeleton"><SkeletonBlock className="h-20"/><SkeletonBlock className="h-72"/><SkeletonBlock className="h-48"/></div></AppFrame>;
