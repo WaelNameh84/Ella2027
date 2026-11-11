@@ -1,4 +1,5 @@
 import express, { type Express } from "express";
+import path from "node:path";
 import cors from "cors";
 import pinoHttp from "pino-http";
 import { clerkMiddleware } from "@clerk/express";
@@ -12,6 +13,10 @@ import {
 } from "./middlewares/clerkProxyMiddleware";
 
 const app: Express = express();
+const frontendDistPath = path.resolve(
+  process.cwd(),
+  "../ai-video-studio/dist/public",
+);
 
 app.use(
   pinoHttp({
@@ -48,5 +53,24 @@ app.use(
 );
 
 app.use("/api", router);
+
+// Serve the Vite build from the same origin as the API so relative /api requests work.
+app.use(express.static(frontendDistPath, { index: false }));
+
+// Client-side routes (for example, /projects/123) should load the SPA entry point.
+app.use((req, res, next) => {
+  if (
+    (req.method !== "GET" && req.method !== "HEAD") ||
+    req.path === "/api" ||
+    req.path.startsWith("/api/")
+  ) {
+    next();
+    return;
+  }
+
+  res.sendFile(path.join(frontendDistPath, "index.html"), (error) => {
+    if (error) next(error);
+  });
+});
 
 export default app;
