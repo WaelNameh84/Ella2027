@@ -831,6 +831,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
           {freeMode && scenes.length===0 && <div className="script-bar panel"><div className="script-symbol"><ShieldCheck size={18}/></div><div className="script-copy"><b>{tx(lang,'أنشئ Storyboard بلا تكلفة','Create a no-cost storyboard')}</b><p>{tx(lang,'اختر قالبًا محليًا لإضافة خمس مشاهد قابلة للتحرير دون استدعاء مزوّد.','Choose a local template to add five editable scenes without calling a provider.')}</p><div className="flex flex-wrap gap-2 mt-3">{projectTemplates.slice(0,5).map(item=><button key={item.id} className="btn btn-quiet" disabled={createScene.isPending} onClick={()=>{const perScene=Math.max(1,Math.floor(project.durationSeconds/5));const seeds=buildFreeTemplateScenes(item.id,project.idea,lang,project.visualStyle,5,perScene);void (async()=>{for(const [index,seed] of seeds.entries())await createScene.mutateAsync({projectId,data:{...seed,sortOrder:index}});refresh();})();}}>{tx(lang,item.ar,item.en)}</button>)}</div></div></div>}
          {scenes.length ? <div className="script-bar panel" role="status" data-testid="story-scenes-ready"><div className="script-symbol"><Check size={18}/></div><div className="script-copy"><b>{tx(lang,'المشاهد موجودة بالفعل','Scenes already exist')}</b><p>{tx(lang,'تابع تعديل المشاهد من الخط الزمني. لا يمكن بدء تأليف جديد فوق مشاهد موجودة.','Continue editing these scenes in the timeline. A new storyboard cannot be generated over existing scenes.')}</p></div></div> : !freeMode && <><div className="script-bar panel"><div className="script-symbol"><WandSparkles size={18}/></div><div className="script-copy"><b>{tx(lang,'حوّل الفكرة إلى سيناريو','Turn the idea into a storyboard')}</b><p>{textProviderReady ? tx(lang,'أنشئ مسودة مشاهد باستخدام مزوّد نص مضبوط.','Generate a scene draft using a configured text provider.') : tx(lang,'لا يوجد مفتاح نص جاهز؛ أضف مفتاحًا صالحًا قبل التوليد.','No available text provider. Add an enabled key before generating.')}</p><label className="checkline charge-consent"><input type="checkbox" checked={chargeApproved} onChange={e=>setChargeApproved(e.target.checked)}/>{tx(lang,'أوافق على احتمال احتساب رسوم من المزوّد الأساسي أو الاحتياطي.','I approve possible charges from the primary or fallback provider.')}</label><div className="form-two mt-3"><label><span className="field-label">{tx(lang,'عدد المشاهد','Number of scenes')}</span><input className="studio-input" type="number" min="1" max="24" value={scriptSettings.sceneCount} onChange={e=>setScriptSettings(v=>({...v,sceneCount:Math.max(1,Math.min(24,Number(e.target.value)||1))}))} /></label><label><span className="field-label">{tx(lang,'مدة كل مشهد (ثانية)','Seconds per scene')}</span><input className="studio-input" type="number" min="1" max="600" value={scriptSettings.sceneDurationSeconds} onChange={e=>setScriptSettings(v=>({...v,sceneDurationSeconds:Math.max(1,Math.min(600,Number(e.target.value)||1))}))} /></label><label><span className="field-label">{tx(lang,'أسلوب المشاهد','Scene style')}</span><select className="studio-input" value={scriptSettings.sceneStyle} onChange={e=>setScriptSettings(v=>({...v,sceneStyle:e.target.value}))}>{visualStyles.map(([value,ar])=><option key={value} value={value}>{tx(lang,ar,value)}</option>)}</select></label></div></div><button disabled={!textProviderReady || generate.isPending || !chargeApproved || Boolean(currentJob?.status === 'running' || currentJob?.status === 'queued')} className="btn btn-primary" onClick={()=>generate.mutate({projectId,data:{providerKeyId:null,allowRotation:true,approvePotentialCharges:chargeApproved,...scriptSettings}},{onSuccess:refresh})} data-testid="button-generate-script">{generate.isPending ? <LoaderCircle size={16} className="animate-spin"/> : <WandSparkles size={16}/ >}{tx(lang,'توليد المشاهد','Generate scenes')}</button></div>
          {generate.isError && <div className="inline-error">{tx(lang,'تعذّر بدء التوليد. تحقق من مفتاح النص أو أعد المحاولة.','Could not start generation. Check your text key or try again.')}</div>}</>}
+         {scenes.length > 0 && <BatchVoiceGeneration projectId={projectId} scenes={scenes} keys={keysQuery.data || []} lang={lang} freeMode={freeMode} hasActiveJob={Boolean(currentJob && (currentJob.status === 'queued' || currentJob.status === 'running'))} onQueued={refresh}/>}
          {scenes.length > 0 && <BatchVideoGeneration projectId={projectId} scenes={scenes} keys={keysQuery.data || []} lang={lang} freeMode={freeMode} hasActiveJob={Boolean(currentJob && (currentJob.status === 'queued' || currentJob.status === 'running'))} onQueued={refresh}/>}
          {currentJob && <div className="job-progress panel" role="status"><div className="job-progress-head"><div><b>{tx(lang,({script:'توليد السيناريو',export:'تصدير الفيديو',image:'توليد صورة',video:'توليد فيديو',voice:'توليد صوت'})[currentJob.jobType],({script:'Script generation',export:'Video export',image:'Image generation',video:'Video generation',voice:'Voice generation'})[currentJob.jobType])}</b><span className={`job-state job-${currentJob.status}`}>{tx(lang,currentJob.status==='queued'?'في الانتظار':currentJob.status==='running'?'قيد التنفيذ':currentJob.status==='completed'?'مكتملة':'فشلت',currentJob.status)}</span></div><Link href="/jobs" className="text-link">{tx(lang,'عرض المهام','View jobs')}</Link></div>{(currentJob.status==='queued'||currentJob.status==='running')&&<div className="job-progress-track"><span style={{width:`${currentJob.progress}%`}}/></div>}<p>{currentJob.error || currentJob.message}</p>{latestExportJob?.status==='completed'&&<ExportActions projectId={projectId} lang={lang}/>}</div>}
       </section>
@@ -1059,6 +1060,13 @@ function defaultVideoModel(provider:string|undefined,mode:'text'|'image') {
   if(provider==='replicate')return 'minimax/video-01';
   return '';
 }
+function defaultVoiceId(provider:string|undefined) {
+  if(provider==='elevenlabs')return 'EXAVitQu4vr4xnSDxMaL';
+  if(provider==='openai'||provider==='openai-audio')return 'alloy';
+  if(provider==='google-tts')return 'en-US-Neural2-C';
+  if(provider==='azure-speech')return 'en-US:en-US-JennyNeural';
+  return '';
+}
 function GenerationPanel({projectId,scene,keys,lang,onQueued,freeMode}:{projectId:string;scene:Scene;keys:ProviderKey[];lang:Lang;onQueued:()=>void;freeMode:boolean}) {
   const imageJob=useQueueSceneImageGeneration(),videoJob=useQueueSceneVideoGeneration(),voiceJob=useQueueSceneVoiceGeneration();
   const [action,setAction]=useState<'image'|'video'|'voice'|null>(null);
@@ -1159,6 +1167,65 @@ function BatchVideoGeneration({projectId,scenes,keys,lang,hasActiveJob,onQueued,
         <label className="checkline charge-consent"><input type="checkbox" checked={approved} onChange={e=>setApproved(e.target.checked)} data-testid="checkbox-batch-video-consent"/>{tx(lang,`أوافق على إرسال ${scenesToQueue.length} طلبات فيديو، وقد تُحتسب رسوم لكل مشهد.`,`I approve ${scenesToQueue.length} video requests; each scene may incur a charge.`)}</label>
         {progress&&<div className="export-confirm" role="status" data-testid="batch-video-progress">{queueing?tx(lang,`جارٍ إرسال الطلب ${progress.processed} من ${progress.total}…`,`Sending request ${progress.processed} of ${progress.total}…`):progress.queued?tx(lang,`أُرسل ${progress.queued} طلبات وتعذّر ${progress.failed}.`,`Queued ${progress.queued}; ${progress.failed} failed.`):tx(lang,'تعذّر إرسال الطلبات. تحقّق من مفتاح الفيديو والنموذج.','Requests could not be queued. Check the video key and model.')}</div>}
         <div className="modal-actions"><button type="button" className="btn btn-quiet" onClick={close} disabled={queueing}>{tx(lang,'إلغاء','Cancel')}</button><button type="button" className="btn btn-primary" disabled={!activeKey||!model.trim()||!approved||!scenesToQueue.length||queueing||hasActiveJob} onClick={()=>void begin()} data-testid="button-submit-batch-video">{queueing?<LoaderCircle size={15} className="animate-spin"/>:<Film size={15}/ >}{queueing?tx(lang,'جارٍ إرسال الطلبات…','Queueing videos…'):tx(lang,'ابدأ توليد الفيديو','Start video generation')}</button></div>
+      </div>
+    </Modal>}
+  </>;
+}
+
+function BatchVoiceGeneration({projectId,scenes,keys,lang,hasActiveJob,onQueued,freeMode}:{projectId:string;scenes:Scene[];keys:ProviderKey[];lang:Lang;hasActiveJob:boolean;onQueued:()=>void;freeMode:boolean}) {
+  const voiceJob=useQueueSceneVoiceGeneration();
+  const voiceKeys=keys.filter(key=>key.enabled&&key.serviceType==='voice'&&providerSupports(key.provider,'voice')&&(key.status==='valid'||key.status==='untested'));
+  const scenesWithoutVoice=scenes.filter(scene=>scene.narration.trim()&&!scene.voiceUrl);
+  const [open,setOpen]=useState(false);
+  const [providerId,setProviderId]=useState('');
+  const [voiceId,setVoiceId]=useState('');
+  const [approved,setApproved]=useState(false);
+  const [queueing,setQueueing]=useState(false);
+  const [progress,setProgress]=useState<{queued:number;failed:number;total:number;processed:number}|null>(null);
+  const [summary,setSummary]=useState<{queued:number;failed:number;total:number}|null>(null);
+  const activeKey=voiceKeys.find(key=>key.id===providerId)||voiceKeys[0];
+  const firstVoiceProvider=voiceKeys[0]?.provider;
+  useEffect(()=>{if(!providerId&&firstVoiceProvider)setVoiceId(defaultVoiceId(firstVoiceProvider));},[providerId,firstVoiceProvider]);
+  const close=()=>{if(queueing)return;setOpen(false);setApproved(false)};
+  const begin=async()=>{
+    if(!activeKey||!voiceId.trim()||!approved||!scenesWithoutVoice.length||queueing||hasActiveJob)return;
+    setQueueing(true);
+    setProgress({queued:0,failed:0,total:scenesWithoutVoice.length,processed:0});
+    let queued=0,failed=0;
+    for(const scene of scenesWithoutVoice){
+      try{
+        await voiceJob.mutateAsync({projectId,sceneId:scene.id,data:{providerKeyId:activeKey.id,voiceId:voiceId.trim(),approvePotentialCharges:true}});
+        queued++;
+      }catch{
+        failed++;
+      }
+      setProgress({queued,failed,total:scenesWithoutVoice.length,processed:queued+failed});
+    }
+    setQueueing(false);
+    setApproved(false);
+    setSummary({queued,failed,total:scenesWithoutVoice.length});
+    if(queued){setOpen(false);onQueued();}
+  };
+  if(!scenes.length)return null;
+  if(freeMode&&scenesWithoutVoice.length>0)return <div className="script-bar panel mt-4"><div className="script-symbol"><Languages size={18}/></div><div className="script-copy"><b>{tx(lang,'نص التعليق جاهز؛ الصوت لم يُولّد بعد','Narration text is ready; audio has not been generated')}</b><p>{tx(lang,'فعّل المزوّدات الخارجية وأضف مفتاحًا لخدمة الصوت. لن يُرسل أي طلب قبل موافقتك على الدفعة.','Enable external providers and add a voice-service key. No request is sent until you approve the batch.')} <Link href="/settings/providers" className="text-link">{tx(lang,'إعداد مفتاح الصوت','Set up a voice key')}<ArrowLeft size={14}/></Link></p></div></div>;
+  return <>
+    <section className="script-bar panel mt-4" data-testid="batch-voice-panel">
+      <div className="script-symbol"><Languages size={18}/></div>
+      <div className="script-copy"><b>{tx(lang,'إضافة تعليق صوتي للمشاهد','Add voice narration to scenes')}</b><p>{scenesWithoutVoice.length?tx(lang,'يوجد نص سرد بلا صوت. أنشئ ملفًا صوتيًا لكل مشهد ناقص دفعة واحدة.','Narration text has no audio yet. Generate an audio file for every scene missing one in a single batch.'):scenes.some(scene=>scene.narration.trim())?tx(lang,'كل المشاهد التي لديها سرد تحتوي على ملف صوت.','Every scene with narration already has an audio file.'):tx(lang,'أضف نص السرد للمشاهد أولًا ثم أنشئ الصوت.','Add narration text to scenes before generating audio.')}</p>
+        {voiceKeys.length===0&&scenesWithoutVoice.length>0&&<Link href="/settings/providers" className="text-link" data-testid="link-batch-voice-provider-settings">{tx(lang,'أضف مفتاح ElevenLabs أو OpenAI أو Google TTS لخدمة الصوت','Add an ElevenLabs, OpenAI, or Google TTS voice key')}<ArrowLeft size={14}/></Link>}
+        {hasActiveJob&&<small className="provider-purpose-description">{tx(lang,'انتظر انتهاء المهمة الحالية قبل بدء دفعة صوت جديدة.','Wait for the current job to finish before starting a voice batch.')}</small>}
+        {summary&&<p role="status" data-testid="batch-voice-result">{summary.failed?tx(lang,`أُرسل ${summary.queued} من ${summary.total} طلبات الصوت؛ تعذّر إرسال ${summary.failed}.`,`${summary.queued} of ${summary.total} voice requests were queued; ${summary.failed} could not be queued.`):tx(lang,`تم إرسال ${summary.queued} طلبات صوت إلى قائمة المهام.`,`Queued ${summary.queued} voice requests.`)} <Link href="/jobs" className="text-link">{tx(lang,'عرض المهام','View jobs')}<ArrowLeft size={13}/></Link></p>}
+      </div>
+      {scenesWithoutVoice.length>0&&<button className="btn btn-primary" disabled={!voiceKeys.length||hasActiveJob} onClick={()=>{setProgress(null);setSummary(null);setApproved(false);setProviderId('');setVoiceId(defaultVoiceId(firstVoiceProvider));setOpen(true)}} data-testid="button-batch-voice">{tx(lang,'توليد صوت لكل المشاهد','Generate voice for all scenes')}</button>}
+    </section>
+    {open&&<Modal title={tx(lang,'توليد التعليق الصوتي للمشاهد','Generate scene narration')} subtitle={tx(lang,`سيتم إرسال ${scenesWithoutVoice.length} طلب صوت. قد تُحتسب رسوم لكل مشهد.`,`This will send ${scenesWithoutVoice.length} voice requests. Each scene may incur a charge.`)} onClose={close}>
+      <div className="form-stack">
+        {voiceKeys.length>1&&<label><span className="field-label">{tx(lang,'مفتاح الصوت','Voice key')}</span><select className="studio-input" value={activeKey?.id||''} onChange={e=>{const selected=voiceKeys.find(key=>key.id===e.target.value);setProviderId(e.target.value);setVoiceId(defaultVoiceId(selected?.provider));}} data-testid="select-batch-voice-key">{voiceKeys.map(key=><option key={key.id} value={key.id}>{key.label} · {key.provider}</option>)}</select></label>}
+        <label><span className="field-label">{tx(lang,'معرّف الصوت','Voice ID')}</span><input required className="studio-input" value={voiceId} onChange={e=>setVoiceId(e.target.value)} placeholder={tx(lang,'معرّف صوت من حساب المزوّد','A voice ID from your provider account')} data-testid="input-batch-voice-id"/></label>
+        <p className="generation-note">{tx(lang,'القيمة الافتراضية تناسب المزوّد المختار؛ يمكنك تغييرها إلى صوت عربي متاح في حسابك.','The default matches the selected provider; you can change it to an Arabic voice available in your account.')}</p>
+        <label className="checkline charge-consent"><input type="checkbox" checked={approved} onChange={e=>setApproved(e.target.checked)} data-testid="checkbox-batch-voice-consent"/>{tx(lang,`أوافق على إرسال ${scenesWithoutVoice.length} طلبات صوت، وقد تُحتسب رسوم لكل مشهد.`,`I approve ${scenesWithoutVoice.length} voice requests; each scene may incur a charge.`)}</label>
+        {progress&&<div className="export-confirm" role="status" data-testid="batch-voice-progress">{queueing?tx(lang,`جارٍ إرسال الطلب ${progress.processed} من ${progress.total}…`,`Sending request ${progress.processed} of ${progress.total}…`):progress.queued?tx(lang,`أُرسل ${progress.queued} طلبات وتعذّر ${progress.failed}.`,`Queued ${progress.queued}; ${progress.failed} failed.`):tx(lang,'تعذّر إرسال الطلبات. تحقّق من مفتاح الصوت ومعرّف الصوت.','Requests could not be queued. Check the voice key and voice ID.')}</div>}
+        <div className="modal-actions"><button type="button" className="btn btn-quiet" onClick={close} disabled={queueing}>{tx(lang,'إلغاء','Cancel')}</button><button type="button" className="btn btn-primary" disabled={!activeKey||!voiceId.trim()||!approved||!scenesWithoutVoice.length||queueing||hasActiveJob} onClick={()=>void begin()} data-testid="button-submit-batch-voice">{queueing?<LoaderCircle size={15} className="animate-spin"/>:<Languages size={15}/ >}{queueing?tx(lang,'جارٍ إرسال الطلبات…','Queueing narration…'):tx(lang,'ابدأ توليد الصوت','Start voice generation')}</button></div>
       </div>
     </Modal>}
   </>;
