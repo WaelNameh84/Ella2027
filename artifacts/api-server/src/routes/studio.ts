@@ -1,6 +1,8 @@
 import { and, asc, count, desc, eq } from "drizzle-orm";
 import { Router, type IRouter, type Response } from "express";
 import { resolve } from "node:path";
+import { randomUUID } from "node:crypto";
+import { readFile, unlink } from "node:fs/promises";
 import {
   CreateProjectBody,
   CreateProjectResponse,
@@ -1095,6 +1097,7 @@ router.post("/projects/:projectId/export", async (req, res): Promise<void> => {
       project.musicUrl,
       project.musicVolume,
       parsed.data.format ?? "mp4",
+      parsed.data.codec ?? "h264",
     );
     const downloadUrl = `/api/projects/${project.id}/export/file`;
     await db.update(projectsTable).set({
@@ -1118,6 +1121,38 @@ router.post("/projects/:projectId/export", async (req, res): Promise<void> => {
   }
 });
 
+router.post("/projects/:projectId/preview", async (req, res): Promise<void> => {
+  const params = ExportProjectParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const userId = userIdOf(res);
+  const project = await projectForUser(params.data.projectId, userId);
+  if (!project) {
+    res.status(404).json({ error: "Project not found." });
+    return;
+  }
+  const scenes = await scenesForProject(project.id, userId);
+  if (!scenes.length || scenes.some((scene) => !scene.assetUrl || !["image", "video"].includes(scene.assetType ?? ""))) {
+    res.status(409).json({ error: "Add an image or video to every scene before previewing." });
+    return;
+  }
+  const previewId = `${project.id}-preview-${randomUUID()}`;
+  let previewPath: string | null = null;
+  try {
+    previewPath = await renderMp4(userId, project.id, scenes, 480, 24, project.aspectRatio, false, project.musicUrl, project.musicVolume, "mp4", "h264", previewId);
+    const bytes = await readFile(previewPath);
+    res.setHeader("Content-Type", "video/mp4");
+    res.setHeader("Content-Disposition", `inline; filename="ella-preview.mp4"`);
+    res.setHeader("Cache-Control", "no-store");
+    res.send(bytes);
+  } catch (error) {
+    res.status(422).json({ error: error instanceof Error ? error.message : "Preview rendering failed." });
+  } finally {
+    if (previewPath) await unlink(previewPath).catch(() => undefined);
+  }
+});
 router.get("/projects/:projectId/export/file", async (req, res): Promise<void> => {
   const params = ExportProjectParams.safeParse(req.params);
   if (!params.success) {

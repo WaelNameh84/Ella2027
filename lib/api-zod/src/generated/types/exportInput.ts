@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ExportInputFormat } from './exportInputFormat';
+export type ExportInputCodec = 'h264' | 'hevc';
 import type { ExportInputFps } from './exportInputFps';
 import type { ExportInputResolution } from './exportInputResolution';
 
@@ -14,4 +15,5 @@ export interface ExportInput {
   fps: ExportInputFps;
   includeSubtitles: boolean;
   format?: ExportInputFormat;
+  codec?: ExportInputCodec;
 }

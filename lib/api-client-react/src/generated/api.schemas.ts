@@ -497,6 +497,12 @@ export interface ScriptGenerationInput {
   providerKeyId?: string | null;
   allowRotation: boolean;
   approvePotentialCharges: boolean;
+  /** Number of scenes to create. */
+  sceneCount?: number;
+  /** Default duration for each scene, in seconds. */
+  sceneDurationSeconds?: number;
+  /** Visual direction applied to every scene. */
+  sceneStyle?: string;
 }
 
 export type SceneImageGenerationInputOutputs = typeof SceneImageGenerationInputOutputs[keyof typeof SceneImageGenerationInputOutputs];
@@ -879,12 +885,15 @@ export const ExportInputFormat = {
   mp4: 'mp4',
   webm: 'webm',
 } as const;
+export type ExportInputCodec = typeof ExportInputCodec[keyof typeof ExportInputCodec];
+export const ExportInputCodec = { h264: 'h264', hevc: 'hevc' } as const;
 
 export interface ExportInput {
   resolution: ExportInputResolution;
   fps: ExportInputFps;
   includeSubtitles: boolean;
   format?: ExportInputFormat;
+  codec?: ExportInputCodec;
 }
 
 export interface ExportResult {

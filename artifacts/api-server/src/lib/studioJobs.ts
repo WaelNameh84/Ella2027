@@ -42,11 +42,15 @@ type JobInput = {
   fps?: number;
   includeSubtitles?: boolean;
   format?: "mp4" | "webm";
+  codec?: "h264" | "hevc";
   sceneId?: string;
   model?: string;
   mode?: "text" | "image";
   outputs?: number;
   voiceId?: string;
+  sceneCount?: number;
+  sceneDurationSeconds?: number;
+  sceneStyle?: string;
 };
 
 function parseGeneratedJson(text: string): ScriptResult {
@@ -362,8 +366,12 @@ async function processScriptJob(job: typeof studioJobsTable.$inferSelect): Promi
       `Language: ${project.language}`,
       `Audience: ${project.audience}`,
       `Visual style: ${project.visualStyle}`,
+      `Requested scene count: ${input.sceneCount ?? 6} scenes`,
+      `Default duration for every scene: ${input.sceneDurationSeconds ?? 8} seconds`,
+      `Scene direction: ${input.sceneStyle ?? (project.visualStyle || "Cinematic")}`,
       `Target duration: ${project.durationSeconds} seconds`,
-      "Use 3 to 12 scenes. Create 1 to 8 recurring character profiles, and refer to them by their stable IDs. Keep each character's face, age, hair, body, costume, palette, and environment consistent across every scene. Make each image prompt include only the relevant character profile details, shot size, camera movement, lens feel, location, lighting, and composition. Write narration in the selected language and keep scene durations close to the target total.",
+      `Return exactly ${input.sceneCount ?? 6} scenes. Use approximately ${input.sceneDurationSeconds ?? 8} seconds for each scene unless the story requires a small adjustment.`,
+      "Use 1 to 24 scenes. Create 1 to 8 recurring character profiles, and refer to them by their stable IDs. Keep each character's face, age, hair, body, costume, palette, and environment consistent across every scene. Make each image prompt include only the relevant character profile details, shot size, camera movement, lens feel, location, lighting, and composition. Write narration in the selected language and keep scene durations close to the target total.",
     ].join("\n");
 
     let lastError = "All configured providers failed.";
@@ -756,6 +764,7 @@ async function processExportJob(job: typeof studioJobsTable.$inferSelect): Promi
     project.musicUrl,
     project.musicVolume,
     input.format ?? "mp4",
+    input.codec ?? "h264",
   );
   const downloadUrl = `/api/projects/${project.id}/export/file`;
   await db.transaction(async (tx) => {

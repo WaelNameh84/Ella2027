@@ -772,7 +772,10 @@ export const generateProjectScriptBodyAllowRotationDefault = true;
 export const GenerateProjectScriptBody = zod.object({
   "providerKeyId": zod.string().uuid().nullish(),
   "allowRotation": zod.boolean().default(generateProjectScriptBodyAllowRotationDefault),
-  "approvePotentialCharges": zod.boolean()
+  "approvePotentialCharges": zod.boolean(),
+  "sceneCount": zod.number().int().min(1).max(24).default(6),
+  "sceneDurationSeconds": zod.number().int().min(1).max(600).default(8),
+  "sceneStyle": zod.string().min(1).max(200).default("Cinematic")
 })
 
 export const generateProjectScriptResponseOneCharactersItemIdMax = 100;
@@ -874,7 +877,10 @@ export const queueProjectScriptBodyAllowRotationDefault = true;
 export const QueueProjectScriptBody = zod.object({
   "providerKeyId": zod.string().uuid().nullish(),
   "allowRotation": zod.boolean().default(queueProjectScriptBodyAllowRotationDefault),
-  "approvePotentialCharges": zod.boolean()
+  "approvePotentialCharges": zod.boolean(),
+  "sceneCount": zod.number().int().min(1).max(24).default(6),
+  "sceneDurationSeconds": zod.number().int().min(1).max(600).default(8),
+  "sceneStyle": zod.string().min(1).max(200).default("Cinematic")
 })
 
 export const queueProjectScriptResponseProgressMin = 0;
@@ -933,7 +939,8 @@ export const QueueProjectExportBody = zod.object({
   "resolution": zod.union([zod.literal(480),zod.literal(720),zod.literal(1080),zod.literal(2160)]),
   "fps": zod.union([zod.literal(24),zod.literal(25),zod.literal(30),zod.literal(60)]),
   "includeSubtitles": zod.boolean(),
-  "format": zod.enum(['mp4', 'webm']).optional()
+  "format": zod.enum(['mp4', 'webm']).optional(),
+  "codec": zod.enum(['h264', 'hevc']).optional()
 })
 
 export const queueProjectExportResponseProgressMin = 0;
@@ -1458,7 +1465,8 @@ export const ExportProjectBody = zod.object({
   "resolution": zod.union([zod.literal(480),zod.literal(720),zod.literal(1080),zod.literal(2160)]),
   "fps": zod.union([zod.literal(24),zod.literal(25),zod.literal(30),zod.literal(60)]),
   "includeSubtitles": zod.boolean(),
-  "format": zod.enum(['mp4', 'webm']).optional()
+  "format": zod.enum(['mp4', 'webm']).optional(),
+  "codec": zod.enum(['h264', 'hevc']).optional()
 })
 
 export const ExportProjectResponse = zod.object({

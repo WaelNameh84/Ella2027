@@ -81,12 +81,12 @@ async function safeAssetResponse(rawUrl: string): Promise<Response> {
   return new Response(bytes, { headers: { "content-type": response.headers.get("content-type") ?? "" } });
 }
 
-function runFfmpeg(args: string[]): Promise<void> {
+function runFfmpeg(args: string[], timeoutMs = 120_000): Promise<void> {
   return new Promise((resolvePromise, reject) => {
     const child = spawn("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", ...args], {
       stdio: "ignore",
     });
-    const timeout = setTimeout(() => child.kill("SIGKILL"), 120_000);
+    const timeout = setTimeout(() => child.kill("SIGKILL"), timeoutMs);
     child.once("error", (error) => {
       clearTimeout(timeout);
       reject(error);
@@ -97,6 +97,25 @@ function runFfmpeg(args: string[]): Promise<void> {
       else reject(new Error("FFmpeg could not render the selected scene assets."));
     });
   });
+}
+function hasAudioStream(path: string): Promise<boolean> {
+  return new Promise((resolvePromise) => {
+    const child = spawn("ffprobe", ["-v", "error", "-select_streams", "a:0", "-show_entries", "stream=index", "-of", "csv=p=0", path], { stdio: ["ignore", "pipe", "ignore"] });
+    let output = "";
+    child.stdout.on("data", (chunk) => { output += String(chunk); });
+    child.once("error", () => resolvePromise(false));
+    child.once("close", (code) => resolvePromise(code === 0 && output.trim().length > 0));
+  });
+}
+function videoEncodingArgs(format: "mp4" | "webm", resolution: number, codec: "h264" | "hevc" = "h264"): string[] {
+  if (format === "webm") {
+    return ["-c:v", "libvpx-vp9", "-crf", resolution >= 2160 ? "28" : "32", "-b:v", "0", "-row-mt", "1", "-cpu-used", resolution >= 2160 ? "3" : "5", "-c:a", "libopus", "-b:a", "192k"];
+  }
+  if (codec === "hevc") {
+    return ["-c:v", "libx265", "-preset", resolution >= 2160 ? "medium" : "fast", "-crf", resolution >= 2160 ? "28" : "27", "-tag:v", "hvc1", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k", "-ar", "48000", "-ac", "2", "-movflags", "+faststart"];
+  }
+  const bitrate = resolution >= 2160 ? ["-b:v", "35M", "-maxrate", "45M", "-bufsize", "70M"] : resolution >= 1080 ? ["-b:v", "12M", "-maxrate", "16M", "-bufsize", "24M"] : ["-b:v", "6M"];
+  return ["-c:v", "libx264", "-preset", resolution >= 2160 ? "medium" : "veryfast", "-pix_fmt", "yuv420p", ...bitrate, "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", "-movflags", "+faststart"];
 }
 
 function ffmpegFilter(width: number, height: number, fps: number): string {
@@ -143,6 +162,8 @@ export async function renderMp4(
   musicUrl: string | null = null,
   musicVolume = 0,
   format: "mp4" | "webm" = "mp4",
+  codec: "h264" | "hevc" = "h264",
+  outputProjectId = projectId,
 ): Promise<string> {
   if (!scenes.length) throw new Error("Add scenes before exporting.");
   if (scenes.some((scene) => !scene.assetUrl || !["image", "video"].includes(scene.assetType ?? ""))) {
@@ -156,6 +177,7 @@ export async function renderMp4(
     2160: [3840, 2160],
   };
   const baseDimensions = landscapeDimensions[resolution] ?? landscapeDimensions[720];
+  const renderTimeoutMs = resolution >= 2160 ? 300_000 : 120_000;
   const even = (value: number) => Math.max(2, Math.round(value / 2) * 2);
   const baseHeight = baseDimensions[1];
   const [width, height] = aspectRatio === "9:16"
@@ -174,7 +196,7 @@ export async function renderMp4(
   const userDir = resolve("generated-artifacts/ai-video-studio/exports", userId.replace(/[^a-zA-Z0-9_-]/g, "_"));
   await mkdir(workDir, { recursive: true });
   await mkdir(userDir, { recursive: true });
-  const finalPath = join(userDir, `${projectId}.${format}`);
+  const finalPath = join(userDir, `${outputProjectId}.${format}`);
   const concatenatedPath = join(workDir, "video-track.mp4");
   const segmentList: string[] = [];
   const sceneDurations: number[] = [];
@@ -191,6 +213,7 @@ export async function renderMp4(
       const sourcePath = join(workDir, `source-${index}.${extension}`);
       const segmentPath = join(workDir, `scene-${index}.mp4`);
       await writeFile(sourcePath, sourceBytes);
+      const sourceHasAudio = isVideo && await hasAudioStream(sourcePath);
       const clipStart = isVideo ? Math.max(0, scene.clipStartSeconds || 0) : 0;
       const clipRange = isVideo && scene.clipEndSeconds !== null
         ? Math.max(0, scene.clipEndSeconds - clipStart)
@@ -230,22 +253,21 @@ export async function renderMp4(
         ? ["-i", voicePath]
         : ["-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000"];
       const voiceVolume = Math.max(0, Math.min(2, (scene.voiceVolume ?? 100) / 100));
+      const audioFilter = sourceHasAudio && voicePath
+        ? `[0:a]volume=0.7,aresample=48000[source];[1:a]volume=${voiceVolume},aresample=48000[voice];[source][voice]amix=inputs=2:duration=longest:dropout_transition=2,apad,atrim=duration=${duration}[a]`
+        : sourceHasAudio
+          ? `[0:a]volume=1,aresample=48000,apad,atrim=duration=${duration}[a]`
+          : `[1:a]volume=${voiceVolume},aresample=48000,apad,atrim=duration=${duration}[a]`;
       await runFfmpeg([
         ...inputArgs,
         ...audioInput,
-       "-filter_complex", `[0:v]${videoFilter}[v];[1:a]volume=${voiceVolume},apad,atrim=duration=${duration}[a]`,
+        "-filter_complex", `[0:v]${videoFilter}[v];${audioFilter}`,
         "-map", "[v]",
         "-map", "[a]",
         "-t", String(duration),
-        "-c:v", "libx264",
-        "-preset", "veryfast",
-        "-pix_fmt", "yuv420p",
-        "-c:a", "aac",
-        "-ar", "48000",
-        "-ac", "2",
-        "-movflags", "+faststart",
+        ...videoEncodingArgs("mp4", resolution, codec),
         segmentPath,
-      ]);
+      ], renderTimeoutMs);
       segmentList.push(segmentPath);
     }
 
@@ -287,15 +309,9 @@ export async function renderMp4(
         "-map", `[${videoLabel}]`,
         "-map", `[${audioLabel}]`,
         "-t", String(renderedDuration),
-        "-c:v", "libx264",
-        "-preset", "veryfast",
-        "-pix_fmt", "yuv420p",
-        "-c:a", "aac",
-        "-ar", "48000",
-        "-ac", "2",
-        "-movflags", "+faststart",
+        ...videoEncodingArgs("mp4", resolution, codec),
         concatenatedPath,
-      ]);
+      ], renderTimeoutMs);
     } else {
       const concatFile = join(workDir, "concat.txt");
       await writeFile(
@@ -326,25 +342,17 @@ export async function renderMp4(
         "-map", "0:v:0",
         "-map", "[a]",
         "-t", String(renderedDuration),
-        ...(format === "webm"
-          ? ["-c:v", "libvpx-vp9", "-crf", "32", "-b:v", "0", "-row-mt", "1", "-cpu-used", "5", "-c:a", "libopus", "-b:a", "128k"]
-          : ["-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart"]),
+        ...videoEncodingArgs(format, resolution),
         finalPath,
-      ]);
+      ], renderTimeoutMs);
     } else {
       if (format === "webm") {
         await runFfmpeg([
           "-i", concatenatedPath,
           "-t", String(renderedDuration),
-          "-c:v", "libvpx-vp9",
-          "-crf", "32",
-          "-b:v", "0",
-          "-row-mt", "1",
-          "-cpu-used", "5",
-          "-c:a", "libopus",
-          "-b:a", "128k",
+          ...videoEncodingArgs("webm", resolution),
           finalPath,
-        ]);
+        ], renderTimeoutMs);
       } else {
         await writeFile(finalPath, await readFile(concatenatedPath));
       }
