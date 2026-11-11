@@ -128,7 +128,7 @@ function safeJobError(error: unknown): string {
 function supportsJob(provider: string, jobType: JobKind): boolean {
   if (jobType === "image") return ["openai", "stability", "replicate", "huggingface"].includes(provider);
   if (jobType === "video") return ["replicate", "fal"].includes(provider);
-  if (jobType === "voice") return ["elevenlabs", "openai", "openai-audio"].includes(provider);
+  if (jobType === "voice") return ["elevenlabs", "openai", "openai-audio", "google-tts", "azure-speech"].includes(provider);
   return false;
 }
 

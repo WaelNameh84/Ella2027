@@ -393,6 +393,44 @@ export async function generateNarration(
     return Buffer.from(await response.arrayBuffer());
   }
 
+  if (provider === "azure-speech") {
+    const region = process.env.AZURE_SPEECH_REGION || "eastus";
+    const language = process.env.AZURE_SPEECH_LANGUAGE || "en-US";
+    const voice = voiceId && voiceId.includes(":") ? voiceId : `${language}-JennyNeural`;
+    const ssml = `<speak version="1.0" xml:lang="${language}" xmlns="http://www.w3.org/2001/10/synthesis"><voice name="${voice}">${text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</voice></speak>`;
+    const response = await fetch(`https://${region}.tts.speech.microsoft.com/cognitiveservices/v1`, {
+      method: "POST",
+      headers: { "Ocp-Apim-Subscription-Key": key, "Content-Type": "application/ssml+xml", "X-Microsoft-OutputFormat": "audio-24khz-48kbitrate-mono-mp3" },
+      body: ssml, signal: AbortSignal.timeout(90_000), redirect: "error",
+    });
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (!response.ok) throw new ProviderCallError(`Azure Speech returned HTTP ${response.status}.`, response.status, bytes.toString("utf8").slice(0, 4000));
+    if (!bytes.length) throw new Error("Azure Speech returned no audio.");
+    return bytes;
+  }
+  if (provider === "google-tts") {
+    const languageCode = process.env.GOOGLE_TTS_LANGUAGE_CODE || "en-US";
+    const requestedVoice = voiceId && voiceId.includes("-") ? voiceId : `${languageCode}-Neural2-C`;
+    const response = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${encodeURIComponent(key)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        input: { text },
+        voice: { languageCode, name: requestedVoice },
+        audioConfig: { audioEncoding: "MP3" },
+      }),
+      signal: AbortSignal.timeout(90_000),
+      redirect: "error",
+    });
+    const body = await response.text();
+    let result: { audioContent?: string; error?: { message?: string } } = {};
+    try { result = JSON.parse(body) as typeof result; } catch { /* handled below */ }
+    if (!response.ok) {
+      throw new ProviderCallError(result.error?.message || `Google TTS returned HTTP ${response.status}.`, response.status, body.slice(0, 4000));
+    }
+    if (!result.audioContent) throw new Error("Google TTS returned no audio.");
+    return Buffer.from(result.audioContent, "base64");
+  }
   if (provider === "openai" || provider === "openai-audio") {
     const response = await providerResponse("https://api.openai.com/v1/audio/speech", key, {
       model: "gpt-4o-mini-tts",
@@ -411,7 +449,7 @@ export async function generateNarration(
     return bytes;
   }
 
-  throw new Error("Narration generation is currently supported for ElevenLabs and OpenAI Audio keys.");
+  throw new Error("Narration generation is currently supported for ElevenLabs, Google TTS, Azure Speech, and OpenAI Audio keys.");
 }
 
 export function isProviderCallError(error: unknown): error is ProviderCallError {

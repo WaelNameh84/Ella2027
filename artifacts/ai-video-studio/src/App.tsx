@@ -76,8 +76,8 @@ function providerSupports(provider: string, service: string) {
   if (service === 'text') return ['openai','gemini','anthropic','groq','openrouter','huggingface','mistral','cerebras','together','sambanova','deepseek','nvidia','cohere'].includes(provider);
   if (service === 'image') return ['openai','stability','replicate','huggingface'].includes(provider);
   if (service === 'video') return ['replicate','fal'].includes(provider);
-  if (service === 'voice') return ['elevenlabs','openai','openai-audio'].includes(provider);
-  if (service === 'transcription') return ['openai','whisper','huggingface'].includes(provider);
+  if (service === 'voice') return ['elevenlabs','openai','openai-audio','google-tts','azure-speech'].includes(provider);
+  if (service === 'transcription') return ['openai','whisper','huggingface','deepgram','assemblyai','google-speech','azure-speech'].includes(provider);
   if (service === 'media') return ['pexels','pixabay','unsplash'].includes(provider);
   return false;
 }
@@ -141,6 +141,21 @@ function providerServicePurpose(service: string, lang: Lang, provider = '') {
     return {
       label: tx(lang, 'كتابة السيناريو عبر Cohere', 'Script generation through Cohere'),
       description: tx(lang, 'مفتاح تجريبي مجاني محدود؛ الحدود الحالية يحددها Cohere.', 'Free trial key with usage limits set by Cohere.'),
+    };
+  }
+  if (service === 'voice' && provider === 'azure-speech') {
+    return { label: tx(lang, 'التعليق الصوتي عبر Azure Speech', 'Voice narration through Azure Speech'), description: tx(lang, 'ينشئ ملف MP3 عبر منطقة Azure المضبوطة على الخادم.', 'Creates MP3 narration through the Azure region configured on the server.') };
+  }
+  if (service === 'voice' && provider === 'google-tts') {
+    return {
+      label: tx(lang, 'التعليق الصوتي عبر Google Cloud TTS', 'Voice narration through Google Cloud TTS'),
+      description: tx(lang, 'ينشئ ملف MP3 من النص باستخدام مفتاح Google Cloud.', 'Creates an MP3 narration from text using a Google Cloud key.'),
+    };
+  }
+  if (service === 'transcription' && ['deepgram','assemblyai','google-speech','azure-speech'].includes(provider)) {
+    return {
+      label: tx(lang, `التفريغ عبر ${provider}`, `Transcription through ${provider}`),
+      description: tx(lang, 'يحوّل الملف الصوتي إلى نص. الترجمة المباشرة إلى الإنجليزية تحتاج Whisper.', 'Converts audio to text. Direct translation to English still requires Whisper.'),
     };
   }
   if (service === 'video' && provider === 'fal') {
