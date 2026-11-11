@@ -87,3 +87,6 @@
 
 ## تحديث تكاملات 2026-11-11
 أُضيفت مسارات فعلية للتعليق الصوتي عبر Google Cloud Text-to-Speech، وللتفريغ عبر Deepgram وAssemblyAI وGoogle Speech-to-Text. تبقى الترجمة الصوتية المباشرة في هذه المزوّدات غير مفعّلة؛ تستخدم الترجمة OpenAI Whisper كما كان سابقًا. لم تُوصل بعد محركات التشغيل المحلي Ollama/Piper/Whisper.cpp/ComfyUI أو MusicGen وRunway، لأنها تحتاج إعدادات تشغيل أو نقاط نهاية إضافية غير ممثلة في مفتاح API واحد. Azure Speech أصبح موصولًا مع إعداد المنطقة عبر `AZURE_SPEECH_REGION`، وقيمته الافتراضية `eastus`.
+
+## تحديث نماذج الفيديو المحلية
+أُضيفت Wan 2.2 وCogVideoX وLTX-Video وHunyuanVideo 1.5 إلى قائمة المزوّدات كخيارات Local GPU. هذه الخيارات تحفظ اختيار النموذج وتحتاج Local Video Worker متصلًا قبل أن تصبح قابلة للتوليد الفعلي.
