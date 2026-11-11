@@ -391,7 +391,7 @@ const projectTemplates = [
   { id: 'documentary', ar: 'وثائقي', en: 'Documentary', videoType: 'documentary', durationSeconds: 300, aspectRatio: '16:9', visualStyle: 'Grounded documentary', audience: 'General audience' },
   { id: 'presentation', ar: 'عرض تقديمي', en: 'Presentation', videoType: 'presentation', durationSeconds: 120, aspectRatio: '16:9', visualStyle: 'Readable, professional slides', audience: 'Meeting attendees' },
 ] as const;
-function buildFreeTemplateScenes(templateId:string,idea:string,lang:Lang,visualStyle:string,durationSeconds:number) {
+function buildFreeTemplateScenes(templateId:string,idea:string,lang:Lang,visualStyle:string,sceneCount:number,sceneDurationSeconds:number) {
   const ar=lang==='ar';
   const beats=ar?[
     ['الافتتاح','قدّم المكان أو اللحظة التي تبدأ منها الفكرة.','لقطة تأسيسية واسعة تُظهر عالم القصة وتفاصيله.','كل حكاية تبدأ من تفصيل صغير يستحق أن ننتبه له.'],
@@ -407,58 +407,84 @@ function buildFreeTemplateScenes(templateId:string,idea:string,lang:Lang,visualS
     ['Resolution','End on an image or idea that stays with the viewer.','Balanced closing shot with calm negative space.','And the idea leaves an impression after the story ends.'],
   ];
   const template=projectTemplates.find(item=>item.id===templateId);
-  const base=Math.floor(durationSeconds/5),extra=durationSeconds%5;
-  return beats.map((beat,index)=>({
-    title:beat[0], description:`${beat[1]} ${ar?'فكرة المشروع':'Project idea'}: ${idea.trim()}`,
-    imagePrompt:`${visualStyle||template?.visualStyle||'Cinematic'}; ${beat[2]} ${ar?'من دون نص مكتوب داخل الصورة.':'No text or lettering in the image.'} ${idea.trim()}`,
-    narration:beat[3], durationSeconds:Math.max(1,base+(index<extra?1:0)),
-  }));
+  return Array.from({length:sceneCount},(_,index)=>{
+    const beat=beats[index%beats.length];
+    const repeat=index>=beats.length?` ${Math.floor(index/beats.length)+1}`:'';
+    return {
+      title:`${beat[0]}${repeat}`, description:`${beat[1]} ${ar?'فكرة المشروع':'Project idea'}: ${idea.trim()}`,
+      imagePrompt:`${visualStyle||template?.visualStyle||'Cinematic'}; ${beat[2]} ${ar?'من دون نص مكتوب داخل الصورة.':'No text or lettering in the image.'} ${idea.trim()}`,
+      narration:beat[3], durationSeconds:sceneDurationSeconds,
+    };
+  });
 }
-function ProjectForm({ onClose, initial, onSave, pending, freeMode = true, textProviderReady = false, checkingProvider = false, generationError = false, projectCreated = false, onOpenCreated }: { onClose: () => void; initial?: Partial<ProjectInput>; onSave: (data: ProjectInput, approvePotentialCharges?: boolean, templateId?: string, mode?: 'auto' | 'manual') => void; pending: boolean; freeMode?: boolean; textProviderReady?: boolean; checkingProvider?: boolean; generationError?: boolean; projectCreated?: boolean; onOpenCreated?: () => void }) {
+function ProjectForm({ onClose, initial, onSave, pending, freeMode = true, textProviderReady = false, checkingProvider = false, generationError = false, projectCreated = false, onOpenCreated }: { onClose: () => void; initial?: Partial<ProjectInput>; onSave: (data: ProjectInput, approvePotentialCharges?: boolean, templateId?: string, mode?: 'auto' | 'manual', sceneCount?: number, sceneDurationSeconds?: number, allowExternalProviders?: boolean) => void | Promise<void>; pending: boolean; freeMode?: boolean; textProviderReady?: boolean; checkingProvider?: boolean; generationError?: boolean; projectCreated?: boolean; onOpenCreated?: () => void }) {
   const { lang } = useApp();
   const [form, setForm] = useState<ProjectInput>({ ...blankProject, ...initial });
   const [template, setTemplate] = useState('');
   const [mode, setMode] = useState<'auto' | 'manual'>('auto');
   const [customLanguage, setCustomLanguage] = useState('');
   const [approvePotentialCharges, setApprovePotentialCharges] = useState(false);
+  const [sceneCount, setSceneCount] = useState(5);
+  const [sceneDurationSeconds, setSceneDurationSeconds] = useState(8);
+  const [allowExternalProviders, setAllowExternalProviders] = useState(!freeMode);
+  const [submitError, setSubmitError] = useState('');
   const selectedTemplate = projectTemplates.find(item => item.id === template);
   const editing = Boolean(initial);
   const update = (key: keyof ProjectInput, val: string | number) => setForm(old => ({ ...old, [key]: val }));
-  const submit = () => {
+  useEffect(() => setAllowExternalProviders(!freeMode), [freeMode]);
+  const submit = async () => {
     const idea = form.idea.trim();
     const firstLine = idea.split(/\r?\n/, 1)[0]?.trim() || idea;
     const firstSentence = firstLine.split(/[.!؟?]/, 1)[0]?.trim() || firstLine;
     const title = firstSentence.length > 72 ? `${firstSentence.slice(0, 71).trimEnd()}…` : firstSentence;
-    onSave(editing ? { ...form, title: form.title.trim(), idea } : {
+    const payload = editing ? { ...form, title: form.title.trim(), idea } : {
       ...form,
       title,
       idea,
-      videoType: selectedTemplate?.videoType ?? 'story',
+      videoType: form.videoType,
       language: lang === 'ar' ? 'ar' : 'en',
-      durationSeconds: selectedTemplate?.durationSeconds ?? 60,
+      durationSeconds: mode === 'auto' ? sceneCount * sceneDurationSeconds : form.durationSeconds,
       audience: selectedTemplate ? (lang === 'ar' ? 'الجمهور العام' : selectedTemplate.audience) : (lang === 'ar' ? 'الجمهور العام' : 'General audience'),
       visualStyle: selectedTemplate?.visualStyle ?? (lang === 'ar' ? 'سينمائي' : 'Cinematic'),
       aspectRatio: selectedTemplate?.aspectRatio ?? '16:9',
-    }, !editing && !selectedTemplate && approvePotentialCharges, !editing ? selectedTemplate?.id : undefined, mode);
+    };
+    try {
+      const useTextProvider = !editing && mode === 'auto' && !selectedTemplate && allowExternalProviders && textProviderReady;
+      await onSave(payload, useTextProvider && approvePotentialCharges, !editing ? selectedTemplate?.id : undefined, mode, sceneCount, sceneDurationSeconds, !editing && mode === 'auto' ? allowExternalProviders : undefined);
+      setSubmitError('');
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : tx(lang, 'تعذر حفظ إعدادات المشروع.', 'Could not save project settings.'));
+    }
   };
-  const canSubmit = editing || (Boolean(form.idea.trim()) && (mode === 'manual' || Boolean(selectedTemplate) || (!freeMode && textProviderReady && approvePotentialCharges)));
+  const useTextProvider = !editing && mode === 'auto' && !selectedTemplate && allowExternalProviders && textProviderReady;
+  const totalDurationSeconds = sceneCount * sceneDurationSeconds;
+  const minSceneDuration = Math.ceil(5 / sceneCount);
+  const maxSceneDuration = Math.floor(3600 / sceneCount);
+  const canSubmit = editing || (Boolean(form.idea.trim()) && (mode === 'manual' || !useTextProvider || approvePotentialCharges));
   return <Modal onClose={onClose} title={editing ? tx(lang,'تعديل تفاصيل المشروع','Edit project details') : tx(lang, 'فكرتك إلى قصة', 'Turn your idea into a story')} subtitle={editing ? tx(lang, 'عدّل تفاصيل المشروع ومشاهده.', 'Update the project details.') : tx(lang, 'اكتب فكرة قصيرة، وسنؤلف منها القصة والمشاهد.', 'Write a short idea and we’ll turn it into a story and scenes.')}>
-    <form onSubmit={e => { e.preventDefault(); submit(); }} className="form-stack">
+    <form onSubmit={e => { e.preventDefault(); void submit(); }} className="form-stack">
       {!editing ? <>
         <div className="workflow-mode-grid" role="radiogroup" aria-label={tx(lang,'طريقة إنشاء الفيديو','Video creation mode')}>
           <button type="button" className={`workflow-mode-card ${mode === 'auto' ? 'is-selected' : ''}`} onClick={() => setMode('auto')} role="radio" aria-checked={mode === 'auto'}>
-            <WandSparkles size={19}/><strong>{tx(lang,'تلقائي','Automatic')}</strong><span>{tx(lang,'أعطيه فكرة قصيرة، فيؤلف القصة ويجهز المشاهد والصوت والترجمة والتصدير.','Give it a short idea and it builds the story, scenes, voice, subtitles, and export.')}</span>
+            <WandSparkles size={19}/><strong>{tx(lang,'تلقائي','Automatic')}</strong><span>{tx(lang,'أدخل الفكرة ونوع الفيديو وعدد المشاهد ومدتها؛ ينشئ Storyboard تلقائيًا. توليد الفيديو يحتاج مفتاح مزوّد وموافقة منفصلة.','Enter the idea, format, scene count, and timing; it creates a storyboard automatically. Video generation needs a provider key and separate approval.')}</span>
           </button>
           <button type="button" className={`workflow-mode-card ${mode === 'manual' ? 'is-selected' : ''}`} onClick={() => setMode('manual')} role="radio" aria-checked={mode === 'manual'}>
             <Settings2 size={19}/><strong>{tx(lang,'يدوي','Manual')}</strong><span>{tx(lang,'أنشئ المشروع ثم أضف النصوص والوسائط وعدّل كل مشهد بنفسك.','Create the project, then add text, media, and edit every scene yourself.')}</span>
           </button>
         </div>
         {mode === 'manual' && <div className="service-purpose-hint"><b>{tx(lang,'تحكم كامل','Full control')}</b><span>{tx(lang,'سيُفتح المشروع مباشرة بدون تأليف أو توليد تلقائي. يمكنك إضافة المشاهد والنصوص والوسائط يدويًا.','The project opens without automatic writing or generation. Add scenes, text, and media yourself.')}</span></div>}
-        {mode === 'auto' && <label><span className="field-label">{tx(lang,'ابدأ بقالب مجاني (اختياري)','Start with a free template (optional)')}</span><select className="studio-input" value={template} onChange={e=>{const id=e.target.value;setTemplate(id);const preset=projectTemplates.find(item=>item.id===id);if(preset)setForm(old=>({...old,videoType:preset.videoType,durationSeconds:preset.durationSeconds,aspectRatio:preset.aspectRatio,visualStyle:preset.visualStyle,audience:lang==='ar'?'الجمهور العام':preset.audience}));}}><option value="">{tx(lang,'اختر قالبًا أو استخدم الكتابة بالذكاء الاصطناعي','Choose a template or use AI writing')}</option>{projectTemplates.map(item=><option key={item.id} value={item.id}>{tx(lang,item.ar,item.en)}</option>)}</select></label>}
-        {mode === 'auto' && freeMode && !selectedTemplate && <div className="service-purpose-hint is-unavailable"><b>{tx(lang,'وضع صفر المصاريف مفعّل','Zero-spend mode is on')}</b><span>{tx(lang,'اختر قالبًا جاهزًا لإنشاء المشاهد دون أي طلب إلى مزوّد خارجي.','Choose a built-in template to create scenes without calling an external provider.')}</span></div>}
-        {mode === 'auto' && selectedTemplate && <div className="service-purpose-hint"><b>{tx(lang,'قالب محلي مجاني','Free local storyboard')}</b><span>{tx(lang,'سيُنشئ خمس مشاهد قابلة للتعديل محليًا. أضف صورك أو استخدم مصادر الوسائط العامة.','Creates five editable scenes locally. Add your own images or use public media sources.')}</span></div>}
+        {mode === 'auto' && <label><span className="field-label">{tx(lang,'ابدأ بقالب مجاني (اختياري)','Start with a free template (optional)')}</span><select className="studio-input" value={template} disabled={projectCreated} onChange={e=>{const id=e.target.value;setTemplate(id);const preset=projectTemplates.find(item=>item.id===id);if(preset){setSceneCount(5);setSceneDurationSeconds(Math.max(1,Math.round(preset.durationSeconds/5)));setForm(old=>({...old,videoType:preset.videoType,aspectRatio:preset.aspectRatio,visualStyle:preset.visualStyle,audience:lang==='ar'?'الجمهور العام':preset.audience}));}}}><option value="">{tx(lang,'بدون قالب — اكتب فكرتك فقط','No template — just describe your idea')}</option>{projectTemplates.map(item=><option key={item.id} value={item.id}>{tx(lang,item.ar,item.en)}</option>)}</select></label>}
         <label><span className="field-label">{tx(lang,'فكرتك','Your idea')}</span><textarea required maxLength={1500} rows={5} className="studio-input resize-y" value={form.idea} onChange={e => update('idea',e.target.value)} placeholder={tx(lang,'مثال: طفل يجد رسالة قديمة تقوده إلى سرّ في قريته…','Example: A child finds an old letter that leads to a secret in their village…')} data-testid="input-project-idea" disabled={projectCreated} autoFocus /></label>
-        {mode === 'auto' && !selectedTemplate && !freeMode && (checkingProvider ? <Busy text={tx(lang,'جارٍ التحقق من مفتاح الكتابة…','Checking your writing key…')} /> : !textProviderReady ? <div className="service-purpose-hint is-unavailable"><b>{tx(lang,'لا يوجد مفتاح كتابة جاهز','No text-generation key is ready')}</b><span>{tx(lang,'أضف مفتاحًا مفعّلًا لمزوّد نص، ثم ارجع لبدء القصة.','Enable a text provider key, then return to start the story.')}</span><Link href="/settings/providers" className="text-link">{tx(lang,'إعداد مفاتيح الخدمات','Set up provider keys')}<ArrowLeft size={14}/></Link></div> : <label className="checkline charge-consent"><input type="checkbox" checked={approvePotentialCharges} disabled={projectCreated} onChange={e=>setApprovePotentialCharges(e.target.checked)} data-testid="checkbox-story-charge-consent"/>{tx(lang,'أوافق على إرسال الفكرة لمزوّد النص؛ قد تُحتسب رسوم حسب خطتي.','I agree to send this idea to my text provider; charges may apply.')}</label>)}
+        {mode === 'auto' && <>
+          <div className="form-two"><label><span className="field-label">{tx(lang,'نوع الفيديو','Video type')}</span><select className="studio-input" value={form.videoType} disabled={projectCreated} onChange={e=>update('videoType',e.target.value)}>{videoTypes.map(([value,ar,en])=><option key={value} value={value}>{tx(lang,ar,en)}</option>)}</select></label><label><span className="field-label">{tx(lang,'عدد المشاهد','Number of scenes')}</span><input type="number" min="1" max="24" step="1" className="studio-input" value={sceneCount} disabled={projectCreated} onChange={e=>{const next=Math.max(1,Math.min(24,Number(e.target.value)||1));setSceneCount(next);setSceneDurationSeconds(value=>Math.min(Math.floor(3600/next),Math.max(Math.ceil(5/next),value)));}} data-testid="input-scene-count" /></label></div>
+          <div className="form-two"><label><span className="field-label">{tx(lang,'مدة كل مشهد بالثواني','Seconds per scene')}</span><input type="number" min={minSceneDuration} max={maxSceneDuration} step="1" className="studio-input" value={sceneDurationSeconds} disabled={projectCreated} onChange={e=>setSceneDurationSeconds(Math.max(minSceneDuration,Math.min(maxSceneDuration,Number(e.target.value)||minSceneDuration)))} data-testid="input-scene-duration" /></label><div className="service-purpose-hint"><b>{tx(lang,'المدة الإجمالية المحسوبة','Calculated total duration')}</b><span>{tx(lang,`${totalDurationSeconds} ثانية (${sceneCount} × ${sceneDurationSeconds})`,`${totalDurationSeconds} seconds (${sceneCount} × ${sceneDurationSeconds})`)}</span></div></div>
+          <label className="rotation-row"><span><b>{tx(lang,'السماح بالمزوّدات الخارجية (قد تكون مدفوعة)','Allow external providers (may cost)')}</b><small>{tx(lang,'عند تشغيله يمكن استخدام مفاتيحك للنص والفيديو. سيطلب التطبيق موافقتك قبل إرسال كل طلب قد يكلّف.','When enabled, your text/video provider keys can be used. The app still asks before each request that may incur a charge.')}</small></span><input type="checkbox" checked={allowExternalProviders} disabled={pending||projectCreated} onChange={e=>setAllowExternalProviders(e.target.checked)} data-testid="checkbox-allow-external-providers" /></label>
+          {selectedTemplate && <div className="service-purpose-hint"><b>{tx(lang,'Storyboard محلي','Local storyboard')}</b><span>{tx(lang,`سيُنشئ ${sceneCount} مشاهد قابلة للتعديل بمدة ${sceneDurationSeconds} ثوانٍ لكل مشهد، دون اتصال بمزوّد. أضف الصور أو ولّد الفيديو لاحقًا بعد إعداد المفاتيح.`,`Creates ${sceneCount} editable scenes at ${sceneDurationSeconds} seconds each without a provider call. Add images or generate videos later after setting up keys.`)}</span></div>}
+          {!selectedTemplate && !useTextProvider && <div className="service-purpose-hint"><b>{tx(lang,'إنشاء تلقائي محلي','Automatic local storyboard')}</b><span>{tx(lang,'سيحوّل التطبيق فكرتك إلى مشاهد قابلة للتعديل دون طلب خارجي. هذا Storyboard أولي وليس فيديو AI مولّدًا. أضف مفتاح الكتابة لاحقًا لتأليف أذكى.','The app will turn your idea into editable scenes without an external request. This is a starter storyboard, not an AI-generated video. Add a text key later for AI writing.')}</span></div>}
+          {allowExternalProviders && !selectedTemplate && checkingProvider && <Busy text={tx(lang,'جارٍ التحقق من مفتاح الكتابة…','Checking your writing key…')} />}
+          {allowExternalProviders && !selectedTemplate && !checkingProvider && !textProviderReady && <div className="service-purpose-hint is-unavailable"><b>{tx(lang,'لا يوجد مفتاح كتابة جاهز بعد','No text-generation key is ready yet')}</b><span>{tx(lang,'يمكنك إنشاء Storyboard محلي الآن، أو إضافة مفتاح نص من الإعدادات لاحقًا.','You can create a local storyboard now, or add a text provider key in Settings later.')}</span><Link href="/settings/providers" className="text-link">{tx(lang,'إعداد مفاتيح الخدمات','Set up provider keys')}<ArrowLeft size={14}/></Link></div>}
+          {useTextProvider && <label className="checkline charge-consent"><input type="checkbox" checked={approvePotentialCharges} disabled={projectCreated} onChange={e=>setApprovePotentialCharges(e.target.checked)} data-testid="checkbox-story-charge-consent"/>{tx(lang,'أوافق على إرسال الفكرة لمزوّد النص؛ قد تُحتسب رسوم حسب خطتي.','I approve sending this idea to my text provider; charges may apply.')}</label>}
+        </>}
         {generationError && <div className="inline-error" role="alert">{tx(lang,'تم حفظ الفكرة، لكن تعذّر بدء تأليف القصة. أعد المحاولة أو افتح المشروع.','Your idea was saved, but story generation could not start. Retry or open the project.')}{onOpenCreated && <button type="button" className="text-link mt-2" onClick={onOpenCreated}>{tx(lang,'فتح المشروع','Open project')}<ArrowLeft size={14}/></button>}</div>}
       </> : <>
         <label><span className="field-label">{tx(lang,'عنوان المشروع','Project title')}</span><input required maxLength={160} className="studio-input" value={form.title} onChange={e => update('title',e.target.value)} placeholder={tx(lang,'مثال: ذاكرة البحر','e.g. Memory of the sea')} data-testid="input-project-title" /></label>
@@ -468,7 +494,8 @@ function ProjectForm({ onClose, initial, onSave, pending, freeMode = true, textP
         <div className="form-two"><label><span className="field-label">{tx(lang,'المدة بالثواني','Duration in seconds')}</span><input type="number" min="5" max="3600" className="studio-input" value={form.durationSeconds} onChange={e => update('durationSeconds',Number(e.target.value))} /></label><label><span className="field-label">{tx(lang,'نسبة الأبعاد','Aspect ratio')}</span><select className="studio-input" value={form.aspectRatio} onChange={e => update('aspectRatio',e.target.value)}><option>16:9</option><option>9:16</option><option>1:1</option><option>4:5</option><option>4:3</option><option>3:2</option></select></label></div>
         <div className="form-two"><label><span className="field-label">{tx(lang,'الجمهور','Audience')}</span><input className="studio-input" value={form.audience} onChange={e => update('audience',e.target.value)} /></label><label><span className="field-label">{tx(lang,'الأسلوب البصري','Visual style')}</span><select className="studio-input" value={visualStyles.some(([value])=>value===form.visualStyle)?form.visualStyle:'custom'} onChange={e=>{if(e.target.value!=='custom')update('visualStyle',e.target.value);else if(visualStyles.some(([value])=>value===form.visualStyle))update('visualStyle','');}}><option value="custom">{tx(lang,'أسلوب مخصص','Custom style')}</option>{visualStyles.map(([value,ar])=><option key={value} value={value}>{lang==='ar'?ar:value}</option>)}</select>{!visualStyles.some(([value])=>value===form.visualStyle)&&<input className="studio-input mt-2" value={form.visualStyle} onChange={e=>update('visualStyle',e.target.value)} placeholder={tx(lang,'اكتب أسلوبك الخاص','Describe your own style')} />}</label></div>
       </>}
-      <div className="modal-actions"><button type="button" className="btn btn-quiet" onClick={onClose}>{tx(lang,'إلغاء','Cancel')}</button><button disabled={pending || !canSubmit} className="btn btn-primary" data-testid="button-create-project">{pending ? <LoaderCircle className="animate-spin" size={16}/> : editing ? <Check size={16}/> : <WandSparkles size={16}/ >}{editing ? tx(lang,'حفظ التعديلات','Save changes') : pending ? projectCreated ? tx(lang,'جارٍ بدء كتابة القصة…','Starting story generation…') : tx(lang,'جارٍ إنشاء المشروع…','Creating project…') : selectedTemplate ? tx(lang,'إنشاء مشاهد القالب','Create template scenes') : generationError ? tx(lang,'إعادة محاولة التأليف','Retry story generation') : tx(lang,'اكتب القصة','Write the story')}</button></div>
+      {submitError && <p className="inline-error" role="alert">{submitError}</p>}
+      <div className="modal-actions"><button type="button" className="btn btn-quiet" onClick={onClose}>{tx(lang,'إلغاء','Cancel')}</button><button disabled={pending || !canSubmit} className="btn btn-primary" data-testid="button-create-project">{pending ? <LoaderCircle className="animate-spin" size={16}/> : editing ? <Check size={16}/> : <WandSparkles size={16}/ >}{editing ? tx(lang,'حفظ التعديلات','Save changes') : pending ? projectCreated ? tx(lang,'جارٍ بدء كتابة القصة…','Starting story generation…') : tx(lang,'جارٍ إنشاء المشروع…','Creating project…') : useTextProvider ? generationError ? tx(lang,'إعادة محاولة التأليف','Retry story generation') : tx(lang,'اكتب القصة','Write the story') : tx(lang,'أنشئ المشاهد تلقائيًا','Create scenes automatically')}</button></div>
     </form>
   </Modal>;
 }
@@ -482,6 +509,7 @@ function Projects() {
   const q = useListProjects();
   const keysQuery = useListProviderKeys();
   const settingsQuery = useGetProviderSettings();
+  const updateProviderSettings = useUpdateProviderSettings();
   const qc = useQueryClient();
   const create = useCreateProject();
   const createScene = useCreateScene();
@@ -578,7 +606,7 @@ function Projects() {
       setBackupImporting(false);
     }
   };
-  const startStory = (projectId: string) => generate.mutate({ projectId, data: { providerKeyId: null, allowRotation: true, approvePotentialCharges: true } }, {
+  const startStory = (projectId: string, sceneCount: number, sceneDurationSeconds: number, sceneStyle: string) => generate.mutate({ projectId, data: { providerKeyId: null, allowRotation: true, approvePotentialCharges: true, sceneCount, sceneDurationSeconds, sceneStyle } }, {
     onSuccess: () => {
       afterChange();
       setOpen(false);
@@ -586,43 +614,48 @@ function Projects() {
       setLocation(`/projects/${projectId}`);
     },
   });
-  const saveProjectAndWriteStory = (data: ProjectInput, approvePotentialCharges = false, templateId?: string, mode: 'auto' | 'manual' = 'auto') => {
+  const saveProjectAndWriteStory = async (data: ProjectInput, approvePotentialCharges = false, templateId?: string, mode: 'auto' | 'manual' = 'auto', sceneCount = 5, sceneDurationSeconds = 8, allowExternalProviders?: boolean) => {
     if (createdProjectId) {
-      startStory(createdProjectId);
+      if (!approvePotentialCharges || allowExternalProviders !== true) throw new Error(tx(lang, 'أكّد السماح بالمزوّدات والموافقة على الرسوم المحتملة قبل إعادة المحاولة.', 'Confirm external providers and possible charges before retrying.'));
+      startStory(createdProjectId, sceneCount, sceneDurationSeconds, data.visualStyle || 'Cinematic');
       return;
     }
-    create.mutate({ data }, { onSuccess: project => {
-      afterChange();
-      if (mode === 'auto') window.localStorage.setItem(`ella:auto:${project.id}`, 'pending');
-      if (templateId) {
-        const seeds = buildFreeTemplateScenes(templateId, data.idea, lang, data.visualStyle, data.durationSeconds);
-        void (async () => {
-          try {
-            for (const [index, seed] of seeds.entries()) await createScene.mutateAsync({ projectId: project.id, data: { ...seed, sortOrder: index } });
-            afterChange();
-            setOpen(false);
-            setLocation(`/projects/${project.id}`);
-          } catch {
-            setOpen(false);
-            setLocation(`/projects/${project.id}`);
-          }
-        })();
-        return;
+    if (mode === 'auto' && allowExternalProviders !== undefined) {
+      if (!settingsQuery.data) throw new Error(tx(lang, 'تعذر تحميل إعدادات المزوّدات. أعد المحاولة بعد لحظة.', 'Provider settings are not ready. Please try again in a moment.'));
+      if (settingsQuery.data.freeMode !== !allowExternalProviders) {
+        const saved = await updateProviderSettings.mutateAsync({ data: { ...settingsQuery.data, freeMode: !allowExternalProviders } });
+        qc.setQueryData(getGetProviderSettingsQueryKey(), saved);
       }
-      if (mode === 'manual') {
-        setOpen(false);
-        setLocation(`/projects/${project.id}`);
-        return;
-      }
+    }
+    const project = await create.mutateAsync({ data });
+    afterChange();
+    if (mode === 'manual') {
+      setOpen(false);
+      setLocation(`/projects/${project.id}`);
+      return;
+    }
+    const useTextProvider = !templateId && allowExternalProviders === true && textProviderReady && approvePotentialCharges;
+    if (useTextProvider) {
       setCreatedProjectId(project.id);
-      if (approvePotentialCharges) startStory(project.id);
-    } });
+      startStory(project.id, sceneCount, sceneDurationSeconds, data.visualStyle || 'Cinematic');
+      return;
+    }
+    const seeds = buildFreeTemplateScenes(templateId ?? '', data.idea, lang, data.visualStyle, sceneCount, sceneDurationSeconds);
+    try {
+      for (const [index, seed] of seeds.entries()) await createScene.mutateAsync({ projectId: project.id, data: { ...seed, sortOrder: index } });
+      afterChange();
+      setOpen(false);
+      setLocation(`/projects/${project.id}`);
+    } catch {
+      setOpen(false);
+      setLocation(`/projects/${project.id}`);
+    }
   };
   return <AppFrame title={tx(lang,'المشاريع','Projects')}><div className="page-toolbar"><div><span className="eyebrow">{tx(lang,'أرشيف الإنتاج','PRODUCTION ARCHIVE')}</span><h2>{tx(lang,'كل القصص التي بدأت.', 'Every story you started.')}</h2><p>{tx(lang,'مشاريعك وسيناريوهاتك محفوظة في مكان واحد.', 'Your projects and storyboards, kept in one place.')}</p></div><div className="flex flex-wrap gap-2"><input ref={importFileRef} className="sr-only" type="file" accept="application/json,.json" onChange={event=>{const file=event.target.files?.[0];event.target.value='';if(file)void importBackupFile(file)}}/><button onClick={()=>importFileRef.current?.click()} className="btn btn-quiet" disabled={backupImporting} data-testid="button-import-project-backup">{backupImporting?<LoaderCircle size={16} className="animate-spin"/>:<FileUp size={16}/ >}{tx(lang,'استيراد JSON','Import JSON')}</button><button onClick={() => setOpen(true)} className="btn btn-primary" data-testid="button-new-project"><Plus size={17}/>{tx(lang,'مشروع جديد','New project')}</button></div></div>
     {backupProgress&&<p className="save-state mt-2" role="status">{backupProgress}</p>}
     <div className="list-controls"><label className="searchbox"><Search size={17}/><input value={search} onChange={e => setSearch(e.target.value)} placeholder={tx(lang,'ابحث في مشاريعك','Search projects')} data-testid="input-project-search" /></label><span className="result-count">{q.data?.length ?? '—'} {tx(lang,'مشروع','projects')}</span></div>
     {q.isLoading ? <div className="project-grid">{[1,2,3].map(n=><SkeletonBlock key={n} className="h-52" />)}</div> : q.isError ? <StateError lang={lang} retry={() => q.refetch()} /> : list.length ? <div className="project-grid">{list.map(p=><ProjectCard key={p.id} project={p} onExport={exportBackup} exporting={backupExportingId===p.id} onDelete={id => { if (window.confirm(tx(lang,'هل تريد حذف المشروع وكل مشاهده؟','Delete this project and all its scenes?'))) remove.mutate({projectId:id},{onSuccess:()=>{afterChange();qc.invalidateQueries({queryKey:getGetProjectQueryKey(id)});}}); }} />)}</div> : <Empty title={search ? tx(lang,'لا توجد مطابقة','No matching projects') : tx(lang,'ابدأ بمشهد أول','Start with a first frame')} body={search ? tx(lang,'جرّب كلمات بحث أخرى.','Try another search term.') : tx(lang,'أنشئ مشروعًا ليصبح لديك مكان لصياغة الفكرة وبناء المشاهد.','Create a project to shape the idea and build your scenes.')} action={!search && <button className="btn btn-primary" onClick={() => setOpen(true)}><Plus size={16}/>{tx(lang,'إنشاء أول مشروع','Create your first project')}</button>} />}
-    {open && <ProjectForm onClose={() => { setOpen(false); setCreatedProjectId(null); }} pending={create.isPending || generate.isPending || createScene.isPending} freeMode={freeMode} textProviderReady={textProviderReady} checkingProvider={keysQuery.isLoading} generationError={generate.isError && Boolean(createdProjectId)} projectCreated={Boolean(createdProjectId)} onOpenCreated={createdProjectId ? () => { setOpen(false); setCreatedProjectId(null); setLocation(`/projects/${createdProjectId}`); } : undefined} onSave={saveProjectAndWriteStory} />}
+    {open && <ProjectForm onClose={() => { setOpen(false); setCreatedProjectId(null); }} pending={create.isPending || generate.isPending || createScene.isPending || updateProviderSettings.isPending} freeMode={freeMode} textProviderReady={textProviderReady} checkingProvider={keysQuery.isLoading} generationError={generate.isError && Boolean(createdProjectId)} projectCreated={Boolean(createdProjectId)} onOpenCreated={createdProjectId ? () => { setOpen(false); setCreatedProjectId(null); setLocation(`/projects/${createdProjectId}`); } : undefined} onSave={saveProjectAndWriteStory} />}
   </AppFrame>;
 }
 
@@ -701,7 +734,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
   const currentJob = projectJobsQuery.data?.find(job => job.status === 'queued' || job.status === 'running') ?? projectJobsQuery.data?.[0];
   const latestExportJob = projectJobsQuery.data?.find(job => job.jobType === 'export');
   const autoMarker = typeof window !== 'undefined' ? window.localStorage.getItem(`ella:auto:${projectId}`) : null;
-  const autoMode = Boolean(autoMarker);
+  const autoMode = autoMarker === 'approved';
   const autoImageJob = useQueueSceneImageGeneration();
   const autoVideoJob = useQueueSceneVideoGeneration();
   const autoVoiceJob = useQueueSceneVoiceGeneration();
@@ -714,7 +747,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
     voice: keysQuery.data?.find(key => key.enabled && key.serviceType === 'voice' && providerSupports(key.provider, 'voice') && (key.status === 'valid' || key.status === 'untested')),
   }), [keysQuery.data]);
   useEffect(() => {
-    if (!autoMode || autoMarker !== 'pending' || freeMode || !scenes.length || autoStartedRef.current) return;
+    if (!autoMode || freeMode || !scenes.length || autoStartedRef.current) return;
     const scriptRunning = projectJobsQuery.data?.some(job => job.jobType === 'script' && (job.status === 'queued' || job.status === 'running'));
     if (scriptRunning || !autoKeys.image || !autoKeys.video || !autoKeys.voice) return;
     autoStartedRef.current = true;
@@ -795,7 +828,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
         <div className="timeline-panel panel"><div className="section-heading !mb-4"><div><span className="eyebrow">{tx(lang,'خط الإنتاج','EDIT TIMELINE')}</span><h3>{tx(lang,'ترتيب المشاهد','Scene sequence')}</h3></div><button className="btn btn-quiet" onClick={()=>createScene.mutate({projectId,data:{sortOrder:scenes.length,title:tx(lang,`مشهد ${scenes.length+1}`,`Scene ${scenes.length+1}`),description:'',imagePrompt:'',narration:'',durationSeconds:6,assetUrl:null,assetType:null}},{onSuccess:s=>{refresh();setSelected(s.id)}})} disabled={createScene.isPending}><Plus size={16}/>{tx(lang,'إضافة مشهد','Add scene')}</button></div>
            {scenes.length === 0 ? <div className="timeline-empty"><span className="timeline-empty-line"/><span>{tx(lang,'لم تُنشأ مشاهد بعد','No scenes yet')}</span><button className="text-link" onClick={()=>createScene.mutate({projectId,data:{sortOrder:0,title:tx(lang,'المشهد الأول','Scene one'),description:'',imagePrompt:'',narration:'',durationSeconds:6}},{onSuccess:s=>{refresh();setSelected(s.id)}})}>{tx(lang,'أضف أول مشهد','Add the first scene')}</button></div> : <FilmTimeline scenes={scenes} selectedId={activeScene?.id ?? null} musicUrl={project.musicUrl} musicVolume={project.musicVolume} lang={lang} previewing={previewing} onPreview={()=>void requestPreview()} onSelect={setSelected} onReorder={(source,target)=>void reorderDrop(source,target)} onSaveScene={(sceneId,data)=>updateScene.mutateAsync({projectId,sceneId,data}).then(()=>{refresh()})} onSaveProject={data=>updateProject.mutateAsync({projectId,data}).then(()=>{refresh()})} />}
         </div>
-          {freeMode && scenes.length===0 && <div className="script-bar panel"><div className="script-symbol"><ShieldCheck size={18}/></div><div className="script-copy"><b>{tx(lang,'أنشئ Storyboard بلا تكلفة','Create a no-cost storyboard')}</b><p>{tx(lang,'اختر قالبًا محليًا لإضافة خمس مشاهد قابلة للتحرير دون استدعاء مزوّد.','Choose a local template to add five editable scenes without calling a provider.')}</p><div className="flex flex-wrap gap-2 mt-3">{projectTemplates.slice(0,5).map(item=><button key={item.id} className="btn btn-quiet" disabled={createScene.isPending} onClick={()=>{const seeds=buildFreeTemplateScenes(item.id,project.idea,lang,project.visualStyle,project.durationSeconds);void (async()=>{for(const [index,seed] of seeds.entries())await createScene.mutateAsync({projectId,data:{...seed,sortOrder:index}});refresh();})();}}>{tx(lang,item.ar,item.en)}</button>)}</div></div></div>}
+          {freeMode && scenes.length===0 && <div className="script-bar panel"><div className="script-symbol"><ShieldCheck size={18}/></div><div className="script-copy"><b>{tx(lang,'أنشئ Storyboard بلا تكلفة','Create a no-cost storyboard')}</b><p>{tx(lang,'اختر قالبًا محليًا لإضافة خمس مشاهد قابلة للتحرير دون استدعاء مزوّد.','Choose a local template to add five editable scenes without calling a provider.')}</p><div className="flex flex-wrap gap-2 mt-3">{projectTemplates.slice(0,5).map(item=><button key={item.id} className="btn btn-quiet" disabled={createScene.isPending} onClick={()=>{const perScene=Math.max(1,Math.floor(project.durationSeconds/5));const seeds=buildFreeTemplateScenes(item.id,project.idea,lang,project.visualStyle,5,perScene);void (async()=>{for(const [index,seed] of seeds.entries())await createScene.mutateAsync({projectId,data:{...seed,sortOrder:index}});refresh();})();}}>{tx(lang,item.ar,item.en)}</button>)}</div></div></div>}
          {scenes.length ? <div className="script-bar panel" role="status" data-testid="story-scenes-ready"><div className="script-symbol"><Check size={18}/></div><div className="script-copy"><b>{tx(lang,'المشاهد موجودة بالفعل','Scenes already exist')}</b><p>{tx(lang,'تابع تعديل المشاهد من الخط الزمني. لا يمكن بدء تأليف جديد فوق مشاهد موجودة.','Continue editing these scenes in the timeline. A new storyboard cannot be generated over existing scenes.')}</p></div></div> : !freeMode && <><div className="script-bar panel"><div className="script-symbol"><WandSparkles size={18}/></div><div className="script-copy"><b>{tx(lang,'حوّل الفكرة إلى سيناريو','Turn the idea into a storyboard')}</b><p>{textProviderReady ? tx(lang,'أنشئ مسودة مشاهد باستخدام مزوّد نص مضبوط.','Generate a scene draft using a configured text provider.') : tx(lang,'لا يوجد مفتاح نص جاهز؛ أضف مفتاحًا صالحًا قبل التوليد.','No available text provider. Add an enabled key before generating.')}</p><label className="checkline charge-consent"><input type="checkbox" checked={chargeApproved} onChange={e=>setChargeApproved(e.target.checked)}/>{tx(lang,'أوافق على احتمال احتساب رسوم من المزوّد الأساسي أو الاحتياطي.','I approve possible charges from the primary or fallback provider.')}</label><div className="form-two mt-3"><label><span className="field-label">{tx(lang,'عدد المشاهد','Number of scenes')}</span><input className="studio-input" type="number" min="1" max="24" value={scriptSettings.sceneCount} onChange={e=>setScriptSettings(v=>({...v,sceneCount:Math.max(1,Math.min(24,Number(e.target.value)||1))}))} /></label><label><span className="field-label">{tx(lang,'مدة كل مشهد (ثانية)','Seconds per scene')}</span><input className="studio-input" type="number" min="1" max="600" value={scriptSettings.sceneDurationSeconds} onChange={e=>setScriptSettings(v=>({...v,sceneDurationSeconds:Math.max(1,Math.min(600,Number(e.target.value)||1))}))} /></label><label><span className="field-label">{tx(lang,'أسلوب المشاهد','Scene style')}</span><select className="studio-input" value={scriptSettings.sceneStyle} onChange={e=>setScriptSettings(v=>({...v,sceneStyle:e.target.value}))}>{visualStyles.map(([value,ar])=><option key={value} value={value}>{tx(lang,ar,value)}</option>)}</select></label></div></div><button disabled={!textProviderReady || generate.isPending || !chargeApproved || Boolean(currentJob?.status === 'running' || currentJob?.status === 'queued')} className="btn btn-primary" onClick={()=>generate.mutate({projectId,data:{providerKeyId:null,allowRotation:true,approvePotentialCharges:chargeApproved,...scriptSettings}},{onSuccess:refresh})} data-testid="button-generate-script">{generate.isPending ? <LoaderCircle size={16} className="animate-spin"/> : <WandSparkles size={16}/ >}{tx(lang,'توليد المشاهد','Generate scenes')}</button></div>
          {generate.isError && <div className="inline-error">{tx(lang,'تعذّر بدء التوليد. تحقق من مفتاح النص أو أعد المحاولة.','Could not start generation. Check your text key or try again.')}</div>}</>}
          {scenes.length > 0 && <BatchVideoGeneration projectId={projectId} scenes={scenes} keys={keysQuery.data || []} lang={lang} freeMode={freeMode} hasActiveJob={Boolean(currentJob && (currentJob.status === 'queued' || currentJob.status === 'running'))} onQueued={refresh}/>}
@@ -1047,7 +1080,7 @@ function GenerationPanel({projectId,scene,keys,lang,onQueued,freeMode}:{projectI
     if(action==='voice')voiceJob.mutate({projectId,sceneId:scene.id,data:{providerKeyId:activeKey.id,voiceId:voiceId.trim(),approvePotentialCharges:true}},{onSuccess:done});
   };
   const modelValid=action==='voice'?voiceId.trim().length>0:model.trim().length>0;
-  if(freeMode)return <div className="service-purpose-hint is-unavailable"><b>{tx(lang,'التوليد الخارجي متوقف في وضع صفر المصاريف','External generation is blocked in zero-spend mode')}</b><span>{tx(lang,'استخدم صورك أو مكتبة الوسائط العامة ثم صدّر المشروع محليًا.','Use your own assets or public media catalogs, then export locally.')}</span></div>;
+  if(freeMode)return <div className="service-purpose-hint is-unavailable"><b>{tx(lang,'المزوّدات الخارجية متوقفة','External providers are off')}</b><span>{tx(lang,'شغّل السماح بالمزوّدات من الإعدادات عند الاستعداد. لا يُرسل طلب فيديو قبل موافقتك على احتمال الرسوم.','Enable external providers in Settings when ready. No video request is sent before you approve possible charges.')} <Link href="/settings/providers" className="text-link">{tx(lang,'فتح الإعدادات','Open settings')}<ArrowLeft size={13}/></Link></span></div>;
   return <div className="generation-tools"><div className="generation-heading"><span className="eyebrow">{tx(lang,'توليد الأصول','GENERATE ASSETS')}</span><Link href="/settings/providers" className="text-link">{tx(lang,'إعداد المزوّدين','Provider setup')}<ArrowLeft size={13}/></Link></div><div className="generation-buttons">
     {(['image','video','voice'] as const).map(kind=>{const availableKeys=keys.filter(key=>key.enabled&&key.serviceType===kind&&providerSupports(key.provider,kind)&&(key.status==='valid'||key.status==='untested'));const available=availableKeys.length>0;return <button key={kind} className="btn btn-quiet" disabled={!available} onClick={()=>{setAction(kind);setProviderId('');setApproved(false);if(kind==='video'){const nextMode=scene.assetType==='image'?'image':'text';setMode(nextMode);setModel(defaultVideoModel(availableKeys[0]?.provider,nextMode));}}} title={!available?tx(lang,'لا يوجد مفتاح مفعّل لمزوّد موصول بهذه المهمة','No enabled key for a provider currently connected to this task'):undefined}>{kind==='image'?<ImagePlus size={15}/>:kind==='video'?<Film size={15}/>:<Languages size={15}/ >}{tx(lang,kind==='image'?'صورة':kind==='video'?'فيديو':'صوت',kind)}</button>})}
   </div><p className="generation-note">{tx(lang,'المخرجات تظهر هنا بعد اكتمال المهمة؛ لا توجد نتائج تجريبية.','Completed outputs appear here after the job finishes. No sample assets are shown.')}</p>
@@ -1106,7 +1139,7 @@ function BatchVideoGeneration({projectId,scenes,keys,lang,hasActiveJob,onQueued,
     }
   };
   if(!scenes.length)return null;
-  if(freeMode)return <div className="script-bar panel mt-4"><div className="script-symbol"><ShieldCheck size={18}/></div><div className="script-copy"><b>{tx(lang,'الإنفاق محمي','Spending is protected')}</b><p>{tx(lang,'توليد الفيديو الخارجي متوقف. أضف وسائط عامة مجانية أو ملفاتك الخاصة ثم صدّر محليًا.','External video generation is blocked. Use public media or your own files, then export locally.')}</p></div></div>;
+  if(freeMode)return <div className="script-bar panel mt-4"><div className="script-symbol"><ShieldCheck size={18}/></div><div className="script-copy"><b>{tx(lang,'المزوّدات الخارجية متوقفة','External providers are off')}</b><p>{tx(lang,'شغّل السماح بالمزوّدات من الإعدادات لإرسال مقاطع المشاهد. ستحتاج موافقة واحدة على الدفعة، وقد تُحتسب رسوم لكل مشهد.','Enable external providers in Settings to send scene clips. One approval is required for the batch; each scene may incur a charge.')} <Link href="/settings/providers" className="text-link">{tx(lang,'فتح الإعدادات','Open settings')}<ArrowLeft size={14}/></Link></p></div></div>;
   return <>
     <section className="script-bar panel mt-4" data-testid="batch-video-panel">
       <div className="script-symbol"><Film size={18}/></div>
@@ -1296,7 +1329,7 @@ function ProvidersPage() {
   return <AppFrame title={tx(lang,'مزوّدو الخدمة','Provider settings')} crumb="CREDENTIALS & ROTATION">
     <div className="page-toolbar"><div><span className="eyebrow">{tx(lang,'المفاتيح والاعتمادية','KEYS & RELIABILITY')}</span><h2>{tx(lang,'أدواتك، تحت سيطرتك.', 'Your tools, on your terms.')}</h2><p>{tx(lang,'المفاتيح لا تظهر مجددًا بعد حفظها؛ تُرسل للخادم مباشرة ولا تُخزّن في المتصفح. كل مفتاح يظهر تحت نوع الخدمة المخصص له.', 'Keys are never shown again after saving. They are sent directly to the server and never stored in browser storage. Each key appears under its assigned service.')}</p></div><button className="btn btn-primary" onClick={()=>openAdd('text')} data-testid="button-add-provider"><Plus size={16}/>{tx(lang,'إضافة مفتاح','Add a key')}</button></div>
     <div className="resource-notice panel"><ShieldCheck size={18}/><p>{tx(lang,'أضفنا NVIDIA NIM وCohere للكتابة بمستويات تجريبية مجانية وحدود استخدام. توليد الفيديو ليس مجانياً عبر واجهات API المستضافة؛ مزوّدا fal.ai وReplicate قد يحاسبان حسب النموذج، ويظل كل طلب فيديو خلف موافقتك الصريحة.', 'NVIDIA NIM and Cohere are available for script writing with free prototype/trial limits. Hosted video-generation APIs are not free: fal.ai and Replicate may charge by model, and every video request remains behind your explicit approval.')}</p></div>
-    <div className={`resource-notice panel ${prefs?.freeMode !== false ? 'is-unavailable' : ''}`} role="status"><ShieldCheck size={18}/><p>{prefs?.freeMode !== false ? tx(lang,'وضع صفر المصاريف يعمل: سيمنع الخادم طلبات التوليد والتفريغ واختبار المفاتيح الخارجية. تبقى المشاريع والقوالب والمصادر العامة والمعاينة والتصدير المحلي متاحة. هذا لا يضمن مجانية الاستضافة نفسها.','Zero-spend mode is active: the server blocks external generation, transcription, and key tests. Projects, templates, public media sources, preview, and local export remain available. This does not guarantee hosting is free.') : tx(lang,'وضع صفر المصاريف متوقف؛ أي طلب لمزوّد خارجي قد يستهلك رصيدًا أو يسبب رسومًا.','Zero-spend mode is off; an external provider request may use credits or incur a charge.')}</p></div>
+    <div className={`resource-notice panel ${prefs?.freeMode !== false ? 'is-unavailable' : ''}`} role="status"><ShieldCheck size={18}/><p>{prefs?.freeMode !== false ? tx(lang,'المزوّدات الخارجية متوقفة حاليًا. يمكنك تشغيلها من المفتاح أدناه عند إضافة مفاتيحك؛ وسيظل كل طلب محتمل الرسوم بحاجة إلى موافقتك.','External providers are currently off. You can enable them using the control below after adding keys; each request that may incur charges still needs your approval.') : tx(lang,'المزوّدات الخارجية مسموحة. قد يستهلك استخدامها رصيدًا أو يسبب رسومًا، لكن التطبيق سيطلب موافقتك قبل كل مهمة مولّدة.','External providers are enabled. They may use credits or incur charges, but the app asks before every generation job.')}</p></div>
     {keys.isError&&<StateError lang={lang} retry={()=>keys.refetch()} />}
     <div className="provider-category-list grid gap-3">
       {serviceSections.map(section=>{
@@ -1310,15 +1343,16 @@ function ProvidersPage() {
       })}
     </div>
     <section className="panel rotation-panel"><div className="section-heading"><div><span className="eyebrow">{tx(lang,'التعامل مع التعطّل','FAILOVER BEHAVIOR')}</span><h3>{tx(lang,'تدوير المفاتيح وإعادة المحاولة','Key rotation & retries')}</h3></div><ShieldCheck size={20} className="text-primary"/></div>
-      {settingsQ.isLoading ? <SkeletonBlock className="h-48"/> : settingsQ.isError ? <StateError lang={lang} retry={()=>settingsQ.refetch()}/> : prefs && <><div className="rotation-options">{[
-        ['freeMode',tx(lang,'وضع صفر المصاريف','Zero-spend mode'),tx(lang,'يمنع الخادم من الاتصال بمزوّدي التوليد أو التفريغ أو اختبار المفاتيح؛ تعطيله يتطلب موافقتك.','Blocks server calls to generation, transcription, and key-test providers; turn off only when you approve possible costs.')],
+      {settingsQ.isLoading ? <SkeletonBlock className="h-48"/> : settingsQ.isError ? <StateError lang={lang} retry={()=>settingsQ.refetch()}/> : prefs && <><div className="rotation-options">
+        <label className="rotation-row"><span><b>{tx(lang,'السماح بالمزوّدات الخارجية (قد تكون مدفوعة)','Allow external providers (may cost)')}</b><small>{tx(lang,'عند إيقافه يمنع الخادم اتصالات التوليد والتفريغ واختبار المفاتيح. تشغيله لا يلغي موافقة كل طلب قد يكلّف.','When off, the server blocks generation, transcription, and key-test calls. Turning it on does not skip per-request cost approval.')}</small></span><input aria-label={tx(lang,'السماح بالمزوّدات الخارجية','Allow external providers')} type="checkbox" checked={!prefs.freeMode} onChange={e=>setPrefs({...prefs,freeMode:!e.target.checked})} data-testid="checkbox-provider-external-access" /></label>
+        {[
         ['autoRotate',tx(lang,'التدوير التلقائي','Automatic rotation'),tx(lang,'استخدم المفتاح التالي عند الحاجة.','Move to another key when needed.')],
         ['rotateOnQuota',tx(lang,'عند تجاوز الحصة','On quota limits'),tx(lang,'انتقل لمفتاح آخر عند نفاد الحصة.','Switch when a provider quota is reached.')],
         ['rotateOnRateLimit',tx(lang,'عند تحديد المعدل','On rate limits'),tx(lang,'أعد المحاولة على مفتاح آخر عند تقييد المعدل.','Retry with another key when rate limited.')],
         ['rotateOnConnectionFailure',tx(lang,'عند فشل الاتصال','On connection failures'),tx(lang,'بدّل المزوّد عند تعذّر الاتصال.','Fail over when a provider cannot be reached.')],
       ].map(([field,title,desc])=><label className="rotation-row" key={field}><span><b>{title}</b><small>{desc}</small></span><input aria-label={title} type="checkbox" checked={Boolean(prefs[field as keyof ProviderSettings])} onChange={e=>setPrefs(p=>p?({...p,[field]:e.target.checked}):p)} /></label>)}</div>
       <div className="rotation-advanced"><label><span className="field-label">{tx(lang,'أقصى عدد للمحاولات','Maximum attempts')}</span><input className="studio-input" type="number" min="1" max="10" value={prefs.maxAttempts} onChange={e=>setPrefs({...prefs,maxAttempts:Number(e.target.value)})}/></label><label><span className="field-label">{tx(lang,'تأخير إعادة المحاولة بالثواني','Retry delay (seconds)')}</span><input className="studio-input" type="number" min="0" max="300" value={prefs.retryDelaySeconds} onChange={e=>setPrefs({...prefs,retryDelaySeconds:Number(e.target.value)})}/></label><label><span className="field-label">{tx(lang,'المزوّد الاحتياطي','Fallback provider')}</span><select className="studio-input" value={prefs.fallbackProvider || ''} onChange={e=>setPrefs({...prefs,fallbackProvider:e.target.value||null})}><option value="">{tx(lang,'حسب الأولوية فقط','Use priority order')}</option>{fallbackProviders.map(provider=><option key={provider} value={provider}>{provider}</option>)}</select></label></div>
-      <div className="modal-actions"><span className="save-state">{saveSettings.isSuccess && <><Check size={14}/>{tx(lang,'حُفظت الإعدادات','Settings saved')}</>}</span><button className="btn btn-primary" disabled={saveSettings.isPending} onClick={()=>saveSettings.mutate({data:prefs},{onSuccess:()=>qc.invalidateQueries({queryKey:getGetProviderSettingsQueryKey()})})}>{saveSettings.isPending?tx(lang,'جارٍ الحفظ...','Saving...'):tx(lang,'حفظ إعدادات التدوير','Save rotation settings')}</button></div></>}
+      <div className="modal-actions"><span className="save-state">{saveSettings.isSuccess && <><Check size={14}/>{tx(lang,'حُفظت الإعدادات','Settings saved')}</>}</span><button className="btn btn-primary" disabled={saveSettings.isPending} onClick={()=>saveSettings.mutate({data:prefs},{onSuccess:()=>qc.invalidateQueries({queryKey:getGetProviderSettingsQueryKey()})})}>{saveSettings.isPending?tx(lang,'جارٍ الحفظ...','Saving...'):tx(lang,'حفظ الإعدادات','Save settings')}</button></div></>}
     </section>
     {dialog && <ProviderForm initial={editing} initialService={initialService} onClose={()=>setDialog(false)} pending={create.isPending||update.isPending} onSave={data=>{if(editing){const {apiKey,...safe}=data;update.mutate({keyId:editing.id,data:{...safe,...(apiKey?{apiKey}:{})}},{onSuccess:()=>{invalidate();setDialog(false)}})}else create.mutate({data},{onSuccess:()=>{invalidate();setDialog(false)}})}} />}
   </AppFrame>;
@@ -1336,7 +1370,7 @@ function ProviderRow({item,onEdit,onToggle,onPriority,onTest,onDelete,testing,fr
     <label className="switch-control" title={tx(lang,'مفعّل','Enabled')}><input type="checkbox" checked={item.enabled} onChange={e=>onToggle(e.target.checked)}/><span /></label>
     <div className="provider-actions">
       {officialUrl&&<a className="btn btn-ghost !p-2" title={tx(lang,'الموقع الرسمي للمزوّد','Provider official site')} href={officialUrl} target="_blank" rel="noopener noreferrer"><ExternalLink size={15}/></a>}
-      <button className="btn btn-ghost !p-2" title={freeMode?tx(lang,'عطّل وضع صفر المصاريف أولًا','Turn off zero-spend mode first'):tx(lang,'اختبار المفتاح','Test key')} onClick={onTest} disabled={testing||freeMode}>{testing?<LoaderCircle size={15} className="animate-spin"/>:<Check size={15}/>}</button>
+      <button className="btn btn-ghost !p-2" title={freeMode?tx(lang,'شغّل السماح بالمزوّدات الخارجية أولًا','Enable external providers first'):tx(lang,'اختبار المفتاح','Test key')} onClick={onTest} disabled={testing||freeMode}>{testing?<LoaderCircle size={15} className="animate-spin"/>:<Check size={15}/>}</button>
       <button className="btn btn-ghost !p-2" title={tx(lang,'تعديل','Edit')} onClick={onEdit}><Settings2 size={15}/></button>
       <button className="btn btn-ghost !p-2 text-destructive" title={tx(lang,'حذف','Delete')} onClick={onDelete}><Trash2 size={15}/></button>
     </div>

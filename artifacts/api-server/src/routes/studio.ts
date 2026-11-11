@@ -933,8 +933,10 @@ router.post("/projects/:projectId/generate-script", async (req, res): Promise<vo
     `Language: ${project.language}`,
     `Audience: ${project.audience}`,
     `Visual style: ${project.visualStyle}`,
+    `Requested scene count: exactly ${parsed.data.sceneCount} scenes`,
+    `Duration for every scene: exactly ${parsed.data.sceneDurationSeconds} seconds`,
     `Target duration: ${project.durationSeconds} seconds`,
-    "Use 3 to 12 scenes. Keep recurring characters, clothing, color palette, and environment consistent across scenes. Write narration in the selected language. Make image prompts concrete and visually specific. Keep scene durations close to the target total.",
+    `Return exactly ${parsed.data.sceneCount} scenes and use exactly ${parsed.data.sceneDurationSeconds} seconds for durationSeconds in every scene. Keep recurring characters, clothing, color palette, and environment consistent across scenes. Write narration in the selected language. Make image prompts concrete and visually specific.`,
   ].join("\n");
 
   let generated: ReturnType<typeof parseGeneratedJson> | undefined;
@@ -949,7 +951,11 @@ router.post("/projects/:projectId/generate-script", async (req, res): Promise<vo
     }
     try {
       const response = await generateWithProvider(keyRow.provider, key, prompt);
-      generated = parseGeneratedJson(response);
+      const parsedScenes = parseGeneratedJson(response);
+      if (parsedScenes.length !== parsed.data.sceneCount) {
+        throw new Error(`Generated scene count mismatch: expected ${parsed.data.sceneCount}, received ${parsedScenes.length}.`);
+      }
+      generated = parsedScenes.map((scene) => ({ ...scene, durationSeconds: parsed.data.sceneDurationSeconds }));
       await db.update(providerKeysTable).set({
         status: "valid",
         usedCount: keyRow.usedCount + 1,
@@ -991,13 +997,12 @@ router.post("/projects/:projectId/generate-script", async (req, res): Promise<vo
     res.status(502).json({ error: finalMessage });
     return;
   }
-  const secondsPerScene = Math.max(1, Math.round(project.durationSeconds / generated.length));
   const inserted = await db.insert(scenesTable).values(generated.map((scene, index) => ({
     projectId: project.id,
     userId,
     sortOrder: index,
     ...scene,
-    durationSeconds: scene.durationSeconds || secondsPerScene,
+    durationSeconds: scene.durationSeconds,
   }))).returning();
   const [updatedProject] = await db.update(projectsTable)
     .set({ status: "editing", progress: 45 })

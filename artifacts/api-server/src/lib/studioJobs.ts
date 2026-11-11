@@ -369,10 +369,10 @@ async function processScriptJob(job: typeof studioJobsTable.$inferSelect): Promi
       `Audience: ${project.audience}`,
       `Visual style: ${project.visualStyle}`,
       `Requested scene count: ${input.sceneCount ?? 6} scenes`,
-      `Default duration for every scene: ${input.sceneDurationSeconds ?? 8} seconds`,
+      `Exact duration for every scene: ${input.sceneDurationSeconds ?? 8} seconds`,
       `Scene direction: ${input.sceneStyle ?? (project.visualStyle || "Cinematic")}`,
       `Target duration: ${project.durationSeconds} seconds`,
-      `Return exactly ${input.sceneCount ?? 6} scenes. Use approximately ${input.sceneDurationSeconds ?? 8} seconds for each scene unless the story requires a small adjustment.`,
+      `Return exactly ${input.sceneCount ?? 6} scenes. Set durationSeconds to exactly ${input.sceneDurationSeconds ?? 8} for every scene.`,
       "Use 1 to 24 scenes. Create 1 to 8 recurring character profiles, and refer to them by their stable IDs. Keep each character's face, age, hair, body, costume, palette, and environment consistent across every scene. Make each image prompt include only the relevant character profile details, shot size, camera movement, lens feel, location, lighting, and composition. Write narration in the selected language and keep scene durations close to the target total.",
     ].join("\n");
 
@@ -391,7 +391,18 @@ async function processScriptJob(job: typeof studioJobsTable.$inferSelect): Promi
       }
       try {
         const response = await generateWithProvider(keyRow.provider, key, prompt);
-        generated = parseGeneratedJson(response);
+        const parsed = parseGeneratedJson(response);
+        const expectedSceneCount = input.sceneCount ?? 6;
+        if (parsed.scenes.length !== expectedSceneCount) {
+          throw new Error(`Generated scene count mismatch: expected ${expectedSceneCount}, received ${parsed.scenes.length}.`);
+        }
+        generated = {
+          ...parsed,
+          scenes: parsed.scenes.map((scene) => ({
+            ...scene,
+            durationSeconds: input.sceneDurationSeconds ?? 8,
+          })),
+        };
         await db.transaction(async (tx) => {
           await tx.update(providerKeysTable).set({
             status: "valid",
