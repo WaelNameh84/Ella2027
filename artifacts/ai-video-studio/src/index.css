@@ -280,6 +280,8 @@ body { min-height: 100dvh; }
 	.manual-scene-draft { display: grid; gap: .6rem; padding: .8rem; border: 1px solid hsl(var(--border)); border-radius: 10px; background: hsl(var(--card)); }
 	.manual-scene-draft-head { display: flex; align-items: center; gap: .55rem; }
 	.manual-scene-draft-head .storyboard-number { position: static; display: inline-grid; place-items: center; width: 1.6rem; height: 1.6rem; padding: 0; border-radius: 50%; background: hsl(var(--primary) / .12); color: hsl(var(--primary)); font: .65rem var(--app-font-mono); }
+	.inspector-section-title { display: grid; gap: .18rem; margin-top: .55rem; padding-top: .9rem; border-top: 1px solid hsl(var(--border)); }
+	.inspector-section-title b { font-size: .86rem; font-weight: 650; }
 	.page-toolbar { margin: 4px 0 25px; align-items: flex-end; }
 .list-controls { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 17px; }
 	.searchbox { display: flex; align-items: center; gap: 10px; width: min(100%, 440px); min-height: 43px; padding: 0 13px; color: hsl(var(--muted-foreground)); border: 1px solid hsl(var(--border)); border-radius: 10px; background: hsl(var(--card)); }
