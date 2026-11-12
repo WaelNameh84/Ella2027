@@ -124,10 +124,17 @@ const mediaProviders = [
     officialUrl: "https://unsplash.com/developers",
   },
   {
+    name: "AI Horde / Stable Horde",
+    category: "AI image generation",
+    access: "Connected — anonymous public use; no personal key or account",
+    pricingNote: "Anonymous requests use the official public identifier, have the lowest queue priority, may be restricted under high load, and prompts/images are shared with LAION. Queue time is not guaranteed.",
+    officialUrl: "https://aihorde.net/api/",
+  },
+  {
     name: "FFmpeg",
     category: "Video export",
-    access: "Available locally",
-    pricingNote: "Used locally to export MP4 with scene voice tracks, soundtrack, and optional burned-in narration subtitles. Advanced effects and independent tracks are not yet available.",
+    access: "Connected — local composition, no AI video generation",
+    pricingNote: "Composes scene images/videos with transitions, gentle zoom on still images, per-scene narration, soundtrack/effects, and optional burned-in subtitles; MP4 H.264 is downloadable on phones. This is editing/compositing, not AI-generated video.",
     officialUrl: "https://ffmpeg.org/",
   },
   {
@@ -161,8 +168,8 @@ const mediaProviders = [
   {
     name: "Piper TTS",
     category: "Open-source speech",
-    access: "Free software; self-hosted runtime not installed here",
-    pricingNote: "Local text-to-speech with downloadable voices. Voice licenses vary, and a Piper runtime is not currently connected to this app.",
+    access: "Connected — free Arabic Kareem voice runs on the app server",
+    pricingNote: "No personal API key or external inference credit is used. The runtime downloads its Arabic model on first use; availability depends on the Render service's disk, memory, and network.",
     officialUrl: "https://github.com/OHF-Voice/piper1-gpl",
   },
   {

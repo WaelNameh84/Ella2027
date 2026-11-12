@@ -26,6 +26,7 @@ import { transcribeAudio, type TranscriptionMode } from "../lib/transcription";
 import { generatedAssetContentType, generatedAssetPath, readGeneratedAsset, saveGeneratedAsset, type GeneratedAssetKind } from "../lib/studioAssets";
 import { isZeroSpendMode, ZERO_SPEND_ERROR } from "../lib/spendingGuard";
 import { PIPER_LOCAL_PROVIDER_KEY } from "../lib/piperTts";
+import { AI_HORDE_PROVIDER_KEY, listAiHordeModels } from "../lib/aiHorde";
 
 const router: IRouter = Router();
 
@@ -38,7 +39,7 @@ function userIdOf(res: Response): string {
 }
 
 function supportedProvider(provider: string, jobType: JobKind): boolean {
-  if (jobType === "image") return ["openai", "stability", "replicate", "huggingface"].includes(provider);
+  if (jobType === "image") return ["openai", "stability", "replicate", "huggingface", "ai-horde"].includes(provider);
   if (jobType === "video") return ["replicate", "fal"].includes(provider);
   return ["elevenlabs", "openai", "openai-audio"].includes(provider);
 }
@@ -112,6 +113,16 @@ async function sceneOwnerExists(projectId: string, sceneId: string, userId: stri
   return Boolean(scene);
 }
 
+router.get("/providers/ai-horde/models", async (_req, res): Promise<void> => {
+  try {
+    res.json({ models: await listAiHordeModels() });
+  } catch (error) {
+    res.status(503).json({
+      error: error instanceof Error ? error.message : "AI Horde model list is temporarily unavailable.",
+    });
+  }
+});
+
 router.post("/projects/:projectId/scenes/:sceneId/jobs/image", async (req, res): Promise<void> => {
   const params = QueueSceneImageGenerationParams.safeParse(req.params);
   const parsed = QueueSceneImageGenerationBody.safeParse(req.body);
@@ -123,8 +134,13 @@ router.post("/projects/:projectId/scenes/:sceneId/jobs/image", async (req, res):
     res.status(400).json({ error: "Confirm that the image provider may charge before starting generation." });
     return;
   }
+  if (parsed.data.providerKeyId === AI_HORDE_PROVIDER_KEY && !(parsed.data.model ?? "").trim()) {
+    res.status(400).json({ error: "Choose an active AI Horde image model before starting generation." });
+    return;
+  }
   const userId = userIdOf(res);
-  if (await isZeroSpendMode(userId) && parsed.data.providerKeyId !== FREE_TEST_PROVIDER_KEY) {
+  const builtinImageProvider = [FREE_TEST_PROVIDER_KEY, AI_HORDE_PROVIDER_KEY].includes(parsed.data.providerKeyId ?? "");
+  if (await isZeroSpendMode(userId) && !builtinImageProvider) {
     res.status(403).json({ error: ZERO_SPEND_ERROR });
     return;
   }
@@ -132,7 +148,7 @@ router.post("/projects/:projectId/scenes/:sceneId/jobs/image", async (req, res):
     res.status(404).json({ error: "Scene not found." });
     return;
   }
-  const keyCheck = parsed.data.providerKeyId === FREE_TEST_PROVIDER_KEY
+  const keyCheck = builtinImageProvider
     ? { error: null }
     : await confirmUsableKeys(userId, "image", "image", parsed.data.providerKeyId);
   if (keyCheck.error) {

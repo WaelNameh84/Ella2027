@@ -121,8 +121,10 @@ function videoEncodingArgs(format: "mp4" | "webm", resolution: number, codec: "h
   return ["-c:v", "libx264", "-preset", resolution >= 2160 ? "medium" : "veryfast", "-pix_fmt", "yuv420p", ...bitrate, "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", "-movflags", "+faststart"];
 }
 
-function ffmpegFilter(width: number, height: number, fps: number): string {
-  return `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps}`;
+function ffmpegFilter(width: number, height: number, fps: number, gentleMotion = false): string {
+  const base = `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1`;
+  if (!gentleMotion) return `${base},fps=${fps}`;
+  return `${base},zoompan=z='min(zoom+0.0007,1.10)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=${width}x${height}:fps=${fps}`;
 }
 
 async function mediaBytes(
@@ -264,7 +266,7 @@ export async function renderMp4(
       const subtitleFilter = includeSubtitles && caption
         ? `,subtitles=filename=${escapeFilterPath(subtitlePath)}:force_style='${selectedSubtitleStyle}'`
         : "";
-      const videoFilter = `${ffmpegFilter(width, height, fps)},setpts=PTS/${playbackSpeed}${subtitleFilter}`;
+      const videoFilter = `${ffmpegFilter(width, height, fps, !isVideo)},setpts=PTS/${playbackSpeed}${subtitleFilter}`;
       const audioInput = voicePath
         ? ["-i", voicePath]
         : ["-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000"];

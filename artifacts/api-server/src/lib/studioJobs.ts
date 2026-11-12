@@ -23,6 +23,7 @@ import { readGeneratedAsset, saveGeneratedAsset } from "./studioAssets";
 import { isZeroSpendMode, ZERO_SPEND_ERROR } from "./spendingGuard";
 import { createTestImage, createTestWav } from "./freeTestProvider";
 import { generatePiperNarration, PIPER_LOCAL_PROVIDER_KEY } from "./piperTts";
+import { AI_HORDE_PROVIDER_KEY, describeAiHordeStatus, listAiHordeModels, submitAiHordeImage, waitForAiHordeImage } from "./aiHorde";
 
 type SceneDraft = {
   title: string;
@@ -626,13 +627,41 @@ async function processImageJob(job: typeof studioJobsTable.$inferSelect): Promis
     throw new Error("Explicit confirmation is required before a generation provider can be used.");
   }
   const prompt = scenePrompt(project, scene);
-  const outputCount = Math.max(1, Math.min(input.outputs ?? 1, 4));
+  const outputCount = input.providerKeyId === AI_HORDE_PROVIDER_KEY ? 1 : Math.max(1, Math.min(input.outputs ?? 1, 4));
   const outputAssets = assetResult(job);
   while (outputAssets.length < outputCount) {
     const requestedModel = input.model || "black-forest-labs/flux-schnell";
-    const bytes = input.providerKeyId === FREE_TEST_PROVIDER_KEY
-      ? Buffer.from(createTestImage(prompt))
-      : await callMediaProvider(job, "image", input.providerKeyId, "provider_request", async (provider, key) => {
+    let bytes: Buffer;
+    if (input.providerKeyId === FREE_TEST_PROVIDER_KEY) {
+      bytes = Buffer.from(createTestImage(prompt));
+    } else if (input.providerKeyId === AI_HORDE_PROVIDER_KEY) {
+      if (!requestedModel.trim()) throw new Error("Choose an active AI Horde image model before starting generation.");
+      const activeModels = await listAiHordeModels();
+      if (!activeModels.some((item) => item.name === requestedModel)) {
+        throw new Error("The selected AI Horde model is no longer active. Refresh the model list and choose an available model; no generation request was sent.");
+      }
+      const savedResult = { ...(job.result ?? {}) };
+      let requestId = typeof savedResult.aiHordeRequestId === "string" ? savedResult.aiHordeRequestId : "";
+      if (!requestId) {
+        if (savedResult.aiHordeSubmitState === "sending" || savedResult.aiHordeSubmitState === "submitted") {
+          throw new Error("AI Horde submission outcome is unknown. To avoid duplicate anonymous generations, this job was not submitted again; start a new request only if needed.");
+        }
+        savedResult.aiHordeSubmitState = "sending";
+        savedResult.aiHordeModel = requestedModel;
+        await updateJob(job.id, { result: savedResult, stage: "provider_request", progress: 8, message: "Sending one anonymous image request to AI Horde." });
+        job.result = savedResult;
+        requestId = await submitAiHordeImage(prompt, requestedModel);
+        savedResult.aiHordeSubmitState = "submitted";
+        savedResult.aiHordeRequestId = requestId;
+        await updateJob(job.id, { result: savedResult, stage: "provider_request", progress: 10, message: "AI Horde accepted the anonymous request; waiting for an eligible worker." });
+        job.result = savedResult;
+      }
+      bytes = await waitForAiHordeImage(requestId, async (status) => {
+        const update = describeAiHordeStatus(status);
+        await updateJob(job.id, { stage: "provider_request", progress: update.progress, message: update.message });
+      });
+    } else {
+      bytes = await callMediaProvider(job, "image", input.providerKeyId, "provider_request", async (provider, key) => {
       const providerModel = provider === "replicate"
         ? (requestedModel.includes("/") ? requestedModel : "black-forest-labs/flux-schnell")
         : provider === "openai"
@@ -649,7 +678,8 @@ async function processImageJob(job: typeof studioJobsTable.$inferSelect): Promis
         imageResolution,
       );
       return bytes;
-    });
+      });
+    }
     const asset = await saveGeneratedAsset(project.id, scene.id, "image", bytes);
     const saved = {
       id: asset.id,
