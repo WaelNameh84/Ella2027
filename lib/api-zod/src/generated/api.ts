@@ -32,6 +32,9 @@ export const getStudioSummaryResponseRecentProjectsItemCharactersItemVoiceDescri
 export const getStudioSummaryResponseRecentProjectsItemMusicVolumeMin = 0;
 export const getStudioSummaryResponseRecentProjectsItemMusicVolumeMax = 100;
 
+export const getStudioSummaryResponseRecentProjectsItemSoundEffectsVolumeMin = 0;
+export const getStudioSummaryResponseRecentProjectsItemSoundEffectsVolumeMax = 100;
+
 
 
 export const GetStudioSummaryResponse = zod.object({
@@ -59,6 +62,8 @@ export const GetStudioSummaryResponse = zod.object({
 })),
   "musicUrl": zod.string().nullable(),
   "musicVolume": zod.number().int().min(getStudioSummaryResponseRecentProjectsItemMusicVolumeMin).max(getStudioSummaryResponseRecentProjectsItemMusicVolumeMax),
+  "soundEffectsUrl": zod.string().nullable(),
+  "soundEffectsVolume": zod.number().int().min(getStudioSummaryResponseRecentProjectsItemSoundEffectsVolumeMin).max(getStudioSummaryResponseRecentProjectsItemSoundEffectsVolumeMax),
   "status": zod.enum(['draft', 'scripting', 'editing', 'exporting', 'completed', 'failed']),
   "progress": zod.number().int(),
   "sceneCount": zod.number().int(),
@@ -85,6 +90,9 @@ export const listProjectsResponseCharactersItemVoiceDescriptionMax = 1000;
 export const listProjectsResponseMusicVolumeMin = 0;
 export const listProjectsResponseMusicVolumeMax = 100;
 
+export const listProjectsResponseSoundEffectsVolumeMin = 0;
+export const listProjectsResponseSoundEffectsVolumeMax = 100;
+
 
 
 export const ListProjectsResponseItem = zod.object({
@@ -107,6 +115,8 @@ export const ListProjectsResponseItem = zod.object({
 })),
   "musicUrl": zod.string().nullable(),
   "musicVolume": zod.number().int().min(listProjectsResponseMusicVolumeMin).max(listProjectsResponseMusicVolumeMax),
+  "soundEffectsUrl": zod.string().nullable(),
+  "soundEffectsVolume": zod.number().int().min(listProjectsResponseSoundEffectsVolumeMin).max(listProjectsResponseSoundEffectsVolumeMax),
   "status": zod.enum(['draft', 'scripting', 'editing', 'exporting', 'completed', 'failed']),
   "progress": zod.number().int(),
   "sceneCount": zod.number().int(),
@@ -142,6 +152,9 @@ export const createProjectBodyCharactersMax = 24;
 export const createProjectBodyMusicVolumeMin = 0;
 export const createProjectBodyMusicVolumeMax = 100;
 
+export const createProjectBodySoundEffectsVolumeMin = 0;
+export const createProjectBodySoundEffectsVolumeMax = 100;
+
 
 
 export const CreateProjectBody = zod.object({
@@ -162,7 +175,9 @@ export const CreateProjectBody = zod.object({
   "referenceImageUrl": zod.string().url().nullable()
 })).max(createProjectBodyCharactersMax).optional(),
   "musicUrl": zod.string().nullish(),
-  "musicVolume": zod.number().int().min(createProjectBodyMusicVolumeMin).max(createProjectBodyMusicVolumeMax).optional()
+  "musicVolume": zod.number().int().min(createProjectBodyMusicVolumeMin).max(createProjectBodyMusicVolumeMax).optional(),
+  "soundEffectsUrl": zod.string().nullish(),
+  "soundEffectsVolume": zod.number().int().min(createProjectBodySoundEffectsVolumeMin).max(createProjectBodySoundEffectsVolumeMax).optional()
 })
 
 export const createProjectResponseCharactersItemIdMax = 100;
@@ -177,6 +192,9 @@ export const createProjectResponseCharactersItemVoiceDescriptionMax = 1000;
 
 export const createProjectResponseMusicVolumeMin = 0;
 export const createProjectResponseMusicVolumeMax = 100;
+
+export const createProjectResponseSoundEffectsVolumeMin = 0;
+export const createProjectResponseSoundEffectsVolumeMax = 100;
 
 
 
@@ -200,6 +218,8 @@ export const CreateProjectResponse = zod.object({
 })),
   "musicUrl": zod.string().nullable(),
   "musicVolume": zod.number().int().min(createProjectResponseMusicVolumeMin).max(createProjectResponseMusicVolumeMax),
+  "soundEffectsUrl": zod.string().nullable(),
+  "soundEffectsVolume": zod.number().int().min(createProjectResponseSoundEffectsVolumeMin).max(createProjectResponseSoundEffectsVolumeMax),
   "status": zod.enum(['draft', 'scripting', 'editing', 'exporting', 'completed', 'failed']),
   "progress": zod.number().int(),
   "sceneCount": zod.number().int(),
@@ -228,6 +248,9 @@ export const getProjectResponseOneCharactersItemVoiceDescriptionMax = 1000;
 
 export const getProjectResponseOneMusicVolumeMin = 0;
 export const getProjectResponseOneMusicVolumeMax = 100;
+
+export const getProjectResponseOneSoundEffectsVolumeMin = 0;
+export const getProjectResponseOneSoundEffectsVolumeMax = 100;
 
 export const getProjectResponseTwoScenesItemSubtitleStartSecondsMin = 0;
 export const getProjectResponseTwoScenesItemSubtitleStartSecondsMax = 600;
@@ -267,6 +290,8 @@ export const GetProjectResponse = zod.object({
 })),
   "musicUrl": zod.string().nullable(),
   "musicVolume": zod.number().int().min(getProjectResponseOneMusicVolumeMin).max(getProjectResponseOneMusicVolumeMax),
+  "soundEffectsUrl": zod.string().nullable(),
+  "soundEffectsVolume": zod.number().int().min(getProjectResponseOneSoundEffectsVolumeMin).max(getProjectResponseOneSoundEffectsVolumeMax),
   "status": zod.enum(['draft', 'scripting', 'editing', 'exporting', 'completed', 'failed']),
   "progress": zod.number().int(),
   "sceneCount": zod.number().int(),
@@ -341,6 +366,9 @@ export const updateProjectBodyCharactersMax = 24;
 export const updateProjectBodyMusicVolumeMin = 0;
 export const updateProjectBodyMusicVolumeMax = 100;
 
+export const updateProjectBodySoundEffectsVolumeMin = 0;
+export const updateProjectBodySoundEffectsVolumeMax = 100;
+
 
 
 export const UpdateProjectBody = zod.object({
@@ -361,7 +389,9 @@ export const UpdateProjectBody = zod.object({
   "referenceImageUrl": zod.string().url().nullable()
 })).max(updateProjectBodyCharactersMax).optional(),
   "musicUrl": zod.string().nullish(),
-  "musicVolume": zod.number().int().min(updateProjectBodyMusicVolumeMin).max(updateProjectBodyMusicVolumeMax).optional()
+  "musicVolume": zod.number().int().min(updateProjectBodyMusicVolumeMin).max(updateProjectBodyMusicVolumeMax).optional(),
+  "soundEffectsUrl": zod.string().nullish(),
+  "soundEffectsVolume": zod.number().int().min(updateProjectBodySoundEffectsVolumeMin).max(updateProjectBodySoundEffectsVolumeMax).optional()
 })
 
 export const updateProjectResponseCharactersItemIdMax = 100;
@@ -376,6 +406,9 @@ export const updateProjectResponseCharactersItemVoiceDescriptionMax = 1000;
 
 export const updateProjectResponseMusicVolumeMin = 0;
 export const updateProjectResponseMusicVolumeMax = 100;
+
+export const updateProjectResponseSoundEffectsVolumeMin = 0;
+export const updateProjectResponseSoundEffectsVolumeMax = 100;
 
 
 
@@ -399,6 +432,8 @@ export const UpdateProjectResponse = zod.object({
 })),
   "musicUrl": zod.string().nullable(),
   "musicVolume": zod.number().int().min(updateProjectResponseMusicVolumeMin).max(updateProjectResponseMusicVolumeMax),
+  "soundEffectsUrl": zod.string().nullable(),
+  "soundEffectsVolume": zod.number().int().min(updateProjectResponseSoundEffectsVolumeMin).max(updateProjectResponseSoundEffectsVolumeMax),
   "status": zod.enum(['draft', 'scripting', 'editing', 'exporting', 'completed', 'failed']),
   "progress": zod.number().int(),
   "sceneCount": zod.number().int(),
@@ -846,6 +881,9 @@ export const generateProjectScriptResponseOneCharactersItemVoiceDescriptionMax =
 export const generateProjectScriptResponseOneMusicVolumeMin = 0;
 export const generateProjectScriptResponseOneMusicVolumeMax = 100;
 
+export const generateProjectScriptResponseOneSoundEffectsVolumeMin = 0;
+export const generateProjectScriptResponseOneSoundEffectsVolumeMax = 100;
+
 export const generateProjectScriptResponseTwoScenesItemSubtitleStartSecondsMin = 0;
 export const generateProjectScriptResponseTwoScenesItemSubtitleStartSecondsMax = 600;
 
@@ -884,6 +922,8 @@ export const GenerateProjectScriptResponse = zod.object({
 })),
   "musicUrl": zod.string().nullable(),
   "musicVolume": zod.number().int().min(generateProjectScriptResponseOneMusicVolumeMin).max(generateProjectScriptResponseOneMusicVolumeMax),
+  "soundEffectsUrl": zod.string().nullable(),
+  "soundEffectsVolume": zod.number().int().min(generateProjectScriptResponseOneSoundEffectsVolumeMin).max(generateProjectScriptResponseOneSoundEffectsVolumeMax),
   "status": zod.enum(['draft', 'scripting', 'editing', 'exporting', 'completed', 'failed']),
   "progress": zod.number().int(),
   "sceneCount": zod.number().int(),
@@ -1359,7 +1399,7 @@ export const DeleteProviderKeyResponse = zod.void()
 
 
 /**
- * @summary Test one provider key with a minimal request
+ * @summary Test provider authentication using a read-only endpoint when documented; never trigger generation
  */
 export const TestProviderKeyParams = zod.object({
   "keyId": zod.string().uuid()

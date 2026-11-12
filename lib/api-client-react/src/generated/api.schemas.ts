@@ -197,6 +197,10 @@ export interface Project {
      * @maximum 100
      */
   musicVolume: number;
+  /** @nullable */
+  soundEffectsUrl: string | null;
+  /** @minimum 0 @maximum 100 */
+  soundEffectsVolume: number;
   status: ProjectStatus;
   progress: number;
   sceneCount: number;
@@ -332,6 +336,10 @@ export interface ProjectInput {
      * @maximum 100
      */
   musicVolume?: number;
+  /** @nullable */
+  soundEffectsUrl?: string | null;
+  /** @minimum 0 @maximum 100 */
+  soundEffectsVolume?: number;
 }
 
 export type ProjectUpdateAspectRatio = typeof ProjectUpdateAspectRatio[keyof typeof ProjectUpdateAspectRatio];
@@ -373,6 +381,10 @@ export interface ProjectUpdate {
      * @maximum 100
      */
   musicVolume?: number;
+  /** @nullable */
+  soundEffectsUrl?: string | null;
+  /** @minimum 0 @maximum 100 */
+  soundEffectsVolume?: number;
 }
 
 /**

@@ -703,6 +703,34 @@ function buildExportPreflight(scenes:Scene[],targetDuration:number,includeSubtit
   return {errors,warnings};
 }
 
+function ProductionStages({ lang, scenes, jobs, hasExport }: { lang: Lang; scenes: Scene[]; jobs: StudioJob[]; hasExport: boolean }) {
+  const hasJob = (type: StudioJob['jobType']) => jobs.some(job => job.jobType === type && job.status === 'completed');
+  const stages = [
+    { ar: 'الفكرة', en: 'Idea', done: true },
+    { ar: 'السيناريو', en: 'Script', done: scenes.length > 0 || hasJob('script') },
+    { ar: 'Storyboard', en: 'Storyboard', done: scenes.length > 0 },
+    { ar: 'الصور', en: 'Images', done: scenes.length > 0 && scenes.every(scene => Boolean(scene.assetUrl) && (scene.assetType === 'image' || scene.assetType === 'video')) },
+    { ar: 'الفيديو والصوت', en: 'Video & voice', done: scenes.length > 0 && scenes.every(scene => scene.assetType === 'video' && Boolean(scene.assetUrl) && (!scene.narration.trim() || Boolean(scene.voiceUrl))) },
+    { ar: 'التصدير', en: 'Export', done: hasExport },
+  ];
+  const completed = stages.filter(stage => stage.done).length;
+  return <section className="panel production-stages" aria-label={tx(lang, 'مراحل إنتاج الفيلم', 'Film production stages')}>
+    <div className="production-stages-head"><div><span className="eyebrow">{tx(lang, 'ONE IDEA TO FULL MOVIE', 'ONE IDEA TO FULL MOVIE')}</span><h3>{tx(lang, 'خريطة إنتاج الفيلم', 'Film production map')}</h3></div><span className="small-mono">{completed}/{stages.length} {tx(lang, 'مراحل مكتملة', 'stages complete')}</span></div>
+    <div className="production-stage-list">{stages.map((stage, index) => <div className={`production-stage ${stage.done ? 'is-done' : ''}`} key={stage.en}><span className="production-stage-mark">{stage.done ? <Check size={13}/> : String(index + 1).padStart(2, '0')}</span><span>{tx(lang, stage.ar, stage.en)}</span></div>)}</div>
+    <p className="production-stage-note">{tx(lang, 'كل مرحلة تحفظ تقدمها. لا يبدأ أي مزوّد خارجي أو خدمة مدفوعة تلقائيًا؛ الإرسال يحتاج موافقة صريحة من المستخدم.', 'Each stage saves its progress. No external or paid provider starts automatically; every request requires explicit user approval.')}</p>
+  </section>;
+}
+
+function StoryboardBoard({ lang, scenes, selectedId, onSelect }: { lang: Lang; scenes: Scene[]; selectedId: string | null; onSelect: (sceneId: string) => void }) {
+  return <section className="panel storyboard-board" aria-label={tx(lang, 'لوحة Storyboard البصرية', 'Visual storyboard board')}>
+    <div className="storyboard-board-head"><div><span className="eyebrow">{tx(lang, 'STORYBOARD', 'STORYBOARD')}</span><h3>{tx(lang, 'لوحة اللقطات', 'Shot board')}</h3></div><span className="small-mono">{scenes.length} {tx(lang, 'لقطات', 'shots')}</span></div>
+    {!scenes.length ? <div className="storyboard-empty"><Film size={18}/><span>{tx(lang, 'أنشئ المشاهد لتظهر هنا لوحة اللقطات المرئية.', 'Create scenes to populate the visual shot board.')}</span></div> : <div className="storyboard-grid">{scenes.map((scene, index) => <button type="button" className={`storyboard-card ${selectedId === scene.id ? 'is-selected' : ''}`} key={scene.id} onClick={() => onSelect(scene.id)} aria-label={`${tx(lang, 'المشهد', 'Scene')} ${index + 1}: ${scene.title}`}>
+      <div className="storyboard-thumb">{scene.assetUrl && scene.assetType === 'image' ? <img src={scene.assetUrl} alt="" /> : scene.assetUrl && scene.assetType === 'video' ? <video src={scene.assetUrl} muted preload="metadata" /> : <div className="storyboard-placeholder"><Film size={18}/><span>{tx(lang, 'بدون أصل', 'No asset')}</span></div>}<span className="storyboard-number">{String(index + 1).padStart(2, '0')}</span></div>
+      <div className="storyboard-card-copy"><b>{scene.title || tx(lang, `مشهد ${index + 1}`, `Scene ${index + 1}`)}</b><span>{scene.shotType || tx(lang, 'لقطة غير محددة', 'Shot unspecified')} · {scene.durationSeconds}{tx(lang, 'ث', 's')}</span><small className={scene.assetUrl ? 'is-ready' : ''}>{scene.assetUrl ? tx(lang, 'أصل جاهز', 'Asset ready') : tx(lang, 'بانتظار أصل حقيقي', 'Waiting for real asset')}</small></div>
+    </button>)}</div>}
+  </section>;
+}
+
 function ProjectWorkspace({ projectId }: { projectId: string }) {
   const { lang } = useApp();
   const projectQuery = useGetProject(projectId);
@@ -750,62 +778,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
   }, [projectJobsQuery.data]);
   const currentJob = projectJobsQuery.data?.find(job => job.status === 'queued' || job.status === 'running') ?? projectJobsQuery.data?.[0];
   const latestExportJob = projectJobsQuery.data?.find(job => job.jobType === 'export');
-  const autoMarker = typeof window !== 'undefined' ? window.localStorage.getItem(`ella:auto:${projectId}`) : null;
-  const autoMode = autoMarker === 'approved';
-  const autoImageJob = useQueueSceneImageGeneration();
-  const autoVideoJob = useQueueSceneVideoGeneration();
-  const autoVoiceJob = useQueueSceneVoiceGeneration();
-  const autoStartedRef = useRef(false);
-  const autoExportedRef = useRef(false);
   const duration = scenes.reduce((sum,s)=>sum+s.durationSeconds,0);
-  const autoKeys = useMemo(() => ({
-    image: keysQuery.data?.find(key => key.enabled && key.serviceType === 'image' && providerSupports(key.provider, 'image') && providerKeyIsUsable(key.provider,key.status)),
-    video: keysQuery.data?.find(key => key.enabled && key.serviceType === 'video' && providerSupports(key.provider, 'video') && providerKeyIsUsable(key.provider,key.status)),
-    voice: keysQuery.data?.find(key => key.enabled && key.serviceType === 'voice' && providerSupports(key.provider, 'voice') && providerKeyIsUsable(key.provider,key.status)),
-  }), [keysQuery.data]);
-  useEffect(() => {
-    if (!autoMode || freeMode || !scenes.length || autoStartedRef.current) return;
-    const scriptRunning = projectJobsQuery.data?.some(job => job.jobType === 'script' && (job.status === 'queued' || job.status === 'running'));
-    if (scriptRunning || !autoKeys.image || !autoKeys.video || !autoKeys.voice) return;
-    autoStartedRef.current = true;
-    void (async () => {
-      let image = 0, video = 0, voice = 0;
-      for (const scene of scenes) {
-        try {
-          if (!scene.assetUrl || scene.assetType !== 'image') {
-            await autoImageJob.mutateAsync({projectId, sceneId: scene.id, data: {providerKeyId: autoKeys.image!.id, model: autoKeys.image!.provider === 'huggingface' ? 'black-forest-labs/FLUX.1-schnell' : 'dall-e-3', outputs: 1, resolution: 1024, approvePotentialCharges: true}});
-            image++;
-          }
-        } catch { /* the failed job remains visible for retry */ }
-        try {
-          if (scene.assetType !== 'video') {
-            await autoVideoJob.mutateAsync({projectId, sceneId: scene.id, data: {providerKeyId: autoKeys.video!.id, model: defaultVideoModel(autoKeys.video!.provider, 'text') || 'minimax/video-01', mode: 'text', approvePotentialCharges: true}});
-            video++;
-          }
-        } catch { /* the failed job remains visible for retry */ }
-        try {
-          if (!scene.voiceUrl) {
-            const voiceId = autoKeys.voice!.provider === 'elevenlabs' ? 'EXAVITQu4vr4xnSDxMaL' : 'alloy';
-            await autoVoiceJob.mutateAsync({projectId, sceneId: scene.id, data: {providerKeyId: autoKeys.voice!.id, voiceId, approvePotentialCharges: true}});
-            voice++;
-          }
-        } catch { /* the failed job remains visible for retry */ }
-      }
-      window.localStorage.setItem(`ella:auto:${projectId}`, JSON.stringify({scenes: scenes.length, image, video, voice}));
-      refresh();
-    })();
-  }, [autoMode, autoMarker, freeMode, scenes.length, projectId, autoKeys.image?.id, autoKeys.video?.id, autoKeys.voice?.id, projectJobsQuery.data]);
-  useEffect(() => {
-    if (!autoMode || !scenes.length || autoExportedRef.current) return;
-    const marker = window.localStorage.getItem(`ella:auto:${projectId}`);
-    if (!marker || marker === 'pending') return;
-    const completed = projectJobsQuery.data?.filter(job => job.status === 'completed') || [];
-    const enough = (['image', 'video', 'voice'] as const).every(type => completed.filter(job => job.jobType === type).length >= scenes.length);
-    const active = projectJobsQuery.data?.some(job => job.status === 'queued' || job.status === 'running');
-    if (!enough || active || latestExportJob) return;
-    autoExportedRef.current = true;
-    exportProject.mutate({projectId, data: {resolution: 1080, fps: 30, includeSubtitles: true, format: 'mp4', codec: 'h264', subtitleStyle: 'classic'}}, {onSuccess: refresh});
-  }, [autoMode, scenes.length, projectId, projectJobsQuery.data, latestExportJob?.id]);
   const exportPreflight=buildExportPreflight(scenes,project?.durationSeconds??0,exportSettings.includeSubtitles,lang);
   const scenesReadyForExport=exportPreflight.errors.length===0;
   if (projectQuery.isLoading) return <AppFrame title={tx(lang,'تحميل المشروع','Loading project')}><div className="workspace-skeleton"><SkeletonBlock className="h-20"/><SkeletonBlock className="h-72"/><SkeletonBlock className="h-48"/></div></AppFrame>;
@@ -836,6 +809,8 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
   };
   return <AppFrame title={project.title} crumb={tx(lang,'استوديو المشروع','PROJECT STUDIO')}>
     <div className="workspace-head"><div><Link href="/projects" className="back-link"><ArrowRight size={15}/>{tx(lang,'كل المشاريع','All projects')}</Link><h2>{project.title}</h2><p>{project.idea}</p></div><div className="workspace-actions"><Link href={`/media?projectId=${projectId}${activeScene ? `&sceneId=${activeScene.id}` : ''}`} className="btn btn-quiet"><ImagePlus size={16}/>{tx(lang,'إضافة وسائط','Add media')}</Link><button className="btn btn-quiet" onClick={()=>setEditProjectOpen(true)}><Settings2 size={16}/>{tx(lang,'تفاصيل','Details')}</button></div></div>
+    <ProductionStages lang={lang} scenes={scenes} jobs={projectJobsQuery.data || []} hasExport={latestExportJob?.status === 'completed' || Boolean(project.exportUrl)} />
+    <StoryboardBoard lang={lang} scenes={scenes} selectedId={activeScene?.id ?? null} onSelect={setSelected} />
     <div className="editor-grid">
       <section className="editor-main">
         <div className="preview-panel panel"><div className="preview-top"><span className="eyebrow">{tx(lang,'معاينة المشهد','SCENE PREVIEW')}</span><span className="small-mono">{activeScene ? `${String(activeScene.sortOrder+1).padStart(2,'0')} / ${String(scenes.length).padStart(2,'0')}` : '00 / 00'}</span></div>
@@ -861,6 +836,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
     </div>
     <CharacterProfiles projectId={projectId} characters={project.characters || []} onSave={data=>updateProject.mutateAsync({projectId,data}).then(()=>{refresh()})} pending={updateProject.isPending}/>
     <ProjectSoundtrack url={project.musicUrl} volume={project.musicVolume} pending={updateProject.isPending} onSave={data=>updateProject.mutateAsync({projectId,data}).then(()=>{refresh()})}/>
+    <ProjectSoundEffects url={project.soundEffectsUrl} volume={project.soundEffectsVolume} pending={updateProject.isPending} onSave={data=>updateProject.mutateAsync({projectId,data}).then(()=>{refresh()})}/>
     {updateProject.isError&&<p className="inline-error">{tx(lang,'تعذر حفظ تفاصيل المشروع. لم تُفقد التغييرات؛ أعد المحاولة.','Could not save project details. Your edits remain available; try again.')}</p>}
     {editProjectOpen && <ProjectForm initial={{title:project.title,idea:project.idea,videoType:project.videoType,language:project.language,durationSeconds:project.durationSeconds,audience:project.audience,visualStyle:project.visualStyle,aspectRatio:project.aspectRatio as ProjectInput['aspectRatio']}} onClose={()=>setEditProjectOpen(false)} pending={updateProject.isPending} onSave={data=>updateProject.mutate({projectId,data},{onSuccess:()=>{refresh();setEditProjectOpen(false)}})} />}
   </AppFrame>;
@@ -1084,6 +1060,21 @@ function defaultVoiceId(provider:string|undefined) {
   if(provider==='azure-speech')return 'en-US:en-US-JennyNeural';
   return '';
 }
+const providerCostRanges: Record<string, { image: [number, number]; video: [number, number]; voice: [number, number] }> = {
+  openai: { image: [0.02, 0.12], video: [0.05, 2], voice: [0.01, 0.3] },
+  stability: { image: [0.02, 0.08], video: [0.05, 2], voice: [0.01, 0.3] },
+  replicate: { image: [0.01, 0.2], video: [0.08, 3], voice: [0.01, 0.3] },
+  fal: { image: [0.01, 0.2], video: [0.08, 3], voice: [0.01, 0.3] },
+  elevenlabs: { image: [0.01, 0.2], video: [0.08, 3], voice: [0.01, 0.3] },
+  'google-tts': { image: [0.01, 0.2], video: [0.08, 3], voice: [0.005, 0.15] },
+  'azure-speech': { image: [0.01, 0.2], video: [0.08, 3], voice: [0.005, 0.15] },
+  'openai-audio': { image: [0.01, 0.2], video: [0.08, 3], voice: [0.01, 0.3] },
+};
+function CostEstimate({ provider, service, units, lang }: { provider?: string; service: 'image' | 'video' | 'voice'; units: number; lang: Lang }) {
+  const range = providerCostRanges[provider || '']?.[service];
+  const amount = range ? `$${(range[0] * units).toFixed(2)}–$${(range[1] * units).toFixed(2)}` : tx(lang, 'غير متاح لهذا المزوّد', 'Not available for this provider');
+  return <div className="cost-estimate" role="note"><div><b>{tx(lang, 'تقدير تقريبي قبل الإرسال', 'Preflight cost estimate')}</b><span>{amount}</span></div><small>{tx(lang, `تقدير إرشادي لـ ${units} طلب؛ السعر النهائي يحدده النموذج والمزوّد وقد يختلف.`, `Guidance for ${units} request(s); final pricing depends on the model and provider and may vary.`)}</small></div>;
+}
 function GenerationPanel({projectId,scene,keys,lang,onQueued,freeMode}:{projectId:string;scene:Scene;keys:ProviderKey[];lang:Lang;onQueued:()=>void;freeMode:boolean}) {
   const imageJob=useQueueSceneImageGeneration(),videoJob=useQueueSceneVideoGeneration(),voiceJob=useQueueSceneVoiceGeneration();
   const [action,setAction]=useState<'image'|'video'|'voice'|null>(null);
@@ -1110,12 +1101,13 @@ function GenerationPanel({projectId,scene,keys,lang,onQueued,freeMode}:{projectI
     {(['image','video','voice'] as const).map(kind=>{const availableKeys=keys.filter(key=>key.enabled&&key.serviceType===kind&&providerSupports(key.provider,kind)&&providerKeyIsUsable(key.provider,key.status));const available=availableKeys.length>0;return <button key={kind} className="btn btn-quiet" disabled={!available} onClick={()=>{setAction(kind);setProviderId('');setApproved(false);if(kind==='video'){const nextMode=scene.assetType==='image'?'image':'text';setMode(nextMode);setModel(defaultVideoModel(availableKeys[0]?.provider,nextMode));}}} title={!available?tx(lang,'لا يوجد مفتاح مفعّل لمزوّد موصول بهذه المهمة','No enabled key for a provider currently connected to this task'):undefined}>{kind==='image'?<ImagePlus size={15}/>:kind==='video'?<Film size={15}/>:<Languages size={15}/ >}{tx(lang,kind==='image'?'صورة':kind==='video'?'فيديو':'صوت',kind)}</button>})}
   </div><p className="generation-note">{tx(lang,'المخرجات تظهر هنا بعد اكتمال المهمة؛ لا توجد نتائج تجريبية.','Completed outputs appear here after the job finishes. No sample assets are shown.')}</p>
   {(imageJob.isError||videoJob.isError||voiceJob.isError)&&<p className="inline-error" role="alert">{(videoJob.error instanceof Error&&videoJob.error.message)||(imageJob.error instanceof Error&&imageJob.error.message)||(voiceJob.error instanceof Error&&voiceJob.error.message)||tx(lang,'تعذر إرسال طلب التوليد. تحقّق من المفتاح وإعدادات المزوّد.','Could not queue generation. Check the provider key and settings.')}</p>}
-  {action&&<Modal title={tx(lang,'تأكيد طلب التوليد','Confirm generation request')} subtitle={tx(lang,'قد تُحتسب رسوم على هذا الطلب، وقد يجرّب النظام مزوّدًا احتياطيًا آخر عند التعطل أو نفاد الحصة.','This request may incur charges. Automatic failover may also use another configured provider.')} onClose={close}><div className="form-stack">
+      {action&&<Modal title={tx(lang,'تأكيد طلب التوليد','Confirm generation request')} subtitle={tx(lang,'قد تُحتسب رسوم على هذا الطلب، وقد يجرّب النظام مزوّدًا احتياطيًا آخر عند التعطل أو نفاد الحصة.','This request may incur charges. Automatic failover may also use another configured provider.')} onClose={close}><div className="form-stack">
     {!readyKeys.length?<div className="export-confirm"><ShieldCheck size={17}/>{tx(lang,'لا يوجد مفتاح مفعّل لهذه الخدمة. أضف مفتاحًا صالحًا من إعدادات المزوّدين.','No enabled key is available for this service. Add a working key in provider settings.')}</div>:<>
       {readyKeys.length>1&&<label><span className="field-label">{tx(lang,'مفتاح المزوّد','Provider key')}</span><select className="studio-input" value={activeKey?.id||''} onChange={e=>{setProviderId(e.target.value);const selected=readyKeys.find(key=>key.id===e.target.value);if(action==='video')setModel(defaultVideoModel(selected?.provider,mode));}}>{readyKeys.map(key=><option value={key.id} key={key.id}>{key.label} · {key.provider}</option>)}</select></label>}
       {action!=='voice'&&<label><span className="field-label">{tx(lang,'معرّف النموذج لدى المزوّد','Provider model ID')}</span><input required className="studio-input" value={model} onChange={e=>setModel(e.target.value)} placeholder={action==='image'&&activeKey?.provider==='huggingface'?'black-forest-labs/FLUX.1-schnell':action==='video'&&activeKey?.provider==='fal'?'minimax/h3-max/text-to-video':tx(lang,'أدخل معرّف النموذج المتاح لحسابك','Enter a model ID available to your account')} /></label>}
       {action==='video'&&<><label><span className="field-label">{tx(lang,'مصدر الفيديو','Video input')}</span><select className="studio-input" value={mode} onChange={e=>{const nextMode=e.target.value as 'text'|'image';setMode(nextMode);setModel(defaultVideoModel(activeKey?.provider,nextMode));}}><option value="image">{tx(lang,'من صورة المشهد','Use scene image')}</option><option value="text">{tx(lang,'من النص','Use text prompt')}</option></select></label><p className="generation-note">{tx(lang,'يُملأ معرّف النموذج تلقائيًا حسب المزوّد. مفاتيح الفيديو المستضافة ليست مجانية؛ ستحتاج موافقتك قبل كل طلب.','The model endpoint is filled in for your provider. Hosted video APIs are not free; each request still needs your approval.')}</p></>}
       {action==='voice'&&<label><span className="field-label">{tx(lang,'معرّف الصوت','Voice ID')}</span><input required className="studio-input" value={voiceId} onChange={e=>setVoiceId(e.target.value)} placeholder={tx(lang,'أدخل معرّفًا يقدّمه مزوّدك','Enter a voice ID from your provider')} /></label>}
+      {activeKey && action && <CostEstimate provider={activeKey.provider} service={action} units={1} lang={lang} />}
       <label className="checkline charge-consent"><input type="checkbox" checked={approved} onChange={e=>setApproved(e.target.checked)}/>{tx(lang,'أوافق صراحةً على إرسال الطلب واحتمال احتساب رسوم.','I approve sending this request and any potential provider charges.')}</label>
     </>}
     <div className="modal-actions"><button className="btn btn-quiet" onClick={close}>{tx(lang,'إلغاء','Cancel')}</button><button className="btn btn-primary" disabled={!readyKeys.length||busy||!approved||!modelValid} onClick={submit}>{busy?<LoaderCircle size={15} className="animate-spin"/>:<WandSparkles size={15}/ >}{tx(lang,'إرسال إلى قائمة المهام','Queue generation')}</button></div>
@@ -1181,6 +1173,7 @@ function BatchVideoGeneration({projectId,scenes,keys,lang,hasActiveJob,onQueued,
         <label><span className="field-label">{tx(lang,'معرّف نموذج الفيديو','Video model endpoint')}</span><input required className="studio-input" value={model} onChange={e=>setModel(e.target.value)} placeholder={activeKey?.provider==='fal'?'minimax/h3-max/text-to-video':'minimax/video-01'} data-testid="input-batch-video-model"/></label>
         <label><span className="field-label">{tx(lang,'طريقة إنشاء الفيديو','Video source')}</span><select className="studio-input" value={mode} onChange={e=>{const nextMode=e.target.value as 'text'|'image';setMode(nextMode);setModel(defaultVideoModel(activeKey?.provider,nextMode));}} data-testid="select-batch-video-mode"><option value="text">{tx(lang,'من وصف المشهد','From each scene prompt')}</option><option value="image" disabled={!allHaveImages}>{tx(lang,'من صورة كل مشهد','From each scene image')}</option></select></label>
         {!allHaveImages&&<p className="generation-note">{tx(lang,'خيار الصورة يحتاج صورة مرفقة بكل مشهد؛ استخدم وصف المشهد إذا لم تتوفر الصور.','Image mode needs an attached image on every scene. Use scene prompts when images are missing.')}</p>}
+        {activeKey&&<CostEstimate provider={activeKey.provider} service="video" units={scenesToQueue.length} lang={lang}/>}
         <label className="checkline charge-consent"><input type="checkbox" checked={approved} onChange={e=>setApproved(e.target.checked)} data-testid="checkbox-batch-video-consent"/>{tx(lang,`أوافق على إرسال ${scenesToQueue.length} طلبات فيديو، وقد تُحتسب رسوم لكل مشهد.`,`I approve ${scenesToQueue.length} video requests; each scene may incur a charge.`)}</label>
         {progress&&<div className="export-confirm" role="status" data-testid="batch-video-progress">{queueing?tx(lang,`جارٍ إرسال الطلب ${progress.processed} من ${progress.total}…`,`Sending request ${progress.processed} of ${progress.total}…`):progress.queued?tx(lang,`أُرسل ${progress.queued} طلبات وتعذّر ${progress.failed}.`,`Queued ${progress.queued}; ${progress.failed} failed.`):tx(lang,'تعذّر إرسال الطلبات. تحقّق من مفتاح الفيديو والنموذج.','Requests could not be queued. Check the video key and model.')}</div>}
         <div className="modal-actions"><button type="button" className="btn btn-quiet" onClick={close} disabled={queueing}>{tx(lang,'إلغاء','Cancel')}</button><button type="button" className="btn btn-primary" disabled={!activeKey||!model.trim()||!approved||!scenesToQueue.length||queueing||hasActiveJob} onClick={()=>void begin()} data-testid="button-submit-batch-video">{queueing?<LoaderCircle size={15} className="animate-spin"/>:<Film size={15}/ >}{queueing?tx(lang,'جارٍ إرسال الطلبات…','Queueing videos…'):tx(lang,'ابدأ توليد الفيديو','Start video generation')}</button></div>
@@ -1240,6 +1233,7 @@ function BatchVoiceGeneration({projectId,scenes,keys,lang,hasActiveJob,onQueued,
         {voiceKeys.length>1&&<label><span className="field-label">{tx(lang,'مفتاح الصوت','Voice key')}</span><select className="studio-input" value={activeKey?.id||''} onChange={e=>{const selected=voiceKeys.find(key=>key.id===e.target.value);setProviderId(e.target.value);setVoiceId(defaultVoiceId(selected?.provider));}} data-testid="select-batch-voice-key">{voiceKeys.map(key=><option key={key.id} value={key.id}>{key.label} · {key.provider}</option>)}</select></label>}
         <label><span className="field-label">{tx(lang,'معرّف الصوت','Voice ID')}</span><input required className="studio-input" value={voiceId} onChange={e=>setVoiceId(e.target.value)} placeholder={tx(lang,'معرّف صوت من حساب المزوّد','A voice ID from your provider account')} data-testid="input-batch-voice-id"/></label>
         <p className="generation-note">{tx(lang,'القيمة الافتراضية تناسب المزوّد المختار؛ يمكنك تغييرها إلى صوت عربي متاح في حسابك.','The default matches the selected provider; you can change it to an Arabic voice available in your account.')}</p>
+        {activeKey&&<CostEstimate provider={activeKey.provider} service="voice" units={scenesWithoutVoice.length} lang={lang}/>}
         <label className="checkline charge-consent"><input type="checkbox" checked={approved} onChange={e=>setApproved(e.target.checked)} data-testid="checkbox-batch-voice-consent"/>{tx(lang,`أوافق على إرسال ${scenesWithoutVoice.length} طلبات صوت، وقد تُحتسب رسوم لكل مشهد.`,`I approve ${scenesWithoutVoice.length} voice requests; each scene may incur a charge.`)}</label>
         {progress&&<div className="export-confirm" role="status" data-testid="batch-voice-progress">{queueing?tx(lang,`جارٍ إرسال الطلب ${progress.processed} من ${progress.total}…`,`Sending request ${progress.processed} of ${progress.total}…`):progress.queued?tx(lang,`أُرسل ${progress.queued} طلبات وتعذّر ${progress.failed}.`,`Queued ${progress.queued}; ${progress.failed} failed.`):tx(lang,'تعذّر إرسال الطلبات. تحقّق من مفتاح الصوت ومعرّف الصوت.','Requests could not be queued. Check the voice key and voice ID.')}</div>}
         <div className="modal-actions"><button type="button" className="btn btn-quiet" onClick={close} disabled={queueing}>{tx(lang,'إلغاء','Cancel')}</button><button type="button" className="btn btn-primary" disabled={!activeKey||!voiceId.trim()||!approved||!scenesWithoutVoice.length||queueing||hasActiveJob} onClick={()=>void begin()} data-testid="button-submit-batch-voice">{queueing?<LoaderCircle size={15} className="animate-spin"/>:<Languages size={15}/ >}{queueing?tx(lang,'جارٍ إرسال الطلبات…','Queueing narration…'):tx(lang,'ابدأ توليد الصوت','Start voice generation')}</button></div>
@@ -1335,6 +1329,14 @@ function ProjectSoundtrack({url,volume,pending,onSave}:{url:string|null;volume:n
     return()=>window.clearTimeout(timer);
   },[dirty,draftUrl,draftVolume,pending,saveError]);
   return <section className="soundtrack-panel panel"><div><span className="eyebrow">{tx(lang,'الموسيقى والخلفية','SOUNDTRACK')}</span><h3>{tx(lang,'مسار المشروع','Project audio')}</h3><p>{tx(lang,'أضف رابطًا لملف موسيقى ووازن مستواه في التصدير. تُحفظ التغييرات تلقائيًا.','Add a music asset URL and set its mix level for export. Changes save automatically.')}</p></div><div className="soundtrack-controls"><label className="soundtrack-url"><span className="field-label">{tx(lang,'رابط ملف الموسيقى','Music asset URL')}</span><input className="studio-input" type="url" value={draftUrl} onChange={e=>{editVersion.current++;setSaveError(false);setDraftUrl(e.target.value);setDirty(true)}} placeholder="https://" /></label><label className="soundtrack-volume"><span className="field-label">{tx(lang,'مستوى الموسيقى','Music volume')} · {draftVolume}%</span><input type="range" min="0" max="100" value={draftVolume} onChange={e=>{editVersion.current++;setSaveError(false);setDraftVolume(Number(e.target.value));setDirty(true)}} /></label><span className={`save-state ${saveError?'text-destructive':''}`}>{saveError?tx(lang,'تعذر الحفظ تلقائيًا؛ أعد المحاولة.','Auto-save failed; retry the save.'):pending?tx(lang,'جارٍ الحفظ...','Saving...'):dirty?tx(lang,'سيتم الحفظ تلقائيًا بعد التوقف عن التعديل.','Changes auto-save when you stop editing.'):tx(lang,'تم الحفظ تلقائيًا.','Saved automatically.')}</span><button className="btn btn-primary" disabled={!dirty||pending||!validUrl()} onClick={()=>void saveDraft().catch(()=>{})}>{pending?<LoaderCircle size={15} className="animate-spin"/>:<Check size={15}/ >}{tx(lang,'حفظ الآن','Save now')}</button>{url&&<audio className="audio-preview soundtrack-preview" src={url} controls aria-label={tx(lang,'معاينة موسيقى المشروع','Project music preview')}/>}</div></section>;
+}
+function ProjectSoundEffects({url,volume,pending,onSave}:{url:string|null;volume:number;pending:boolean;onSave:(data:{soundEffectsUrl:string|null;soundEffectsVolume:number})=>Promise<void>}) {
+  const {lang}=useApp();
+  const [draftUrl,setDraftUrl]=useState(url||''),[draftVolume,setDraftVolume]=useState(volume),[dirty,setDirty]=useState(false),[saveError,setSaveError]=useState(false);
+  useEffect(()=>{if(!dirty){setDraftUrl(url||'');setDraftVolume(volume)}},[url,volume,dirty]);
+  const validUrl=()=>{if(!draftUrl.trim())return true;try{const parsed=new URL(draftUrl.trim());return parsed.protocol==='https:'||parsed.protocol==='http:'}catch{return false}};
+  const save=()=>{setSaveError(false);return onSave({soundEffectsUrl:draftUrl.trim()||null,soundEffectsVolume:draftVolume}).then(()=>setDirty(false)).catch(error=>{setSaveError(true);throw error})};
+  return <section className="soundtrack-panel panel sound-effects-panel"><div><span className="eyebrow">{tx(lang,'المؤثرات الصوتية','SOUND EFFECTS')}</span><h3>{tx(lang,'مسار المؤثرات','Sound effects track')}</h3><p>{tx(lang,'اربط ملف مؤثرات مرخّصًا لمزجه أثناء التصدير. لا يتم توليد أو تشغيل أي خدمة تلقائيًا.','Attach a licensed sound-effects asset for export mixing. No provider runs automatically.')}</p></div><div className="soundtrack-controls"><label className="soundtrack-url"><span className="field-label">{tx(lang,'رابط ملف المؤثرات','Sound-effects asset URL')}</span><input className="studio-input" type="url" value={draftUrl} onChange={e=>{setDraftUrl(e.target.value);setDirty(true);setSaveError(false)}} placeholder="https://" /></label><label className="soundtrack-volume"><span className="field-label">{tx(lang,'مستوى المؤثرات','Effects volume')} · {draftVolume}%</span><input type="range" min="0" max="100" value={draftVolume} onChange={e=>{setDraftVolume(Number(e.target.value));setDirty(true);setSaveError(false)}} /></label><span className={`save-state ${saveError?'text-destructive':''}`}>{saveError?tx(lang,'تعذر الحفظ؛ أعد المحاولة.','Could not save; retry.'):pending?tx(lang,'جارٍ الحفظ...','Saving...'):dirty?tx(lang,'توجد تغييرات غير محفوظة.','Unsaved changes.'):tx(lang,'تم الحفظ.','Saved.')}</span><button className="btn btn-primary" disabled={!dirty||pending||!validUrl()} onClick={()=>void save().catch(()=>{})}>{pending?<LoaderCircle size={15} className="animate-spin"/>:<Check size={15}/ >}{tx(lang,'حفظ المؤثرات','Save effects')}</button>{url&&<audio className="audio-preview soundtrack-preview" src={url} controls aria-label={tx(lang,'معاينة المؤثرات','Sound-effects preview')}/>}</div></section>;
 }
 function formatTime(seconds:number) { const s=Math.max(0,Math.floor(seconds)); return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`; }
 

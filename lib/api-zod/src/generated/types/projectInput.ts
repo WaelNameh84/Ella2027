@@ -38,4 +38,11 @@ export interface ProjectInput {
      * @maximum 100
      */
   musicVolume?: number;
+  /** @nullable */
+  soundEffectsUrl?: string | null;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  soundEffectsVolume?: number;
 }

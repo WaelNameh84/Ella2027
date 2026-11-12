@@ -168,6 +168,8 @@ export async function renderMp4(
   codec: "h264" | "hevc" = "h264",
   outputProjectId = projectId,
   subtitleStyle: "classic" | "outline" | "pill" = "classic",
+  soundEffectsUrl: string | null = null,
+  soundEffectsVolume = 35,
 ): Promise<string> {
   if (!scenes.length) throw new Error("Add scenes before exporting.");
   if (scenes.some((scene) => !scene.assetUrl || !["image", "video"].includes(scene.assetType ?? ""))) {
@@ -341,18 +343,33 @@ export async function renderMp4(
         concatenatedPath,
       ]);
     }
-    if (musicUrl && musicVolume > 0) {
-      const music = await mediaBytes(musicUrl, projectId);
-      if (!music.contentType.startsWith("audio/")) {
-        throw new Error("The selected soundtrack must be an audio file.");
+    if ((musicUrl && musicVolume > 0) || (soundEffectsUrl && soundEffectsVolume > 0)) {
+      const audioInputs: string[] = ["-i", concatenatedPath];
+      const filters = ["[0:a]volume=1[base]"];
+      let inputIndex = 1;
+      if (musicUrl && musicVolume > 0) {
+        const music = await mediaBytes(musicUrl, projectId);
+        if (!music.contentType.startsWith("audio/")) throw new Error("The selected soundtrack must be an audio file.");
+        const musicPath = join(workDir, "soundtrack");
+        await writeFile(musicPath, music.bytes);
+        audioInputs.push("-stream_loop", "-1", "-i", musicPath);
+        filters.push(`[${inputIndex}:a]volume=${Math.max(0, Math.min(1, musicVolume / 100))}[music]`);
+        inputIndex += 1;
       }
-      const musicPath = join(workDir, "soundtrack");
-      await writeFile(musicPath, music.bytes);
+      if (soundEffectsUrl && soundEffectsVolume > 0) {
+        const effects = await mediaBytes(soundEffectsUrl, projectId);
+        if (!effects.contentType.startsWith("audio/")) throw new Error("The selected sound-effects track must be an audio file.");
+        const effectsPath = join(workDir, "sound-effects");
+        await writeFile(effectsPath, effects.bytes);
+        audioInputs.push("-stream_loop", "-1", "-i", effectsPath);
+        filters.push(`[${inputIndex}:a]volume=${Math.max(0, Math.min(1, soundEffectsVolume / 100))}[effects]`);
+        inputIndex += 1;
+      }
+      const mixInputs = ["[base]", ...(musicUrl && musicVolume > 0 ? ["[music]"] : []), ...(soundEffectsUrl && soundEffectsVolume > 0 ? ["[effects]"] : [])];
+      filters.push(`${mixInputs.join("")}amix=inputs=${mixInputs.length}:duration=first:dropout_transition=2[a]`);
       await runFfmpeg([
-        "-i", concatenatedPath,
-        "-stream_loop", "-1",
-        "-i", musicPath,
-        "-filter_complex", `[0:a]volume=1[voice];[1:a]volume=${Math.max(0, Math.min(1, musicVolume / 100))}[music];[voice][music]amix=inputs=2:duration=first:dropout_transition=2[a]`,
+        ...audioInputs,
+        "-filter_complex", filters.join(";"),
         "-map", "0:v:0",
         "-map", "[a]",
         "-t", String(renderedDuration),

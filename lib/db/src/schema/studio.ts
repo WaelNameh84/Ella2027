@@ -42,6 +42,8 @@ export const projectsTable = pgTable("studio_projects", {
   characters: jsonb("characters").$type<StudioCharacter[]>().notNull().default([]),
   musicUrl: text("music_url"),
   musicVolume: integer("music_volume").notNull().default(20),
+  soundEffectsUrl: text("sound_effects_url"),
+  soundEffectsVolume: integer("sound_effects_volume").notNull().default(35),
   status: text("status").notNull().default("draft"),
   progress: integer("progress").notNull().default(0),
   exportUrl: text("export_url"),

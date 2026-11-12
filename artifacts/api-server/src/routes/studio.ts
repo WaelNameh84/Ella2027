@@ -220,6 +220,8 @@ function projectDto(project: typeof projectsTable.$inferSelect, sceneCount: numb
     characters: project.characters ?? [],
     musicUrl: project.musicUrl,
     musicVolume: project.musicVolume,
+    soundEffectsUrl: project.soundEffectsUrl,
+    soundEffectsVolume: project.soundEffectsVolume,
     status: project.status,
     progress: project.progress,
     sceneCount,
@@ -1129,6 +1131,8 @@ router.post("/projects/:projectId/export", async (req, res): Promise<void> => {
       parsed.data.codec ?? "h264",
       project.id,
       parsed.data.subtitleStyle ?? "classic",
+      project.soundEffectsUrl,
+      project.soundEffectsVolume,
     );
     const downloadUrl = `/api/projects/${project.id}/export/file`;
     await db.update(projectsTable).set({
@@ -1177,7 +1181,7 @@ router.post("/projects/:projectId/preview", async (req, res): Promise<void> => {
   const previewId = `${project.id}-preview-${randomUUID()}`;
   let previewPath: string | null = null;
   try {
-    previewPath = await renderMp4(userId, project.id, scenes, 480, 24, project.aspectRatio, previewOptions.data.includeSubtitles, project.musicUrl, project.musicVolume, "mp4", "h264", previewId, previewOptions.data.subtitleStyle ?? "classic");
+    previewPath = await renderMp4(userId, project.id, scenes, 480, 24, project.aspectRatio, previewOptions.data.includeSubtitles, project.musicUrl, project.musicVolume, "mp4", "h264", previewId, previewOptions.data.subtitleStyle ?? "classic", project.soundEffectsUrl, project.soundEffectsVolume);
     const bytes = await readFile(previewPath);
     res.setHeader("Content-Type", "video/mp4");
     res.setHeader("Content-Disposition", `inline; filename="ella-preview.mp4"`);
