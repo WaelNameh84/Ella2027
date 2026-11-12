@@ -134,6 +134,14 @@
 @layer base {
   * { @apply border-border; }
   body { @apply font-sans antialiased bg-background text-foreground; margin: 0; }
+  body,
+  body * { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  input,
+  textarea,
+  [contenteditable]:not([contenteditable="false"]),
+  [contenteditable]:not([contenteditable="false"]) * { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
+  .text-selectable,
+  .text-selectable * { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
   button, input, textarea, select { font: inherit; }
   button { cursor: pointer; }
 }
