@@ -228,6 +228,7 @@ export function providerRequiresSuccessfulTest(provider: string): boolean {
   return providersRequiringSuccessfulTest.has(provider);
 }
 export function providerCredentialUsable(provider: string, status: ProviderStatus): boolean {
+  if (status === "quota_limited" || status === "rate_limited") return true;
   return providerRequiresSuccessfulTest(provider) ? status === "valid" : status !== "invalid";
 }
 
@@ -239,14 +240,15 @@ export function classifyProviderResponse(
   if (status >= 200 && status < 300) {
     return { status: "valid", message: "Provider accepted the key." };
   }
+  const quotaSignal = /quota|credits?|billing|exhaust(?:ed|ion)?|resource[_ ]exhausted|payment required|plan limit|spend limit/.test(lower);
+  if (status === 402 || ([403, 429].includes(status) && quotaSignal)) {
+    return {
+      status: "quota_limited",
+      message: "Quota/billing limit: the provider reports no available quota or credits. This does not necessarily mean the API key is malformed, so the key remains enabled. Check the provider's Usage/Quota or Billing page, wait for any quota reset, or use another provider with available quota. The app did not purchase credits or change your plan.",
+    };
+  }
   if (status === 401 || status === 403) {
     return { status: "invalid", message: "The provider rejected this key. Check the key and its permissions." };
-  }
-  if (
-    status === 402 ||
-    (status === 429 && /quota|credit|billing|exhaust|insufficient/.test(lower))
-  ) {
-    return { status: "quota_limited", message: "The provider reports a quota or billing limit. The key remains enabled." };
   }
   if (status === 429) {
     return { status: "rate_limited", message: "The provider is rate limiting this key. It remains enabled." };

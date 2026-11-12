@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   classifyProviderResponse,
   generateWithProvider,
+  providerCredentialUsable,
   testProviderCredential,
 } from "../src/lib/providerRegistry.ts";
 import {
@@ -31,8 +32,16 @@ function jsonResponse(body, status = 200) {
 test("provider response classification distinguishes invalid, quota, rate, and outage", () => {
   assert.equal(classifyProviderResponse(200, "").status, "valid");
   assert.equal(classifyProviderResponse(401, "unauthorized").status, "invalid");
+  assert.equal(classifyProviderResponse(403, "permission denied").status, "invalid");
+  assert.equal(classifyProviderResponse(403, "RESOURCE_EXHAUSTED: quota exceeded").status, "quota_limited");
   assert.equal(classifyProviderResponse(429, "rate limit").status, "rate_limited");
   assert.equal(classifyProviderResponse(429, "quota exhausted").status, "quota_limited");
+  const quota = classifyProviderResponse(402, "billing limit");
+  assert.equal(quota.status, "quota_limited");
+  assert.match(quota.message, /key remains enabled/i);
+  assert.match(quota.message, /Usage\/Quota or Billing/i);
+  assert.equal(providerCredentialUsable("groq", "quota_limited"), true);
+  assert.equal(providerCredentialUsable("huggingface", "quota_limited"), true);
   assert.equal(classifyProviderResponse(503, "unavailable").status, "unavailable");
 });
 

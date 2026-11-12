@@ -78,10 +78,48 @@ const FREE_TEST_KEYS: ProviderKey[] = [
   { id: '00000000-0000-4000-8000-000000000002', provider: 'ai-horde', label: 'AI Horde — anonymous, free, low priority', serviceType: 'image', enabled: true, priority: -200, status: 'valid', lastTestAt: null, testMessage: 'Official anonymous API identifier; no personal key. Anonymous requests have the lowest priority and may be restricted under load.', usedCount: 0, cooldownUntil: null, createdAt: new Date(0).toISOString() },
 ];
 
-function providerKeyIsUsable(provider: string, status: ProviderKey['status']) {
+function providerKeyIsUsable(provider: string, status: ProviderKey['status'], cooldownUntil: string | null = null) {
   if (provider === 'free-test') return true;
+  if (status === 'quota_limited' || status === 'rate_limited') {
+    return !cooldownUntil || new Date(cooldownUntil).getTime() <= Date.now();
+  }
   const verifyFirst = ['huggingface','cloudflare','stability','groq','assemblyai','deepgram'].includes(provider);
   return verifyFirst ? status === 'valid' : status === 'valid' || status === 'untested';
+}
+
+function userFacingJobError(message: string | null | undefined, lang: Lang): string {
+  if (!message) return '';
+  const quota = /^Quota\/billing limit from ([^:]+):/i.exec(message);
+  if (quota) {
+    return tx(lang,
+      `المزوّد ${quota[1]} رفض الطلب بسبب عدم توفر حصة أو رصيد في حسابه. هذا لا يعني بالضرورة أن المفتاح مكتوب خطأ؛ سيبقى مفعّلًا ويُعاد استخدامه بعد انتهاء التهدئة إذا عادت الحصة. راجع صفحة Usage/Quota لدى المزوّد، أو انتظر تجدد الحصة، أو اختر مزوّدًا آخر لديه حصة مجانية متاحة. التطبيق لم يشترِ رصيدًا ولم يرقِّ الحساب.`,
+      `${quota[1]} reports that its account has no quota or credits available. This does not necessarily mean the key is malformed. The key remains enabled and becomes selectable again after cooldown. Check the provider's Usage/Quota page, wait for its quota reset, or use another provider with available free quota. The app did not buy credits or upgrade the account.`,
+    );
+  }
+  if (/quota(?:\/billing| or billing) limit/i.test(message)) {
+    return tx(lang,
+      'المزوّد أبلغ عن نفاد الحصة أو الرصيد. هذا لا يعني بالضرورة أن المفتاح خطأ؛ راجع صفحة الاستخدام/الحصة لدى المزوّد أو انتظر تجدد الحصة، أو استخدم مزوّدًا آخر لديه حصة متاحة.',
+      'The provider reports an exhausted quota or credits. This does not necessarily mean the key is wrong; check the provider usage/quota page, wait for a reset, or use another provider with available quota.',
+    );
+  }
+  return message;
+}
+
+function userFacingProviderTestMessage(message: string | null, providerLabel: string, lang: Lang): string {
+  if (!message) return tx(lang, 'لا توجد نتيجة اختبار بعد.', 'No test result yet.');
+  if (/quota(?:\/billing| or billing) limit/i.test(message)) {
+    return tx(lang,
+      `المزوّد ${providerLabel} أبلغ عن عدم توفر حصة أو رصيد. غالبًا المفتاح محفوظ لكنه لا يستطيع توليد السيناريو الآن. راجع Usage/Quota أو Billing لدى المزوّد، وانتظر تجدد الحصة أو استخدم مزوّدًا آخر. سيبقى المفتاح مفعّلًا، ولم يشترِ التطبيق رصيدًا أو يغيّر خطتك.`,
+      `${providerLabel} reports no quota or credits available. The saved key may still be valid, but script generation will not work until quota is available. Check the provider's Usage/Quota or Billing page, wait for a reset, or use another provider. The key remains enabled; the app did not buy credits or change your plan.`,
+    );
+  }
+  if (/rate limiting this key/i.test(message)) {
+    return tx(lang,
+      `المزوّد ${providerLabel} يقيّد عدد الطلبات مؤقتًا. المفتاح لم يُعطّل؛ انتظر قليلًا ثم أعد المحاولة، أو استخدم مفتاحًا/مزوّدًا آخر إذا كان تدوير المفاتيح مفعّلًا.`,
+      `${providerLabel} is temporarily rate-limiting requests. The key was not disabled; wait and retry, or use another key/provider if rotation is enabled.`,
+    );
+  }
+  return message;
 }
 
 function providerSupports(provider: string, service: string) {
@@ -547,7 +585,7 @@ function Projects() {
   const [backupProgress, setBackupProgress] = useState('');
   const importFileRef = useRef<HTMLInputElement | null>(null);
   const list = useMemo(() => (q.data || []).filter(p => `${p.title} ${p.idea}`.toLowerCase().includes(search.toLowerCase())), [q.data, search]);
-  const textProviderReady = Boolean(keysQuery.data?.some(key => key.serviceType === 'text' && providerSupports(key.provider, 'text') && key.enabled && providerKeyIsUsable(key.provider,key.status)));
+  const textProviderReady = Boolean(keysQuery.data?.some(key => key.serviceType === 'text' && providerSupports(key.provider, 'text') && key.enabled && providerKeyIsUsable(key.provider,key.status,key.cooldownUntil)));
   const freeMode = settingsQuery.data?.freeMode ?? true;
   const afterChange = () => { qc.invalidateQueries({ queryKey: getListProjectsQueryKey() }); qc.invalidateQueries({ queryKey: getGetStudioSummaryQueryKey() }); };
   const exportBackup = async (projectId: string) => {
@@ -773,7 +811,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
   useEffect(() => { if (project?.scenes?.length && !selected) setSelected(project.scenes[0].id); }, [project, selected]);
   const scenes = [...(project?.scenes || [])].sort((a,b) => a.sortOrder-b.sortOrder);
   const activeScene = scenes.find(s => s.id === selected) || scenes[0];
-  const textProviderReady=Boolean(keysQuery.data?.some(key=>key.serviceType==='text'&&providerSupports(key.provider,'text')&&key.enabled&&providerKeyIsUsable(key.provider,key.status)));
+  const textProviderReady=Boolean(keysQuery.data?.some(key=>key.serviceType==='text'&&providerSupports(key.provider,'text')&&key.enabled&&providerKeyIsUsable(key.provider,key.status,key.cooldownUntil)));
   const generationKeys=[...(keysQuery.data||[]),...FREE_TEST_KEYS];
   const freeMode=settingsQuery.data?.freeMode??true;
   const refresh = () => { qc.invalidateQueries({queryKey:getGetProjectQueryKey(projectId)}); qc.invalidateQueries({queryKey:getListProjectsQueryKey()}); qc.invalidateQueries({queryKey:getGetStudioSummaryQueryKey()}); qc.invalidateQueries({queryKey:getListStudioJobsQueryKey()}); };
@@ -833,7 +871,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
          {generate.isError && <div className="inline-error">{tx(lang,'تعذّر بدء التوليد. تحقق من مفتاح النص أو أعد المحاولة.','Could not start generation. Check your text key or try again.')}</div>}</>}
          {scenes.length > 0 && <BatchVoiceGeneration projectId={projectId} scenes={scenes} keys={generationKeys} lang={lang} freeMode={freeMode} hasActiveJob={Boolean(currentJob && (currentJob.status === 'queued' || currentJob.status === 'running'))} onQueued={refresh}/>}
          {scenes.length > 0 && <BatchVideoGeneration projectId={projectId} scenes={scenes} keys={generationKeys} lang={lang} freeMode={freeMode} hasActiveJob={Boolean(currentJob && (currentJob.status === 'queued' || currentJob.status === 'running'))} onQueued={refresh}/>}
-         {currentJob && <div className="job-progress panel" role="status"><div className="job-progress-head"><div><b>{tx(lang,({script:'توليد السيناريو',export:'تصدير الفيديو',image:'توليد صورة',video:'توليد فيديو',voice:'توليد صوت'})[currentJob.jobType],({script:'Script generation',export:'Video export',image:'Image generation',video:'Video generation',voice:'Voice generation'})[currentJob.jobType])}</b><span className={`job-state job-${currentJob.status}`}>{tx(lang,currentJob.status==='queued'?'في الانتظار':currentJob.status==='running'?'قيد التنفيذ':currentJob.status==='completed'?'مكتملة':'فشلت',currentJob.status)}</span></div><Link href="/jobs" className="text-link">{tx(lang,'عرض المهام','View jobs')}</Link></div>{(currentJob.status==='queued'||currentJob.status==='running')&&<div className="job-progress-track"><span style={{width:`${currentJob.progress}%`}}/></div>}<p>{currentJob.error || currentJob.message}</p>{latestExportJob?.status==='completed'&&<ExportActions projectId={projectId} lang={lang}/>}</div>}
+         {currentJob && <div className="job-progress panel" role="status"><div className="job-progress-head"><div><b>{tx(lang,({script:'توليد السيناريو',export:'تصدير الفيديو',image:'توليد صورة',video:'توليد فيديو',voice:'توليد صوت'})[currentJob.jobType],({script:'Script generation',export:'Video export',image:'Image generation',video:'Video generation',voice:'Voice generation'})[currentJob.jobType])}</b><span className={`job-state job-${currentJob.status}`}>{tx(lang,currentJob.status==='queued'?'في الانتظار':currentJob.status==='running'?'قيد التنفيذ':currentJob.status==='completed'?'مكتملة':'فشلت',currentJob.status)}</span></div><Link href="/jobs" className="text-link">{tx(lang,'عرض المهام','View jobs')}</Link></div>{(currentJob.status==='queued'||currentJob.status==='running')&&<div className="job-progress-track"><span style={{width:`${currentJob.progress}%`}}/></div>}<p>{currentJob.error ? userFacingJobError(currentJob.error,lang) : currentJob.message}</p>{latestExportJob?.status==='completed'&&<ExportActions projectId={projectId} lang={lang}/>}</div>}
       </section>
       <aside className="scene-inspector panel">
         <div className="inspector-heading"><div><span className="eyebrow">{tx(lang,'محرر اللقطة','SHOT EDITOR')}</span><h3>{activeScene?.title || tx(lang,'اختر مشهدًا','Select a scene')}</h3></div>{activeScene && <div className="flex gap-1"><button className="btn btn-ghost !p-2" onClick={()=>reorder(activeScene,-1)} title={tx(lang,'تحريك للأعلى','Move up')}><ArrowUp size={15}/></button><button className="btn btn-ghost !p-2" onClick={()=>reorder(activeScene,1)} title={tx(lang,'تحريك للأسفل','Move down')}><ArrowDown size={15}/></button><button className="btn btn-ghost !p-2 text-destructive" onClick={()=>{if(window.confirm(tx(lang,'حذف هذا المشهد؟','Delete this scene?')))deleteScene.mutate({projectId,sceneId:activeScene.id},{onSuccess:()=>{setSelected(null);refresh()}})}} title={tx(lang,'حذف','Delete')}><Trash2 size={15}/></button></div>}</div>
@@ -925,7 +963,7 @@ function JobCard({ job, lang, retrying, onRetry }: { job: StudioJob; lang: Lang;
   return <article className="job-card panel"><div className="job-progress-head"><div><b>{typeLabel}</b><span className={`job-state job-${job.status}`}>{statusLabel}</span></div><Link className="text-link" href={`/projects/${job.projectId}`}>{tx(lang,'فتح المشروع','Open project')}<ArrowLeft size={14}/></Link></div>
     {(job.status==='queued'||job.status==='running')&&<div className="job-progress-track"><span style={{width:`${job.progress}%`}}/></div>}
     <div className="job-card-meta"><span>{job.message}</span><time>{new Date(job.createdAt).toLocaleString(lang==='ar'?'ar':'en')}</time></div>
-    {job.error&&<p className="job-error">{job.error}</p>}
+    {job.error&&<p className="job-error">{userFacingJobError(job.error,lang)}</p>}
     {job.status==='completed'&&job.jobType==='export'&&<ExportActions projectId={job.projectId} lang={lang}/>}
     {job.status==='failed'&&<button className="btn btn-quiet mt-3" onClick={onRetry} disabled={retrying}><Clock3 size={15}/>{retrying?tx(lang,'جارٍ الإرسال...','Retrying...'):tx(lang,'إعادة المحاولة','Retry')}</button>}
   </article>;
@@ -1099,7 +1137,7 @@ function GenerationPanel({projectId,scene,keys,lang,onQueued,freeMode}:{projectI
   const [mode,setMode]=useState<'text'|'image'>('image');
   const [approved,setApproved]=useState(false);
   const service=action==='image'?'image':action==='video'?'video':action==='voice'?'voice':null;
-  const readyKeys=keys.filter(key=>key.enabled&&key.serviceType===service&&providerSupports(key.provider,service||'')&&providerKeyIsUsable(key.provider,key.status)).sort((a,b)=>Number(b.provider==='ai-horde')-Number(a.provider==='ai-horde')||Number(b.provider==='piper-local')-Number(a.provider==='piper-local'));
+  const readyKeys=keys.filter(key=>key.enabled&&key.serviceType===service&&providerSupports(key.provider,service||'')&&providerKeyIsUsable(key.provider,key.status,key.cooldownUntil)).sort((a,b)=>Number(b.provider==='ai-horde')-Number(a.provider==='ai-horde')||Number(b.provider==='piper-local')-Number(a.provider==='piper-local'));
   const activeKey=readyKeys.find(key=>key.id===providerId)||readyKeys[0];
   const aiHordeSelected=action==='image'&&activeKey?.provider==='ai-horde';
   const aiHordeModelsQuery=useQuery({queryKey:['ai-horde-active-image-models'],enabled:Boolean(aiHordeSelected),staleTime:60_000,retry:false,queryFn:async()=>{const response=await fetch(`${basePath}/api/providers/ai-horde/models`,{credentials:'include'});const body=await response.json().catch(()=>({})) as {models?:AiHordeModelOption[];error?:string};if(!response.ok)throw new Error(body.error||'AI Horde models are temporarily unavailable.');return Array.isArray(body.models)?body.models:[];}});
@@ -1117,7 +1155,7 @@ function GenerationPanel({projectId,scene,keys,lang,onQueued,freeMode}:{projectI
   const modelValid=action==='voice'?voiceId.trim().length>0:aiHordeSelected?Boolean(model&&aiHordeModels.some(item=>item.name===model)):model.trim().length>0;
   if(freeMode&&!keys.some(key=>key.provider==='free-test'))return <div className="service-purpose-hint is-unavailable"><b>{tx(lang,'المزوّدات الخارجية متوقفة','External providers are off')}</b><span>{tx(lang,'شغّل السماح بالمزوّدات من الإعدادات عند الاستعداد. لا يُرسل طلب فيديو قبل موافقتك على احتمال الرسوم.','Enable external providers in Settings when ready. No video request is sent before you approve possible charges.')} <Link href="/settings/providers" className="text-link">{tx(lang,'فتح الإعدادات','Open settings')}<ArrowLeft size={13}/></Link></span></div>;
   return <div className="generation-tools"><div className="generation-heading"><span className="eyebrow">{tx(lang,'توليد الأصول','GENERATE ASSETS')}</span><Link href="/settings/providers" className="text-link">{tx(lang,'إعداد المزوّدين','Provider setup')}<ArrowLeft size={13}/></Link></div><div className="generation-buttons">
-    {(['image','video','voice'] as const).map(kind=>{const availableKeys=keys.filter(key=>key.enabled&&key.serviceType===kind&&providerSupports(key.provider,kind)&&providerKeyIsUsable(key.provider,key.status));const available=availableKeys.length>0;return <button key={kind} className="btn btn-quiet" disabled={!available} onClick={()=>{setAction(kind);setProviderId('');setApproved(false);if(kind==='voice')setVoiceId(defaultVoiceId(availableKeys[0]?.provider));if(kind==='video'){const nextMode=scene.assetType==='image'?'image':'text';setMode(nextMode);setModel(defaultVideoModel(availableKeys[0]?.provider,nextMode));}}} title={!available?tx(lang,'لا يوجد مزوّد متاح لهذه المهمة','No provider is available for this task'):undefined}>{kind==='image'?<ImagePlus size={15}/>:kind==='video'?<Film size={15}/>:<Languages size={15}/ >}{tx(lang,kind==='image'?'صورة':kind==='video'?'فيديو':'صوت',kind)}</button>})}
+    {(['image','video','voice'] as const).map(kind=>{const availableKeys=keys.filter(key=>key.enabled&&key.serviceType===kind&&providerSupports(key.provider,kind)&&providerKeyIsUsable(key.provider,key.status,key.cooldownUntil));const available=availableKeys.length>0;return <button key={kind} className="btn btn-quiet" disabled={!available} onClick={()=>{setAction(kind);setProviderId('');setApproved(false);if(kind==='voice')setVoiceId(defaultVoiceId(availableKeys[0]?.provider));if(kind==='video'){const nextMode=scene.assetType==='image'?'image':'text';setMode(nextMode);setModel(defaultVideoModel(availableKeys[0]?.provider,nextMode));}}} title={!available?tx(lang,'لا يوجد مزوّد متاح لهذه المهمة','No provider is available for this task'):undefined}>{kind==='image'?<ImagePlus size={15}/>:kind==='video'?<Film size={15}/>:<Languages size={15}/ >}{tx(lang,kind==='image'?'صورة':kind==='video'?'فيديو':'صوت',kind)}</button>})}
   </div><p className="generation-note">{tx(lang,'المخرجات تظهر هنا بعد اكتمال المهمة؛ لا توجد نتائج تجريبية.','Completed outputs appear here after the job finishes. No sample assets are shown.')}</p>
   {(imageJob.isError||videoJob.isError||voiceJob.isError)&&<p className="inline-error" role="alert">{(videoJob.error instanceof Error&&videoJob.error.message)||(imageJob.error instanceof Error&&imageJob.error.message)||(voiceJob.error instanceof Error&&voiceJob.error.message)||tx(lang,'تعذر إرسال طلب التوليد. تحقّق من المفتاح وإعدادات المزوّد.','Could not queue generation. Check the provider key and settings.')}</p>}
       {action&&<Modal title={tx(lang,'تأكيد طلب التوليد','Confirm generation request')} subtitle={aiHordeSelected?tx(lang,'AI Horde مجهول ومجاني بلا حساب أو مفتاح شخصي؛ أولوية الانتظار منخفضة وقد يتوقف عند الضغط.','AI Horde anonymous use is free with no account or personal key; queue priority is low and access may be restricted under load.'):activeKey?.provider==='piper-local'?tx(lang,'Piper صوت عربي مجاني يُولّد محليًا على خادم التطبيق، دون اتصال بمزوّد صوت مدفوع.','Piper generates free Arabic narration locally on the app server; no paid voice provider is contacted.'):tx(lang,'قد تُحتسب رسوم على هذا الطلب، وقد يجرّب النظام مزوّدًا احتياطيًا آخر عند التعطل أو نفاد الحصة.','This request may incur charges. Automatic failover may also use another configured provider.')} onClose={close}><div className="form-stack">
@@ -1138,7 +1176,7 @@ function GenerationPanel({projectId,scene,keys,lang,onQueued,freeMode}:{projectI
 
 function BatchVideoGeneration({projectId,scenes,keys,lang,hasActiveJob,onQueued,freeMode}:{projectId:string;scenes:Scene[];keys:ProviderKey[];lang:Lang;hasActiveJob:boolean;onQueued:()=>void;freeMode:boolean}) {
   const videoJob=useQueueSceneVideoGeneration();
-  const videoKeys=keys.filter(key=>key.enabled&&key.serviceType==='video'&&providerSupports(key.provider,'video')&&providerKeyIsUsable(key.provider,key.status));
+  const videoKeys=keys.filter(key=>key.enabled&&key.serviceType==='video'&&providerSupports(key.provider,'video')&&providerKeyIsUsable(key.provider,key.status,key.cooldownUntil));
   const firstVideoProvider=videoKeys[0]?.provider;
   const scenesWithoutVideo=scenes.filter(scene=>scene.assetType!=='video'||!scene.assetUrl);
   const allHaveImages=scenesWithoutVideo.every(scene=>scene.assetType==='image'&&Boolean(scene.assetUrl));
@@ -1205,7 +1243,7 @@ function BatchVideoGeneration({projectId,scenes,keys,lang,hasActiveJob,onQueued,
 
 function BatchVoiceGeneration({projectId,scenes,keys,lang,hasActiveJob,onQueued,freeMode}:{projectId:string;scenes:Scene[];keys:ProviderKey[];lang:Lang;hasActiveJob:boolean;onQueued:()=>void;freeMode:boolean}) {
   const voiceJob=useQueueSceneVoiceGeneration();
-  const voiceKeys=keys.filter(key=>key.enabled&&key.serviceType==='voice'&&providerSupports(key.provider,'voice')&&providerKeyIsUsable(key.provider,key.status)).sort((a,b)=>Number(b.provider==='piper-local')-Number(a.provider==='piper-local'));
+  const voiceKeys=keys.filter(key=>key.enabled&&key.serviceType==='voice'&&providerSupports(key.provider,'voice')&&providerKeyIsUsable(key.provider,key.status,key.cooldownUntil)).sort((a,b)=>Number(b.provider==='piper-local')-Number(a.provider==='piper-local'));
   const scenesWithoutVoice=scenes.filter(scene=>scene.narration.trim()&&!scene.voiceUrl);
   const [open,setOpen]=useState(false);
   const [providerId,setProviderId]=useState('');
@@ -1276,7 +1314,7 @@ function TranscriptionPanel({projectId,sceneId,language,keys,lang,freeMode}:{pro
   const [error,setError]=useState('');
   const [draft,setDraft]=useState('');
   const [providerUsed,setProviderUsed]=useState('');
-  const readyKeys=keys.filter(key=>key.enabled&&key.serviceType==='transcription'&&providerSupports(key.provider,'transcription')&&providerKeyIsUsable(key.provider,key.status));
+  const readyKeys=keys.filter(key=>key.enabled&&key.serviceType==='transcription'&&providerSupports(key.provider,'transcription')&&providerKeyIsUsable(key.provider,key.status,key.cooldownUntil));
   const activeKey=readyKeys.find(key=>key.id===providerId)||readyKeys[0];
   const canTranslate=activeKey?.provider==='openai'||activeKey?.provider==='whisper';
 
@@ -1474,10 +1512,11 @@ function ProviderRow({item,onEdit,onToggle,onPriority,onTest,onDelete,testing,fr
   const serviceConnected=providerServiceIsConnected(item.provider,item.serviceType);
   const serviceReady=serviceConnected && item.status==='valid';
   const plan=providerPlanInfo[item.provider];
+  const statusLabel=item.status==='quota_limited'?tx(lang,'الحصة مستنفدة','quota limited'):item.status==='rate_limited'?tx(lang,'طلبات كثيرة مؤقتًا','rate limited'):item.status.replace('_',' ');
   return <div className="provider-row">
     <div className="provider-avatar">{item.provider.slice(0,2).toUpperCase()}</div>
-    <div className="provider-ident"><b>{item.label}</b><span>{item.provider}</span><span className={`provider-purpose ${serviceReady?'':'is-unavailable'}`}>{tx(lang,'وظيفته:','Purpose:')} {purpose.label}</span><small className="provider-purpose-description">{purpose.description}</small>{!serviceReady&&<small className="provider-purpose-warning">{serviceConnected?tx(lang,'المفتاح غير جاهز للاستخدام حتى ينجح اختبار الاتصال.','The key is not ready for use until its connection test succeeds.'):tx(lang,'هذا الاستخدام غير موصول حاليًا لهذا المزوّد.','This task is not currently connected for this provider.')}</small>}{item.provider==='stability'&&item.status==='untested'&&<small className="provider-purpose-warning">{tx(lang,'لا توثّق Stability AI فحص مصادقة آمنًا عبر API؛ لم يُرسل طلب توليد.','Stability AI does not document a safe API auth check; no generation request was sent.')}</small>}{plan&&<small className="provider-purpose-description"><b>{tx(lang,'التصنيف:','Plan:')} {tx(lang,plan.kind==='trial'?'رصيد تجريبي محدود':plan.kind==='free-quota'?'حصة مجانية مستمرة':'مدفوع',plan.kind==='trial'?'Limited trial credits':plan.kind==='free-quota'?'Ongoing free quota':'Paid')}</b> — {tx(lang,plan.ar,plan.en)} <a className="text-link" href={plan.url} target="_blank" rel="noopener noreferrer">{tx(lang,'المصدر الرسمي','Official source')}</a></small>}</div>
-    <span className={`key-status ${item.status}`}>{item.status.replace('_',' ')}</span>
+    <div className="provider-ident"><b>{item.label}</b><span>{item.provider}</span><span className={`provider-purpose ${serviceReady?'':'is-unavailable'}`}>{tx(lang,'وظيفته:','Purpose:')} {purpose.label}</span><small className="provider-purpose-description">{purpose.description}</small>{!serviceReady&&<small className="provider-purpose-warning">{item.status==='quota_limited'?tx(lang,'المفتاح محفوظ ومفعّل، لكن حساب المزوّد لا يملك حاليًا حصة/رصيدًا متاحًا؛ هذا لا يعني بالضرورة أن المفتاح خطأ.','The key is saved and enabled, but the provider account currently has no quota/credits available; this does not necessarily mean the key is invalid.'):item.status==='rate_limited'?tx(lang,'المفتاح محفوظ ومفعّل؛ المزوّد يقيّد الطلبات مؤقتًا. انتظر انتهاء المهلة ثم أعد المحاولة.','The key is saved and enabled; the provider is temporarily rate-limiting requests. Wait for cooldown, then retry.'):serviceConnected?tx(lang,'المفتاح غير جاهز للاستخدام حتى ينجح اختبار الاتصال.','The key is not ready for use until its connection test succeeds.'):tx(lang,'هذا الاستخدام غير موصول حاليًا لهذا المزوّد.','This task is not currently connected for this provider.')}</small>}{item.provider==='stability'&&item.status==='untested'&&<small className="provider-purpose-warning">{tx(lang,'لا توثّق Stability AI فحص مصادقة آمنًا عبر API؛ لم يُرسل طلب توليد.','Stability AI does not document a safe API auth check; no generation request was used as a test.')}</small>}{plan&&<small className="provider-purpose-description"><b>{tx(lang,'التصنيف:','Plan:')} {tx(lang,plan.kind==='trial'?'رصيد تجريبي محدود':plan.kind==='free-quota'?'حصة مجانية مستمرة':'مدفوع',plan.kind==='trial'?'Limited trial credits':plan.kind==='free-quota'?'Ongoing free quota':'Paid')}</b> — {tx(lang,plan.ar,plan.en)} <a className="text-link" href={plan.url} target="_blank" rel="noopener noreferrer">{tx(lang,'المصدر الرسمي','Official source')}</a></small>}</div>
+    <span className={`key-status ${item.status}`}>{statusLabel}</span>
     <label className="priority-control"><span>{tx(lang,'الأولوية','Priority')}</span><input type="number" min="0" value={item.priority} aria-label={tx(lang,'أولوية المفتاح','Key priority')} onChange={e=>onPriority(Number(e.target.value))}/></label>
     <label className="switch-control" title={tx(lang,'مفعّل','Enabled')}><input type="checkbox" checked={item.enabled} onChange={e=>onToggle(e.target.checked)}/><span /></label>
     <div className="provider-actions">
@@ -1486,7 +1525,7 @@ function ProviderRow({item,onEdit,onToggle,onPriority,onTest,onDelete,testing,fr
       <button className="btn btn-ghost !p-2" title={tx(lang,'تعديل','Edit')} onClick={onEdit}><Settings2 size={15}/></button>
       <button className="btn btn-ghost !p-2 text-destructive" title={tx(lang,'حذف','Delete')} onClick={onDelete}><Trash2 size={15}/></button>
     </div>
-    <small className="provider-message">{item.testMessage || tx(lang,'لا توجد نتيجة اختبار بعد.','No test result yet.')} · {testedAt} · {tx(lang,`استخدامات مسجلة: ${item.usedCount}`,`Recorded uses: ${item.usedCount}`)}</small>
+    <small className="provider-message">{userFacingProviderTestMessage(item.testMessage,item.label,lang)} · {testedAt} · {tx(lang,`استخدامات مسجلة: ${item.usedCount}`,`Recorded uses: ${item.usedCount}`)}</small>
   </div>;
 }
 function ProviderForm({initial,initialService,restrictToSection,onClose,onSave,pending}:{initial:ProviderKey|null;initialService:ProviderKey['serviceType'];restrictToSection:boolean;onClose:()=>void;onSave:(data:{provider:string;label:string;apiKey:string;serviceType:'text'|'image'|'video'|'voice'|'transcription'|'music'|'media';enabled:boolean;priority:number})=>void;pending:boolean}) {
