@@ -22,6 +22,7 @@ import { generateNarration, generateStill, generateVideo, isProviderCallError } 
 import { readGeneratedAsset, saveGeneratedAsset } from "./studioAssets";
 import { isZeroSpendMode, ZERO_SPEND_ERROR } from "./spendingGuard";
 import { createTestImage, createTestWav } from "./freeTestProvider";
+import { generatePiperNarration, PIPER_LOCAL_PROVIDER_KEY } from "./piperTts";
 
 type SceneDraft = {
   title: string;
@@ -133,7 +134,7 @@ function safeJobError(error: unknown): string {
 function supportsJob(provider: string, jobType: JobKind): boolean {
   if (jobType === "image") return ["openai", "stability", "replicate", "huggingface"].includes(provider);
   if (jobType === "video") return ["replicate", "fal"].includes(provider);
-  if (jobType === "voice") return ["elevenlabs", "openai", "openai-audio", "google-tts", "azure-speech"].includes(provider);
+  if (jobType === "voice") return ["elevenlabs", "openai", "openai-audio", "google-tts", "azure-speech", "piper-local"].includes(provider);
   return false;
 }
 
@@ -735,8 +736,10 @@ async function processVoiceJob(job: typeof studioJobsTable.$inferSelect): Promis
     });
     const voice = input.providerKeyId === FREE_TEST_PROVIDER_KEY
       ? Buffer.from(createTestWav(Math.max(1, scene.durationSeconds)))
-      : await callMediaProvider(job, "voice", input.providerKeyId, "provider_request", (provider, key) =>
-        generateNarration(provider, key, input.voiceId || "alloy", scene.narration));
+      : input.providerKeyId === PIPER_LOCAL_PROVIDER_KEY
+        ? await generatePiperNarration(scene.narration)
+        : await callMediaProvider(job, "voice", input.providerKeyId, "provider_request", (provider, key) =>
+          generateNarration(provider, key, input.voiceId || "alloy", scene.narration));
     const saved = await saveGeneratedAsset(scene.projectId, scene.id, "voice", voice);
     voiceUrl = saved.url;
     await persistJobResult(job, { sceneId: scene.id, voiceUrl }, 85, "Narration saved; attaching it to the scene.");
@@ -817,7 +820,9 @@ async function processNextJob(): Promise<void> {
   const job = await claimNextJob();
   if (!job) return;
   try {
-    if (job.jobType !== "export" && await isZeroSpendMode(job.userId)) {
+    const localFreeVoice = job.jobType === "voice"
+      && [FREE_TEST_PROVIDER_KEY, PIPER_LOCAL_PROVIDER_KEY].includes(String((job.input as JobInput).providerKeyId ?? ""));
+    if (job.jobType !== "export" && !localFreeVoice && await isZeroSpendMode(job.userId)) {
       throw new Error(ZERO_SPEND_ERROR);
     }
     if (job.jobType === "script") {

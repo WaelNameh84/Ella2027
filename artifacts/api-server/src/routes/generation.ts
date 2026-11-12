@@ -25,6 +25,7 @@ import { isProviderCallError } from "../lib/mediaGeneration";
 import { transcribeAudio, type TranscriptionMode } from "../lib/transcription";
 import { generatedAssetContentType, generatedAssetPath, readGeneratedAsset, saveGeneratedAsset, type GeneratedAssetKind } from "../lib/studioAssets";
 import { isZeroSpendMode, ZERO_SPEND_ERROR } from "../lib/spendingGuard";
+import { PIPER_LOCAL_PROVIDER_KEY } from "../lib/piperTts";
 
 const router: IRouter = Router();
 
@@ -203,7 +204,7 @@ router.post("/projects/:projectId/scenes/:sceneId/jobs/voice", async (req, res):
     return;
   }
   const userId = userIdOf(res);
-  if (await isZeroSpendMode(userId) && parsed.data.providerKeyId !== FREE_TEST_PROVIDER_KEY) {
+  if (await isZeroSpendMode(userId) && parsed.data.providerKeyId !== FREE_TEST_PROVIDER_KEY && parsed.data.providerKeyId !== PIPER_LOCAL_PROVIDER_KEY) {
     res.status(403).json({ error: ZERO_SPEND_ERROR });
     return;
   }
@@ -220,7 +221,7 @@ router.post("/projects/:projectId/scenes/:sceneId/jobs/voice", async (req, res):
     res.status(409).json({ error: "Add narration text to this scene before generating speech." });
     return;
   }
-  const keyCheck = parsed.data.providerKeyId === FREE_TEST_PROVIDER_KEY
+  const keyCheck = [FREE_TEST_PROVIDER_KEY, PIPER_LOCAL_PROVIDER_KEY].includes(parsed.data.providerKeyId ?? "")
     ? { error: null }
     : await confirmUsableKeys(userId, "voice", "voice", parsed.data.providerKeyId);
   if (keyCheck.error) {
