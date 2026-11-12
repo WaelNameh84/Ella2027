@@ -5,15 +5,15 @@ import { join, resolve } from "node:path";
 export type GeneratedAssetKind = "image" | "video" | "voice";
 
 const extensions: Record<GeneratedAssetKind, string> = {
-  image: "png",
+  image: "svg",
   video: "mp4",
-  voice: "mp3",
+  voice: "wav",
 };
 
 const contentTypes: Record<GeneratedAssetKind, string> = {
-  image: "image/png",
+  image: "image/svg+xml",
   video: "video/mp4",
-  voice: "audio/mpeg",
+  voice: "audio/wav",
 };
 
 function assetDirectory(projectId: string, sceneId: string): string {
@@ -44,7 +44,7 @@ function filenameFromAssetUrl(
   projectId: string,
   sceneId: string,
 ): string | null {
-  const match = /^\/api\/projects\/([a-f0-9-]+)\/assets\/([a-f0-9-]+)\/([a-f0-9-]+\.(?:png|mp4|mp3))$/i.exec(assetUrl);
+  const match = /^\/api\/projects\/([a-f0-9-]+)\/assets\/([a-f0-9-]+)\/([a-f0-9-]+\.(?:svg|png|mp4|wav|mp3))$/i.exec(assetUrl);
   if (!match || match[1] !== projectId || match[2] !== sceneId) return null;
   return match[3];
 }
@@ -74,8 +74,10 @@ export async function readGeneratedAsset(
 
 export function generatedAssetContentType(assetUrl: string): string | null {
   const filename = assetUrl.split("/").at(-1) ?? "";
-  if (!/^[a-f0-9-]+\.(?:png|mp4|mp3)$/i.test(filename)) return null;
+  if (!/^[a-f0-9-]+\.(?:svg|png|mp4|wav|mp3)$/i.test(filename)) return null;
+  if (filename.endsWith(".svg")) return "image/svg+xml";
   if (filename.endsWith(".png")) return "image/png";
   if (filename.endsWith(".mp4")) return "video/mp4";
+  if (filename.endsWith(".wav")) return "audio/wav";
   return "audio/mpeg";
 }

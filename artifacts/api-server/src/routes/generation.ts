@@ -30,6 +30,7 @@ const router: IRouter = Router();
 
 type JobKind = "image" | "video" | "voice";
 type ServiceKind = "image" | "video" | "voice";
+const FREE_TEST_PROVIDER_KEY = "00000000-0000-0000-0000-000000000000";
 
 function userIdOf(res: Response): string {
   return String(res.locals.userId);
@@ -122,7 +123,7 @@ router.post("/projects/:projectId/scenes/:sceneId/jobs/image", async (req, res):
     return;
   }
   const userId = userIdOf(res);
-  if (await isZeroSpendMode(userId)) {
+  if (await isZeroSpendMode(userId) && parsed.data.providerKeyId !== FREE_TEST_PROVIDER_KEY) {
     res.status(403).json({ error: ZERO_SPEND_ERROR });
     return;
   }
@@ -130,7 +131,9 @@ router.post("/projects/:projectId/scenes/:sceneId/jobs/image", async (req, res):
     res.status(404).json({ error: "Scene not found." });
     return;
   }
-  const keyCheck = await confirmUsableKeys(userId, "image", "image", parsed.data.providerKeyId);
+  const keyCheck = parsed.data.providerKeyId === FREE_TEST_PROVIDER_KEY
+    ? { error: null }
+    : await confirmUsableKeys(userId, "image", "image", parsed.data.providerKeyId);
   if (keyCheck.error) {
     res.status(409).json({ error: keyCheck.error });
     return;
@@ -200,7 +203,7 @@ router.post("/projects/:projectId/scenes/:sceneId/jobs/voice", async (req, res):
     return;
   }
   const userId = userIdOf(res);
-  if (await isZeroSpendMode(userId)) {
+  if (await isZeroSpendMode(userId) && parsed.data.providerKeyId !== FREE_TEST_PROVIDER_KEY) {
     res.status(403).json({ error: ZERO_SPEND_ERROR });
     return;
   }
@@ -217,7 +220,9 @@ router.post("/projects/:projectId/scenes/:sceneId/jobs/voice", async (req, res):
     res.status(409).json({ error: "Add narration text to this scene before generating speech." });
     return;
   }
-  const keyCheck = await confirmUsableKeys(userId, "voice", "voice", parsed.data.providerKeyId);
+  const keyCheck = parsed.data.providerKeyId === FREE_TEST_PROVIDER_KEY
+    ? { error: null }
+    : await confirmUsableKeys(userId, "voice", "voice", parsed.data.providerKeyId);
   if (keyCheck.error) {
     res.status(409).json({ error: keyCheck.error });
     return;

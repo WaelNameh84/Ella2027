@@ -21,6 +21,7 @@ import { renderMp4 } from "./videoExport";
 import { generateNarration, generateStill, generateVideo, isProviderCallError } from "./mediaGeneration";
 import { readGeneratedAsset, saveGeneratedAsset } from "./studioAssets";
 import { isZeroSpendMode, ZERO_SPEND_ERROR } from "./spendingGuard";
+import { createTestImage, createTestWav } from "./freeTestProvider";
 
 type SceneDraft = {
   title: string;
@@ -34,6 +35,8 @@ type SceneDraft = {
   lighting: string;
   characterIds: string[];
 };
+
+export const FREE_TEST_PROVIDER_KEY = "00000000-0000-0000-0000-000000000000";
 
 type ScriptResult = { scenes: SceneDraft[]; characters: StudioCharacter[] };
 
@@ -626,7 +629,9 @@ async function processImageJob(job: typeof studioJobsTable.$inferSelect): Promis
   const outputAssets = assetResult(job);
   while (outputAssets.length < outputCount) {
     const requestedModel = input.model || "black-forest-labs/flux-schnell";
-    const bytes = await callMediaProvider(job, "image", input.providerKeyId, "provider_request", async (provider, key) => {
+    const bytes = input.providerKeyId === FREE_TEST_PROVIDER_KEY
+      ? Buffer.from(createTestImage(prompt))
+      : await callMediaProvider(job, "image", input.providerKeyId, "provider_request", async (provider, key) => {
       const providerModel = provider === "replicate"
         ? (requestedModel.includes("/") ? requestedModel : "black-forest-labs/flux-schnell")
         : provider === "openai"
@@ -728,8 +733,10 @@ async function processVoiceJob(job: typeof studioJobsTable.$inferSelect): Promis
       progress: 20,
       message: "Generating spoken narration.",
     });
-    const voice = await callMediaProvider(job, "voice", input.providerKeyId, "provider_request", (provider, key) =>
-      generateNarration(provider, key, input.voiceId || "alloy", scene.narration));
+    const voice = input.providerKeyId === FREE_TEST_PROVIDER_KEY
+      ? Buffer.from(createTestWav(Math.max(1, scene.durationSeconds)))
+      : await callMediaProvider(job, "voice", input.providerKeyId, "provider_request", (provider, key) =>
+        generateNarration(provider, key, input.voiceId || "alloy", scene.narration));
     const saved = await saveGeneratedAsset(scene.projectId, scene.id, "voice", voice);
     voiceUrl = saved.url;
     await persistJobResult(job, { sceneId: scene.id, voiceUrl }, 85, "Narration saved; attaching it to the scene.");
