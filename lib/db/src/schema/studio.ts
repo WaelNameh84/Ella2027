@@ -193,3 +193,75 @@ export const favoriteMediaTable = pgTable("studio_favorite_media", {
     table.mediaId,
   ),
 ]);
+
+export const dialogueLinesTable = pgTable("studio_dialogue_lines", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  projectId: uuid("project_id").notNull().references(() => projectsTable.id, { onDelete: "cascade" }),
+  sceneId: uuid("scene_id").notNull().references(() => scenesTable.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull(),
+  characterId: text("character_id").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  text: text("text").notNull().default(""),
+  startSeconds: doublePrecision("start_seconds").notNull().default(0),
+  endSeconds: doublePrecision("end_seconds"),
+  voiceId: text("voice_id"),
+  voiceUrl: text("voice_url"),
+  voiceVolume: integer("voice_volume").notNull().default(100),
+  status: text("status").notNull().default("draft"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+}, (table) => [
+  index("studio_dialogue_scene_order_idx").on(table.sceneId, table.sortOrder),
+  index("studio_dialogue_project_user_idx").on(table.projectId, table.userId),
+]);
+
+export const storyboardVersionsTable = pgTable("studio_storyboard_versions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  projectId: uuid("project_id").notNull().references(() => projectsTable.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull(),
+  name: text("name").notNull().default("Untitled storyboard"),
+  source: text("source").notNull().default("free-template"),
+  status: text("status").notNull().default("draft"),
+  snapshot: jsonb("snapshot").$type<Record<string, unknown>>().notNull().default({}),
+  versionNumber: integer("version_number").notNull().default(1),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+}, (table) => [index("studio_storyboard_project_version_idx").on(table.projectId, table.versionNumber)]);
+
+export const wizardProgressTable = pgTable("studio_wizard_progress", {
+  projectId: uuid("project_id").primaryKey().references(() => projectsTable.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull(),
+  currentStep: integer("current_step").notNull().default(1),
+  completedSteps: jsonb("completed_steps").$type<number[]>().notNull().default([]),
+  draft: jsonb("draft").$type<Record<string, unknown>>().notNull().default({}),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+});
+
+export const storageAssetsTable = pgTable("studio_storage_assets", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: text("user_id").notNull(),
+  projectId: uuid("project_id").references(() => projectsTable.id, { onDelete: "cascade" }),
+  sceneId: uuid("scene_id").references(() => scenesTable.id, { onDelete: "cascade" }),
+  kind: text("kind").notNull(),
+  storageKey: text("storage_key").notNull(),
+  publicUrl: text("public_url"),
+  contentType: text("content_type").notNull(),
+  sizeBytes: integer("size_bytes").notNull().default(0),
+  backend: text("backend").notNull().default("local-test"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("studio_storage_project_idx").on(table.projectId, table.createdAt),
+  uniqueIndex("studio_storage_backend_key_idx").on(table.backend, table.storageKey),
+]);
+
+export const providerPricingTable = pgTable("studio_provider_pricing", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  provider: text("provider").notNull(),
+  model: text("model").notNull(),
+  serviceType: text("service_type").notNull(),
+  unit: text("unit").notNull(),
+  unitPriceUsd: doublePrecision("unit_price_usd").notNull().default(0),
+  isEstimate: boolean("is_estimate").notNull().default(true),
+  sourceUrl: text("source_url"),
+  checkedAt: timestamp("checked_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [uniqueIndex("studio_provider_pricing_model_idx").on(table.provider, table.model, table.serviceType, table.unit)]);
