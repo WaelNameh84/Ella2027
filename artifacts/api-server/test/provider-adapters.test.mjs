@@ -36,6 +36,18 @@ test("provider response classification distinguishes invalid, quota, rate, and o
   assert.equal(classifyProviderResponse(503, "unavailable").status, "unavailable");
 });
 
+test("HTTP 400 classification exposes only a concise provider rejection reason", () => {
+  const openAi = classifyProviderResponse(400, JSON.stringify({ error: { message: "Invalid voice ID." } }));
+  assert.match(openAi.message, /Invalid voice ID/);
+
+  const elevenLabs = classifyProviderResponse(400, JSON.stringify({ detail: { status: "voice_not_found", message: "Voice not found for this account." } }));
+  assert.match(elevenLabs.message, /Voice not found for this account/);
+
+  const generic = classifyProviderResponse(400, "not-json");
+  assert.match(generic.message, /Check the voice ID, request settings, and provider access/);
+  assert.doesNotMatch(generic.message, /not-json/);
+});
+
 test("OpenAI script adapter sends the expected request and reads the response", async (t) => {
   let captured;
   mockFetch(t, async (url, init) => {

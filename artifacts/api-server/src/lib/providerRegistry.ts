@@ -227,6 +227,38 @@ export function classifyProviderResponse(
   if (status >= 500 || status === 408) {
     return { status: "unavailable", message: "The provider is temporarily unavailable." };
   }
+  if (status === 400) {
+    let detail = "";
+    try {
+      const data = JSON.parse(body) as Record<string, unknown>;
+      const error = data.error;
+      const nestedError = error && typeof error === "object" ? error as Record<string, unknown> : undefined;
+      const providerDetail = data.detail;
+      const nestedDetail = providerDetail && typeof providerDetail === "object"
+        ? providerDetail as Record<string, unknown>
+        : undefined;
+      const firstIssue = Array.isArray(data.errors) ? data.errors[0] : undefined;
+      const nestedIssue = firstIssue && typeof firstIssue === "object"
+        ? firstIssue as Record<string, unknown>
+        : undefined;
+      const candidate = nestedError?.message
+        ?? nestedDetail?.message
+        ?? (typeof providerDetail === "string" ? providerDetail : undefined)
+        ?? data.message
+        ?? nestedIssue?.message;
+      if (typeof candidate === "string") {
+        detail = candidate.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 400);
+      }
+    } catch {
+      // Keep a generic message for non-JSON or potentially sensitive provider responses.
+    }
+    return {
+      status: "unavailable",
+      message: detail
+        ? `The provider rejected the request (HTTP 400): ${detail}`
+        : "The provider rejected the request (HTTP 400). Check the voice ID, request settings, and provider access.",
+    };
+  }
   return { status: "unavailable", message: `Provider returned HTTP ${status}.` };
 }
 
