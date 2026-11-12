@@ -606,7 +606,7 @@ paths:
     post:
       operationId: testProviderKey
       tags: [providers]
-      summary: Test one provider key with a minimal request
+      summary: Test provider authentication using a read-only endpoint when documented; never trigger generation
       parameters:
         - name: keyId
           in: path

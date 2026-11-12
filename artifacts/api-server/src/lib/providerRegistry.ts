@@ -13,7 +13,7 @@ type ProviderDefinition = {
   testHeaders?: (key: string) => Record<string, string>;
   chatModel?: string;
   chatUrl?: string;
-  chatMode?: "openai" | "gemini" | "anthropic";
+  chatMode?: "openai" | "gemini" | "anthropic" | "cloudflare";
 };
 
 export const providerDefinitions: Record<string, ProviderDefinition> = {
@@ -51,6 +51,19 @@ export const providerDefinitions: Record<string, ProviderDefinition> = {
     chatUrl: "https://api.anthropic.com/v1/messages",
     chatModel: "claude-3-5-haiku-latest",
     chatMode: "anthropic",
+  },
+  cloudflare: {
+    label: "Cloudflare Workers AI",
+    officialUrl: "https://dash.cloudflare.com/profile/api-tokens",
+    testUrl: () => {
+      const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+      return accountId && /^[a-f0-9]{32}$/i.test(accountId)
+        ? `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/models/search?search=%40cf%2Fmeta%2Fllama-3.2-3b-instruct`
+        : "";
+    },
+    chatUrl: "https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/v1/chat/completions",
+    chatModel: "@cf/meta/llama-3.2-3b-instruct",
+    chatMode: "cloudflare",
   },
   groq: {
     label: "Groq",
@@ -134,8 +147,7 @@ export const providerDefinitions: Record<string, ProviderDefinition> = {
   },
   stability: {
     label: "Stability AI",
-    officialUrl: "https://platform.stability.ai/account/keys",
-    testUrl: () => "https://api.stability.ai/v1/user/account",
+    officialUrl: "https://platform.stability.ai/dashboard/api-keys",
   },
   replicate: {
     label: "Replicate",
@@ -156,13 +168,15 @@ export const providerDefinitions: Record<string, ProviderDefinition> = {
   },
   deepgram: {
     label: "Deepgram",
-    officialUrl: "https://console.deepgram.com/",
+    officialUrl: "https://console.deepgram.com/signup?jump=keys",
     testUrl: () => "https://api.deepgram.com/v1/projects",
+    testHeaders: (key) => ({ Authorization: `Token ${key}` }),
   },
   assemblyai: {
     label: "AssemblyAI",
-    officialUrl: "https://www.assemblyai.com/dashboard/signup",
-    testUrl: () => "https://api.assemblyai.com/v2/account",
+    officialUrl: "https://www.assemblyai.com/dashboard/home",
+    testUrl: () => "https://api.assemblyai.com/v2/transcript?limit=1",
+    testHeaders: (key) => ({ Authorization: key }),
   },
   "google-tts": {
     label: "Google Cloud Text-to-Speech",
@@ -206,6 +220,16 @@ export const providerCatalog = [
   { id: "google-speech", name: "Google Speech-to-Text", officialUrl: "https://console.cloud.google.com/apis/credentials", canGenerateScript: false },
   { id: "musicgen", name: "MusicGen", officialUrl: "https://github.com/facebookresearch/audiocraft", canGenerateScript: false },
 ];
+
+const providersRequiringSuccessfulTest = new Set([
+  "huggingface", "cloudflare", "stability", "groq", "assemblyai", "deepgram",
+]);
+export function providerRequiresSuccessfulTest(provider: string): boolean {
+  return providersRequiringSuccessfulTest.has(provider);
+}
+export function providerCredentialUsable(provider: string, status: ProviderStatus): boolean {
+  return providerRequiresSuccessfulTest(provider) ? status === "valid" : status !== "invalid";
+}
 
 export function classifyProviderResponse(
   status: number,
@@ -270,14 +294,19 @@ export async function testProviderCredential(
   key: string,
 ): Promise<{ status: ProviderStatus; message: string }> {
   const definition = providerDefinitions[provider];
-  if (!definition?.testUrl) {
-    return {
-      status: "untested",
-      message: "This provider is saved securely, but an automatic verification endpoint is not configured yet.",
-    };
+  if (provider === "cloudflare" && !/^[a-f0-9]{32}$/i.test(process.env.CLOUDFLARE_ACCOUNT_ID ?? "")) {
+    return { status: "untested", message: "Set the 32-character CLOUDFLARE_ACCOUNT_ID server setting before testing Workers AI access." };
   }
+  if (!definition?.testUrl) {
+    const message = provider === "stability"
+      ? "Stability AI does not document a read-only API key check. No generation request was sent; verify the key in the official dashboard."
+      : "This provider is saved securely, but an automatic verification endpoint is not configured yet.";
+    return { status: "untested", message };
+  }
+  const url = definition.testUrl(key);
+  if (!url) return { status: "untested", message: "The provider's safe verification endpoint is not configured." };
   try {
-    const response = await fetch(definition.testUrl(key), {
+    const response = await fetch(url, {
       method: "GET",
       headers: {
         Authorization: `Bearer ${key}`,
@@ -287,7 +316,21 @@ export async function testProviderCredential(
       redirect: "error",
     });
     const text = await response.text();
-    return classifyProviderResponse(response.status, text.slice(0, 4000));
+    if (provider === "cloudflare" && response.ok) {
+      let result: { success?: boolean } = {};
+      try { result = JSON.parse(text) as typeof result; } catch { /* invalid response below */ }
+      if (result.success !== true) {
+        return { status: "unavailable", message: "Cloudflare returned an unexpected model-catalog response; Workers AI access was not verified." };
+      }
+    }
+    const checked = classifyProviderResponse(response.status, text.slice(0, 4000));
+    if (checked.status === "valid" && provider === "huggingface") {
+      return { ...checked, message: "Hugging Face token identity verified. Inference-provider permissions and billing still depend on token scope, route, and plan." };
+    }
+    if (checked.status === "valid" && provider === "cloudflare") {
+      return { ...checked, message: "Workers AI model catalog access verified with a read-only request. Model availability, free quota, and billing still apply." };
+    }
+    return checked;
   } catch {
     return { status: "unavailable", message: "Could not reach the provider. Check connectivity and try again." };
   }
@@ -308,6 +351,7 @@ export async function generateWithProvider(
     Authorization: `Bearer ${key}`,
   };
   let body: unknown;
+  let chatUrl = definition.chatUrl;
   if (definition.chatMode === "gemini") {
     const url = `${definition.chatUrl}?key=${encodeURIComponent(key)}`;
     const response = await fetch(url, {
@@ -333,7 +377,19 @@ export async function generateWithProvider(
     return result.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("") ?? "";
   }
 
-  if (definition.chatMode === "anthropic") {
+  if (definition.chatMode === "cloudflare") {
+    const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+    if (!accountId || !/^[a-f0-9]{32}$/i.test(accountId)) {
+      throw new Error("Set the 32-character CLOUDFLARE_ACCOUNT_ID server setting before using Workers AI.");
+    }
+    chatUrl = definition.chatUrl.replace("{account_id}", accountId);
+    body = {
+      model: definition.chatModel,
+      temperature: 0.7,
+      max_tokens: 5000,
+      messages: [{ role: "user", content: prompt }],
+    };
+  } else if (definition.chatMode === "anthropic") {
     headers["x-api-key"] = key;
     headers["anthropic-version"] = "2023-06-01";
     body = {
@@ -351,7 +407,7 @@ export async function generateWithProvider(
     };
   }
 
-  const response = await fetch(definition.chatUrl, {
+  const response = await fetch(chatUrl, {
     method: "POST",
     headers,
     body: JSON.stringify(body),

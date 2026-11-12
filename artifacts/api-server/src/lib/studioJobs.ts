@@ -14,6 +14,8 @@ import { decryptProviderKey } from "./secretVault";
 import {
   classifyProviderResponse,
   generateWithProvider,
+  providerCredentialUsable,
+  type ProviderStatus,
 } from "./providerRegistry";
 import { renderMp4 } from "./videoExport";
 import { generateNarration, generateStill, generateVideo, isProviderCallError } from "./mediaGeneration";
@@ -193,7 +195,7 @@ async function callMediaProvider<T>(
   const now = Date.now();
   const candidates = eligible.filter((row) =>
     supportsJob(row.provider, job.jobType as JobKind)
-    && row.status !== "invalid"
+    && providerCredentialUsable(row.provider, row.status as ProviderStatus)
     && (!row.cooldownUntil || row.cooldownUntil.getTime() <= now),
   );
   const fallbackProvider = settings?.fallbackProvider?.trim() || null;
@@ -341,7 +343,8 @@ async function processScriptJob(job: typeof studioJobsTable.$inferSelect): Promi
     )).orderBy(asc(providerKeysTable.priority), asc(providerKeysTable.createdAt));
     const now = Date.now();
     const candidates = eligible.filter((key) =>
-      key.status !== "invalid" && (!key.cooldownUntil || key.cooldownUntil.getTime() <= now),
+      providerCredentialUsable(key.provider, key.status as ProviderStatus)
+      && (!key.cooldownUntil || key.cooldownUntil.getTime() <= now),
     );
     const fallbackProvider = userSettings?.fallbackProvider?.trim() || null;
     const rotate = input.allowRotation !== false && userSettings?.autoRotate !== false;

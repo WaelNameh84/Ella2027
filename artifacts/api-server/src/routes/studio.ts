@@ -72,6 +72,8 @@ import {
   providerDefinitions,
   providerCatalog,
   testProviderCredential,
+  providerCredentialUsable,
+  type ProviderStatus,
 } from "../lib/providerRegistry";
 import { renderMp4 } from "../lib/videoExport";
 import { searchMediaCatalog } from "../lib/mediaCatalog";
@@ -662,10 +664,6 @@ router.post("/provider-keys/:keyId/test", async (req, res): Promise<void> => {
     return;
   }
   const userId = userIdOf(res);
-  if (await isZeroSpendMode(userId)) {
-    res.status(403).json({ error: ZERO_SPEND_ERROR });
-    return;
-  }
   const [row] = await db.select().from(providerKeysTable)
     .where(and(eq(providerKeysTable.id, params.data.keyId), eq(providerKeysTable.userId, userId)))
     .limit(1);
@@ -893,7 +891,8 @@ router.post("/projects/:projectId/generate-script", async (req, res): Promise<vo
   )).orderBy(asc(providerKeysTable.priority), asc(providerKeysTable.createdAt));
   const now = Date.now();
   const candidates = eligible.filter((key) =>
-    key.status !== "invalid" && (!key.cooldownUntil || key.cooldownUntil.getTime() <= now),
+    providerCredentialUsable(key.provider, key.status as ProviderStatus)
+    && (!key.cooldownUntil || key.cooldownUntil.getTime() <= now),
   );
   const fallbackProvider = settings?.fallbackProvider?.trim() || null;
   const rotate = parsed.data.allowRotation && settings?.autoRotate !== false;

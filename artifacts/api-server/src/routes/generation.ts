@@ -20,7 +20,7 @@ import {
   providerSettingsTable,
 } from "@workspace/db";
 import { decryptProviderKey } from "../lib/secretVault";
-import { classifyProviderResponse } from "../lib/providerRegistry";
+import { classifyProviderResponse, providerCredentialUsable } from "../lib/providerRegistry";
 import { isProviderCallError } from "../lib/mediaGeneration";
 import { transcribeAudio, type TranscriptionMode } from "../lib/transcription";
 import { generatedAssetContentType, generatedAssetPath, readGeneratedAsset, saveGeneratedAsset, type GeneratedAssetKind } from "../lib/studioAssets";
@@ -55,7 +55,7 @@ async function confirmUsableKeys(
   const now = Date.now();
   const eligible = rows.filter((row) =>
     supportedProvider(row.provider, jobType)
-    && row.status !== "invalid"
+    && providerCredentialUsable(row.provider, row.status as import("../lib/providerRegistry").ProviderStatus)
     && (!row.cooldownUntil || row.cooldownUntil.getTime() <= now),
   );
   if (selectedId) {
@@ -287,11 +287,12 @@ router.post(
       .where(eq(providerSettingsTable.userId, userId))
       .limit(1);
     const now = Date.now();
-    const supportsMode = (provider: string) =>
-      provider === "huggingface" ? mode === "transcribe" : ["openai", "whisper"].includes(provider);
+    const supportsMode = (provider: string) => mode === "translate"
+      ? ["openai", "whisper"].includes(provider)
+      : ["openai", "whisper", "huggingface", "assemblyai", "deepgram"].includes(provider);
     const usable = keys.filter((key) =>
       supportsMode(key.provider)
-      && key.status !== "invalid"
+      && providerCredentialUsable(key.provider, key.status as import("../lib/providerRegistry").ProviderStatus)
       && (!key.cooldownUntil || key.cooldownUntil.getTime() <= now),
     );
     const selectedKey = keyId ? keys.find((key) => key.id === keyId) : undefined;

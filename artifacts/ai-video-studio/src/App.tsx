@@ -73,8 +73,13 @@ const Context = createContext<AppCtx>({ lang: 'ar', setLang: () => {}, dark: fal
 const useApp = () => useContext(Context);
 const tx = (lang: Lang, ar: string, en: string) => lang === 'ar' ? ar : en;
 
+function providerKeyIsUsable(provider: string, status: ProviderKey['status']) {
+  const verifyFirst = ['huggingface','cloudflare','stability','groq','assemblyai','deepgram'].includes(provider);
+  return verifyFirst ? status === 'valid' : status === 'valid' || status === 'untested';
+}
+
 function providerSupports(provider: string, service: string) {
-  if (service === 'text') return ['openai','gemini','anthropic','groq','openrouter','huggingface','mistral','cerebras','together','sambanova','deepseek','nvidia','cohere'].includes(provider);
+  if (service === 'text') return ['openai','gemini','anthropic','groq','cloudflare','openrouter','huggingface','mistral','cerebras','together','sambanova','deepseek','nvidia','cohere'].includes(provider);
   if (service === 'image') return ['openai','stability','replicate','huggingface'].includes(provider);
   if (service === 'video') return ['replicate','fal'].includes(provider);
   if (service === 'voice') return ['elevenlabs','openai','openai-audio','google-tts','azure-speech'].includes(provider);
@@ -345,6 +350,7 @@ const visualStyles = [
 ] as const;
 const providerOfficialUrls: Record<string, string> = {
   openai: 'https://platform.openai.com/api-keys',
+  cloudflare: 'https://dash.cloudflare.com/profile/api-tokens',
   gemini: 'https://aistudio.google.com/app/apikey',
   segmind: 'https://www.segmind.com/console/api-keys',
   cartesia: 'https://play.cartesia.ai/keys',
@@ -360,7 +366,7 @@ const providerOfficialUrls: Record<string, string> = {
   nvidia: 'https://build.nvidia.com/settings',
   cohere: 'https://dashboard.cohere.com/api-keys',
   deepseek: 'https://platform.deepseek.com/api_keys',
-  stability: 'https://platform.stability.ai/account/keys',
+  stability: 'https://platform.stability.ai/dashboard/api-keys',
   replicate: 'https://replicate.com/account/api-tokens',
   fal: 'https://fal.ai/dashboard/keys',
   runway: 'https://dev.runwayml.com/',
@@ -369,8 +375,8 @@ const providerOfficialUrls: Record<string, string> = {
   'azure-speech': 'https://portal.azure.com/',
   'openai-audio': 'https://platform.openai.com/api-keys',
   whisper: 'https://platform.openai.com/api-keys',
-  deepgram: 'https://console.deepgram.com/',
-  assemblyai: 'https://www.assemblyai.com/dashboard/signup',
+  deepgram: 'https://console.deepgram.com/signup?jump=keys',
+  assemblyai: 'https://www.assemblyai.com/dashboard/home',
   'google-speech': 'https://console.cloud.google.com/apis/credentials',
   musicgen: 'https://github.com/facebookresearch/audiocraft',
   pexels: 'https://www.pexels.com/api/',
@@ -381,6 +387,14 @@ const providerOfficialUrls: Record<string, string> = {
   'ltx-video': 'https://github.com/Lightricks/ltx-video',
   'hunyuan-video': 'https://github.com/Tencent-Hunyuan/HunyuanVideo-1.5',
   openverse: 'https://openverse.org/',
+};
+const providerPlanInfo: Record<string, { kind: string; ar: string; en: string; url: string }> = {
+  huggingface: { kind: 'paid', ar: 'مدفوع للاستدلال: الخطة المجانية لا تشمل رصيدًا شهريًا لمزوّدي الاستدلال؛ فحص هوية المفتاح لا يعني أن الاستدلال مجاني.', en: 'Paid inference: the Free plan includes no monthly Inference Providers credits; identity validation does not make inference free.', url: 'https://huggingface.co/docs/inference-providers/pricing' },
+  cloudflare: { kind: 'free-quota', ar: 'حصة مجانية مستمرة: 10,000 Neurons يوميًا، تتجدد عند 00:00 UTC؛ تجاوز الحصة على Workers Paid يُحاسب بـ 0.011 دولار لكل 1,000 Neurons، وبعض النماذج تتطلب خطة مدفوعة.', en: 'Ongoing free quota: 10,000 Neurons/day, reset at 00:00 UTC; usage above it is billed at $0.011 per 1,000 Neurons on Workers Paid, and some models require paid billing.', url: 'https://developers.cloudflare.com/workers-ai/platform/pricing/' },
+  stability: { kind: 'trial', ar: 'رصيد تجريبي محدود: 25 رصيدًا مجانيًا لمرة واحدة؛ لا تذكر الصفحة الرسمية تجديدًا دوريًا أو تاريخ انتهاء.', en: 'Limited trial: 25 one-time free credits; the cited official page does not state a recurring reset or expiry.', url: 'https://docs.stability.ai/pricing.md' },
+  groq: { kind: 'free-quota', ar: 'خطة مجانية مستمرة؛ حدود الطلبات والرموز تختلف حسب النموذج والحساب، ولا يوجد رقم موحّد ثابت.', en: 'Ongoing $0 Free plan; request/token limits vary by model and account, with no single provider-wide quota.', url: 'https://console.groq.com/docs/rate-limits' },
+  assemblyai: { kind: 'trial', ar: 'رصيد محدود للحسابات الجديدة: 50 دولارًا، لا تنتهي صلاحيته وفق الوثائق؛ ليس رصيدًا شهريًا متجددًا.', en: 'Limited new-account credits: $50, non-expiring per official docs; not a recurring monthly allowance.', url: 'https://www.assemblyai.com/docs/billing-and-pricing' },
+  deepgram: { kind: 'trial', ar: 'رصيد تجريبي محدود: 200 دولار لمرة واحدة دون انتهاء، ثم الدفع حسب الاستخدام؛ ليس حصة دورية.', en: 'Limited trial credit: $200 one-time, with no expiry; pay-as-you-go afterward, not a recurring quota.', url: 'https://deepgram.com/pricing' },
 };
 const projectTemplates = [
   { id: 'children', ar: 'قصة أطفال', en: 'Children’s story', videoType: 'children-story', durationSeconds: 60, aspectRatio: '16:9', visualStyle: 'Warm illustrated storybook', audience: 'Children and families' },
@@ -526,7 +540,7 @@ function Projects() {
   const [backupProgress, setBackupProgress] = useState('');
   const importFileRef = useRef<HTMLInputElement | null>(null);
   const list = useMemo(() => (q.data || []).filter(p => `${p.title} ${p.idea}`.toLowerCase().includes(search.toLowerCase())), [q.data, search]);
-  const textProviderReady = Boolean(keysQuery.data?.some(key => key.serviceType === 'text' && providerSupports(key.provider, 'text') && key.enabled && (key.status === 'valid' || key.status === 'untested')));
+  const textProviderReady = Boolean(keysQuery.data?.some(key => key.serviceType === 'text' && providerSupports(key.provider, 'text') && key.enabled && providerKeyIsUsable(key.provider,key.status)));
   const freeMode = settingsQuery.data?.freeMode ?? true;
   const afterChange = () => { qc.invalidateQueries({ queryKey: getListProjectsQueryKey() }); qc.invalidateQueries({ queryKey: getGetStudioSummaryQueryKey() }); };
   const exportBackup = async (projectId: string) => {
@@ -724,7 +738,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
   useEffect(() => { if (project?.scenes?.length && !selected) setSelected(project.scenes[0].id); }, [project, selected]);
   const scenes = [...(project?.scenes || [])].sort((a,b) => a.sortOrder-b.sortOrder);
   const activeScene = scenes.find(s => s.id === selected) || scenes[0];
-  const textProviderReady=Boolean(keysQuery.data?.some(key=>key.serviceType==='text'&&providerSupports(key.provider,'text')&&key.enabled&&(key.status==='valid'||key.status==='untested')));
+  const textProviderReady=Boolean(keysQuery.data?.some(key=>key.serviceType==='text'&&providerSupports(key.provider,'text')&&key.enabled&&providerKeyIsUsable(key.provider,key.status)));
   const freeMode=settingsQuery.data?.freeMode??true;
   const refresh = () => { qc.invalidateQueries({queryKey:getGetProjectQueryKey(projectId)}); qc.invalidateQueries({queryKey:getListProjectsQueryKey()}); qc.invalidateQueries({queryKey:getGetStudioSummaryQueryKey()}); qc.invalidateQueries({queryKey:getListStudioJobsQueryKey()}); };
   useEffect(() => {
@@ -745,9 +759,9 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
   const autoExportedRef = useRef(false);
   const duration = scenes.reduce((sum,s)=>sum+s.durationSeconds,0);
   const autoKeys = useMemo(() => ({
-    image: keysQuery.data?.find(key => key.enabled && key.serviceType === 'image' && providerSupports(key.provider, 'image') && (key.status === 'valid' || key.status === 'untested')),
-    video: keysQuery.data?.find(key => key.enabled && key.serviceType === 'video' && providerSupports(key.provider, 'video') && (key.status === 'valid' || key.status === 'untested')),
-    voice: keysQuery.data?.find(key => key.enabled && key.serviceType === 'voice' && providerSupports(key.provider, 'voice') && (key.status === 'valid' || key.status === 'untested')),
+    image: keysQuery.data?.find(key => key.enabled && key.serviceType === 'image' && providerSupports(key.provider, 'image') && providerKeyIsUsable(key.provider,key.status)),
+    video: keysQuery.data?.find(key => key.enabled && key.serviceType === 'video' && providerSupports(key.provider, 'video') && providerKeyIsUsable(key.provider,key.status)),
+    voice: keysQuery.data?.find(key => key.enabled && key.serviceType === 'voice' && providerSupports(key.provider, 'voice') && providerKeyIsUsable(key.provider,key.status)),
   }), [keysQuery.data]);
   useEffect(() => {
     if (!autoMode || freeMode || !scenes.length || autoStartedRef.current) return;
@@ -1079,7 +1093,7 @@ function GenerationPanel({projectId,scene,keys,lang,onQueued,freeMode}:{projectI
   const [mode,setMode]=useState<'text'|'image'>('image');
   const [approved,setApproved]=useState(false);
   const service=action==='image'?'image':action==='video'?'video':action==='voice'?'voice':null;
-  const readyKeys=keys.filter(key=>key.enabled&&key.serviceType===service&&providerSupports(key.provider,service||'')&&(key.status==='valid'||key.status==='untested'));
+  const readyKeys=keys.filter(key=>key.enabled&&key.serviceType===service&&providerSupports(key.provider,service||'')&&providerKeyIsUsable(key.provider,key.status));
   const activeKey=readyKeys.find(key=>key.id===providerId)||readyKeys[0];
   const busy=imageJob.isPending||videoJob.isPending||voiceJob.isPending;
   const close=()=>{setAction(null);setApproved(false);setModel('');setVoiceId('')};
@@ -1093,7 +1107,7 @@ function GenerationPanel({projectId,scene,keys,lang,onQueued,freeMode}:{projectI
   const modelValid=action==='voice'?voiceId.trim().length>0:model.trim().length>0;
   if(freeMode)return <div className="service-purpose-hint is-unavailable"><b>{tx(lang,'المزوّدات الخارجية متوقفة','External providers are off')}</b><span>{tx(lang,'شغّل السماح بالمزوّدات من الإعدادات عند الاستعداد. لا يُرسل طلب فيديو قبل موافقتك على احتمال الرسوم.','Enable external providers in Settings when ready. No video request is sent before you approve possible charges.')} <Link href="/settings/providers" className="text-link">{tx(lang,'فتح الإعدادات','Open settings')}<ArrowLeft size={13}/></Link></span></div>;
   return <div className="generation-tools"><div className="generation-heading"><span className="eyebrow">{tx(lang,'توليد الأصول','GENERATE ASSETS')}</span><Link href="/settings/providers" className="text-link">{tx(lang,'إعداد المزوّدين','Provider setup')}<ArrowLeft size={13}/></Link></div><div className="generation-buttons">
-    {(['image','video','voice'] as const).map(kind=>{const availableKeys=keys.filter(key=>key.enabled&&key.serviceType===kind&&providerSupports(key.provider,kind)&&(key.status==='valid'||key.status==='untested'));const available=availableKeys.length>0;return <button key={kind} className="btn btn-quiet" disabled={!available} onClick={()=>{setAction(kind);setProviderId('');setApproved(false);if(kind==='video'){const nextMode=scene.assetType==='image'?'image':'text';setMode(nextMode);setModel(defaultVideoModel(availableKeys[0]?.provider,nextMode));}}} title={!available?tx(lang,'لا يوجد مفتاح مفعّل لمزوّد موصول بهذه المهمة','No enabled key for a provider currently connected to this task'):undefined}>{kind==='image'?<ImagePlus size={15}/>:kind==='video'?<Film size={15}/>:<Languages size={15}/ >}{tx(lang,kind==='image'?'صورة':kind==='video'?'فيديو':'صوت',kind)}</button>})}
+    {(['image','video','voice'] as const).map(kind=>{const availableKeys=keys.filter(key=>key.enabled&&key.serviceType===kind&&providerSupports(key.provider,kind)&&providerKeyIsUsable(key.provider,key.status));const available=availableKeys.length>0;return <button key={kind} className="btn btn-quiet" disabled={!available} onClick={()=>{setAction(kind);setProviderId('');setApproved(false);if(kind==='video'){const nextMode=scene.assetType==='image'?'image':'text';setMode(nextMode);setModel(defaultVideoModel(availableKeys[0]?.provider,nextMode));}}} title={!available?tx(lang,'لا يوجد مفتاح مفعّل لمزوّد موصول بهذه المهمة','No enabled key for a provider currently connected to this task'):undefined}>{kind==='image'?<ImagePlus size={15}/>:kind==='video'?<Film size={15}/>:<Languages size={15}/ >}{tx(lang,kind==='image'?'صورة':kind==='video'?'فيديو':'صوت',kind)}</button>})}
   </div><p className="generation-note">{tx(lang,'المخرجات تظهر هنا بعد اكتمال المهمة؛ لا توجد نتائج تجريبية.','Completed outputs appear here after the job finishes. No sample assets are shown.')}</p>
   {(imageJob.isError||videoJob.isError||voiceJob.isError)&&<p className="inline-error" role="alert">{(videoJob.error instanceof Error&&videoJob.error.message)||(imageJob.error instanceof Error&&imageJob.error.message)||(voiceJob.error instanceof Error&&voiceJob.error.message)||tx(lang,'تعذر إرسال طلب التوليد. تحقّق من المفتاح وإعدادات المزوّد.','Could not queue generation. Check the provider key and settings.')}</p>}
   {action&&<Modal title={tx(lang,'تأكيد طلب التوليد','Confirm generation request')} subtitle={tx(lang,'قد تُحتسب رسوم على هذا الطلب، وقد يجرّب النظام مزوّدًا احتياطيًا آخر عند التعطل أو نفاد الحصة.','This request may incur charges. Automatic failover may also use another configured provider.')} onClose={close}><div className="form-stack">
@@ -1111,7 +1125,7 @@ function GenerationPanel({projectId,scene,keys,lang,onQueued,freeMode}:{projectI
 
 function BatchVideoGeneration({projectId,scenes,keys,lang,hasActiveJob,onQueued,freeMode}:{projectId:string;scenes:Scene[];keys:ProviderKey[];lang:Lang;hasActiveJob:boolean;onQueued:()=>void;freeMode:boolean}) {
   const videoJob=useQueueSceneVideoGeneration();
-  const videoKeys=keys.filter(key=>key.enabled&&key.serviceType==='video'&&providerSupports(key.provider,'video')&&(key.status==='valid'||key.status==='untested'));
+  const videoKeys=keys.filter(key=>key.enabled&&key.serviceType==='video'&&providerSupports(key.provider,'video')&&providerKeyIsUsable(key.provider,key.status));
   const firstVideoProvider=videoKeys[0]?.provider;
   const scenesWithoutVideo=scenes.filter(scene=>scene.assetType!=='video'||!scene.assetUrl);
   const allHaveImages=scenesWithoutVideo.every(scene=>scene.assetType==='image'&&Boolean(scene.assetUrl));
@@ -1177,7 +1191,7 @@ function BatchVideoGeneration({projectId,scenes,keys,lang,hasActiveJob,onQueued,
 
 function BatchVoiceGeneration({projectId,scenes,keys,lang,hasActiveJob,onQueued,freeMode}:{projectId:string;scenes:Scene[];keys:ProviderKey[];lang:Lang;hasActiveJob:boolean;onQueued:()=>void;freeMode:boolean}) {
   const voiceJob=useQueueSceneVoiceGeneration();
-  const voiceKeys=keys.filter(key=>key.enabled&&key.serviceType==='voice'&&providerSupports(key.provider,'voice')&&(key.status==='valid'||key.status==='untested'));
+  const voiceKeys=keys.filter(key=>key.enabled&&key.serviceType==='voice'&&providerSupports(key.provider,'voice')&&providerKeyIsUsable(key.provider,key.status));
   const scenesWithoutVoice=scenes.filter(scene=>scene.narration.trim()&&!scene.voiceUrl);
   const [open,setOpen]=useState(false);
   const [providerId,setProviderId]=useState('');
@@ -1245,7 +1259,7 @@ function TranscriptionPanel({projectId,sceneId,language,keys,lang,freeMode}:{pro
   const [error,setError]=useState('');
   const [draft,setDraft]=useState('');
   const [providerUsed,setProviderUsed]=useState('');
-  const readyKeys=keys.filter(key=>key.enabled&&key.serviceType==='transcription'&&providerSupports(key.provider,'transcription')&&(key.status==='valid'||key.status==='untested'));
+  const readyKeys=keys.filter(key=>key.enabled&&key.serviceType==='transcription'&&providerSupports(key.provider,'transcription')&&providerKeyIsUsable(key.provider,key.status));
   const activeKey=readyKeys.find(key=>key.id===providerId)||readyKeys[0];
   const canTranslate=activeKey?.provider==='openai'||activeKey?.provider==='whisper';
 
@@ -1415,7 +1429,7 @@ function ProvidersPage() {
     </div>
     <section className="panel rotation-panel"><div className="section-heading"><div><span className="eyebrow">{tx(lang,'التعامل مع التعطّل','FAILOVER BEHAVIOR')}</span><h3>{tx(lang,'تدوير المفاتيح وإعادة المحاولة','Key rotation & retries')}</h3></div><ShieldCheck size={20} className="text-primary"/></div>
       {settingsQ.isLoading ? <SkeletonBlock className="h-48"/> : settingsQ.isError ? <StateError lang={lang} retry={()=>settingsQ.refetch()}/> : prefs && <><div className="rotation-options">
-        <label className="rotation-row"><span><b>{tx(lang,'السماح بالمزوّدات الخارجية (قد تكون مدفوعة)','Allow external providers (may cost)')}</b><small>{tx(lang,'عند إيقافه يمنع الخادم اتصالات التوليد والتفريغ واختبار المفاتيح. تشغيله لا يلغي موافقة كل طلب قد يكلّف.','When off, the server blocks generation, transcription, and key-test calls. Turning it on does not skip per-request cost approval.')}</small></span><input aria-label={tx(lang,'السماح بالمزوّدات الخارجية','Allow external providers')} type="checkbox" checked={!prefs.freeMode} onChange={e=>setPrefs({...prefs,freeMode:!e.target.checked})} data-testid="checkbox-provider-external-access" /></label>
+        <label className="rotation-row"><span><b>{tx(lang,'السماح بالمزوّدات الخارجية (قد تكون مدفوعة)','Allow external providers (may cost)')}</b><small>{tx(lang,'عند إيقافه يمنع الخادم مهام التوليد والتفريغ المدفوعة؛ تبقى اختبارات المصادقة للقراءة فقط متاحة ولا تولّد محتوى.','When off, the server blocks generation and paid transcription tasks. Read-only authentication checks remain available and do not generate content.')}</small></span><input aria-label={tx(lang,'السماح بالمزوّدات الخارجية','Allow external providers')} type="checkbox" checked={!prefs.freeMode} onChange={e=>setPrefs({...prefs,freeMode:!e.target.checked})} data-testid="checkbox-provider-external-access" /></label>
         {[
         ['autoRotate',tx(lang,'التدوير التلقائي','Automatic rotation'),tx(lang,'استخدم المفتاح التالي عند الحاجة.','Move to another key when needed.')],
         ['rotateOnQuota',tx(lang,'عند تجاوز الحصة','On quota limits'),tx(lang,'انتقل لمفتاح آخر عند نفاد الحصة.','Switch when a provider quota is reached.')],
@@ -1433,15 +1447,17 @@ function ProviderRow({item,onEdit,onToggle,onPriority,onTest,onDelete,testing,fr
   const testedAt=item.lastTestAt?new Date(item.lastTestAt).toLocaleString(lang==='ar'?'ar':'en') : tx(lang,'لم يُختبر بعد','Not tested yet');
   const purpose=providerServicePurpose(item.serviceType,lang,item.provider);
   const serviceConnected=providerServiceIsConnected(item.provider,item.serviceType);
+  const serviceReady=serviceConnected && item.status==='valid';
+  const plan=providerPlanInfo[item.provider];
   return <div className="provider-row">
     <div className="provider-avatar">{item.provider.slice(0,2).toUpperCase()}</div>
-    <div className="provider-ident"><b>{item.label}</b><span>{item.provider}</span><span className={`provider-purpose ${serviceConnected?'':'is-unavailable'}`}>{tx(lang,'وظيفته:','Purpose:')} {purpose.label}</span><small className="provider-purpose-description">{purpose.description}</small>{!serviceConnected&&<small className="provider-purpose-warning">{tx(lang,'هذا الاستخدام غير موصول حاليًا لهذا المزوّد.','This task is not currently connected for this provider.')}</small>}</div>
+    <div className="provider-ident"><b>{item.label}</b><span>{item.provider}</span><span className={`provider-purpose ${serviceReady?'':'is-unavailable'}`}>{tx(lang,'وظيفته:','Purpose:')} {purpose.label}</span><small className="provider-purpose-description">{purpose.description}</small>{!serviceReady&&<small className="provider-purpose-warning">{serviceConnected?tx(lang,'المفتاح غير جاهز للاستخدام حتى ينجح اختبار الاتصال.','The key is not ready for use until its connection test succeeds.'):tx(lang,'هذا الاستخدام غير موصول حاليًا لهذا المزوّد.','This task is not currently connected for this provider.')}</small>}{item.provider==='stability'&&item.status==='untested'&&<small className="provider-purpose-warning">{tx(lang,'لا توثّق Stability AI فحص مصادقة آمنًا عبر API؛ لم يُرسل طلب توليد.','Stability AI does not document a safe API auth check; no generation request was sent.')}</small>}{plan&&<small className="provider-purpose-description"><b>{tx(lang,'التصنيف:','Plan:')} {tx(lang,plan.kind==='trial'?'رصيد تجريبي محدود':plan.kind==='free-quota'?'حصة مجانية مستمرة':'مدفوع',plan.kind==='trial'?'Limited trial credits':plan.kind==='free-quota'?'Ongoing free quota':'Paid')}</b> — {tx(lang,plan.ar,plan.en)} <a className="text-link" href={plan.url} target="_blank" rel="noopener noreferrer">{tx(lang,'المصدر الرسمي','Official source')}</a></small>}</div>
     <span className={`key-status ${item.status}`}>{item.status.replace('_',' ')}</span>
     <label className="priority-control"><span>{tx(lang,'الأولوية','Priority')}</span><input type="number" min="0" value={item.priority} aria-label={tx(lang,'أولوية المفتاح','Key priority')} onChange={e=>onPriority(Number(e.target.value))}/></label>
     <label className="switch-control" title={tx(lang,'مفعّل','Enabled')}><input type="checkbox" checked={item.enabled} onChange={e=>onToggle(e.target.checked)}/><span /></label>
     <div className="provider-actions">
       {officialUrl&&<a className="btn btn-ghost !p-2" title={tx(lang,'الموقع الرسمي للمزوّد','Provider official site')} href={officialUrl} target="_blank" rel="noopener noreferrer"><ExternalLink size={15}/></a>}
-      <button className="btn btn-ghost !p-2" title={freeMode?tx(lang,'شغّل السماح بالمزوّدات الخارجية أولًا','Enable external providers first'):tx(lang,'اختبار المفتاح','Test key')} onClick={onTest} disabled={testing||freeMode}>{testing?<LoaderCircle size={15} className="animate-spin"/>:<Check size={15}/>}</button>
+      <button className="btn btn-ghost !p-2" title={freeMode?tx(lang,'اختبار قراءة فقط؛ لا يولّد محتوى ولا يستهلك رصيد توليد','Read-only check; does not generate content or use inference credits'):tx(lang,'اختبار مصادقة للقراءة فقط؛ لا يولّد محتوى','Read-only authentication check; no content generation')} onClick={onTest} disabled={testing}>{testing?<LoaderCircle size={15} className="animate-spin"/>:<Check size={15}/>}</button>
       <button className="btn btn-ghost !p-2" title={tx(lang,'تعديل','Edit')} onClick={onEdit}><Settings2 size={15}/></button>
       <button className="btn btn-ghost !p-2 text-destructive" title={tx(lang,'حذف','Delete')} onClick={onDelete}><Trash2 size={15}/></button>
     </div>
@@ -1454,7 +1470,7 @@ function ProviderForm({initial,initialService,restrictToSection,onClose,onSave,p
   const [provider,setProvider]=useState(initial?.provider||initialServiceProvider),[label,setLabel]=useState(initial?.label||''),[apiKey,setApiKey]=useState(''),[serviceType,setServiceType]=useState<'text'|'image'|'video'|'voice'|'transcription'|'music'|'media'>(initial?.serviceType||initialService||'text'),[enabled,setEnabled]=useState(initial?.enabled??true),[priority,setPriority]=useState(initial?.priority??0);
   const [revealed,setRevealed]=useState(false),[copied,setCopied]=useState(false);
   const providerOptions=[
-    ['openai','OpenAI','https://platform.openai.com/api-keys','text'],['gemini','Google AI Studio (GOOGLE_AI_API_KEY)','https://aistudio.google.com/app/apikey','text'],['anthropic','Anthropic Claude','https://console.anthropic.com/settings/keys','text'],['groq','Groq','https://console.groq.com/keys','text'],['openrouter','OpenRouter','https://openrouter.ai/keys','text'],['huggingface','Hugging Face (open models; limits vary)','https://huggingface.co/settings/tokens','text'],['mistral','Mistral','https://console.mistral.ai/api-keys/','text'],['cerebras','Cerebras','https://cloud.cerebras.ai/','text'],['together','Together AI','https://api.together.ai/settings/api-keys','text'],['sambanova','SambaNova','https://cloud.sambanova.ai/','text'],['nvidia',tx(lang,'NVIDIA NIM — مجاني للتجربة','NVIDIA NIM — free prototype tier'),'https://build.nvidia.com/settings','text'],['cohere',tx(lang,'Cohere — مفتاح تجريبي مجاني محدود','Cohere — limited free trial'),'https://dashboard.cohere.com/api-keys','text'],['deepseek','DeepSeek','https://platform.deepseek.com/api_keys','text'],['stability','Stability AI','https://platform.stability.ai/account/keys','image'],['replicate','Replicate','https://replicate.com/account/api-tokens','image'],['segmind','Segmind (SEGMIND_API_KEY)','https://www.segmind.com/console/api-keys','image'],['fal','fal.ai (FAL_KEY)','https://fal.ai/dashboard/keys','video'],['runway','Runway (RUNWAY_API_KEY)','https://dev.runwayml.com/','video'],['luma','Luma AI (LUMA_API_KEY)','https://lumalabs.ai/dream-machine/api','video'],['wan22','Wan 2.2 — سيرفر GPU محلي','https://github.com/Wan-Video/Wan2.2','video'],['cogvideox','CogVideoX — سيرفر GPU محلي','https://github.com/zai-org/CogVideo','video'],['ltx-video','LTX-Video — سيرفر GPU محلي','https://github.com/Lightricks/ltx-video','video'],['hunyuan-video','HunyuanVideo 1.5 — سيرفر GPU محلي','https://github.com/Tencent-Hunyuan/HunyuanVideo-1.5','video'],['elevenlabs','ElevenLabs','https://elevenlabs.io/app/settings/api-keys','voice'],['cartesia','Cartesia (CARTESIA_API_KEY)','https://play.cartesia.ai/keys','voice'],['google-tts','Google Cloud Text-to-Speech (GOOGLE_CLOUD_API_KEY)','https://console.cloud.google.com/apis/credentials','voice'],['azure-speech','Azure Speech (AZURE_SPEECH_KEY)','https://portal.azure.com/','voice'],['openai-audio','OpenAI Audio','https://platform.openai.com/api-keys','voice'],['whisper','Whisper','https://platform.openai.com/api-keys','transcription'],['deepgram','Deepgram','https://console.deepgram.com/','transcription'],['assemblyai','AssemblyAI','https://www.assemblyai.com/dashboard/signup','transcription'],['google-speech','Google Speech-to-Text','https://console.cloud.google.com/apis/credentials','transcription'],['musicgen','MusicGen','https://github.com/facebookresearch/audiocraft','music'],['openverse','Openverse (public search; no key required)','https://openverse.org/','media'],['pexels','Pexels','https://www.pexels.com/api/','media'],['pixabay','Pixabay','https://pixabay.com/api/docs/','media'],['unsplash','Unsplash','https://unsplash.com/developers','media'],
+    ['openai','OpenAI','https://platform.openai.com/api-keys','text'],['gemini','Google AI Studio (GOOGLE_AI_API_KEY)','https://aistudio.google.com/app/apikey','text'],['anthropic','Anthropic Claude','https://console.anthropic.com/settings/keys','text'],['groq','Groq (GROQ_API_KEY)','https://console.groq.com/keys','text'],['cloudflare','Cloudflare Workers AI (CLOUDFLARE_API_TOKEN)','https://dash.cloudflare.com/profile/api-tokens','text'],['openrouter','OpenRouter','https://openrouter.ai/keys','text'],['huggingface','Hugging Face (HF_TOKEN)','https://huggingface.co/settings/tokens/new?ownUserPermissions=inference.serverless.write&tokenType=fineGrained','text'],['mistral','Mistral','https://console.mistral.ai/api-keys/','text'],['cerebras','Cerebras','https://cloud.cerebras.ai/','text'],['together','Together AI','https://api.together.ai/settings/api-keys','text'],['sambanova','SambaNova','https://cloud.sambanova.ai/','text'],['nvidia',tx(lang,'NVIDIA NIM — مجاني للتجربة','NVIDIA NIM — free prototype tier'),'https://build.nvidia.com/settings','text'],['cohere',tx(lang,'Cohere — مفتاح تجريبي مجاني محدود','Cohere — limited free trial'),'https://dashboard.cohere.com/api-keys','text'],['deepseek','DeepSeek','https://platform.deepseek.com/api_keys','text'],['stability','Stability AI (STABILITY_API_KEY)','https://platform.stability.ai/dashboard/api-keys','image'],['replicate','Replicate','https://replicate.com/account/api-tokens','image'],['segmind','Segmind (SEGMIND_API_KEY)','https://www.segmind.com/console/api-keys','image'],['fal','fal.ai (FAL_KEY)','https://fal.ai/dashboard/keys','video'],['runway','Runway (RUNWAY_API_KEY)','https://dev.runwayml.com/','video'],['luma','Luma AI (LUMA_API_KEY)','https://lumalabs.ai/dream-machine/api','video'],['wan22','Wan 2.2 — سيرفر GPU محلي','https://github.com/Wan-Video/Wan2.2','video'],['cogvideox','CogVideoX — سيرفر GPU محلي','https://github.com/zai-org/CogVideo','video'],['ltx-video','LTX-Video — سيرفر GPU محلي','https://github.com/Lightricks/ltx-video','video'],['hunyuan-video','HunyuanVideo 1.5 — سيرفر GPU محلي','https://github.com/Tencent-Hunyuan/HunyuanVideo-1.5','video'],['elevenlabs','ElevenLabs','https://elevenlabs.io/app/settings/api-keys','voice'],['cartesia','Cartesia (CARTESIA_API_KEY)','https://play.cartesia.ai/keys','voice'],['google-tts','Google Cloud Text-to-Speech (GOOGLE_CLOUD_API_KEY)','https://console.cloud.google.com/apis/credentials','voice'],['azure-speech','Azure Speech (AZURE_SPEECH_KEY)','https://portal.azure.com/','voice'],['openai-audio','OpenAI Audio','https://platform.openai.com/api-keys','voice'],['whisper','Whisper','https://platform.openai.com/api-keys','transcription'],['deepgram','Deepgram (DEEPGRAM_API_KEY)','https://console.deepgram.com/signup?jump=keys','transcription'],['assemblyai','AssemblyAI (ASSEMBLYAI_API_KEY)','https://www.assemblyai.com/dashboard/home','transcription'],['google-speech','Google Speech-to-Text','https://console.cloud.google.com/apis/credentials','transcription'],['musicgen','MusicGen','https://github.com/facebookresearch/audiocraft','music'],['openverse','Openverse (public search; no key required)','https://openverse.org/','media'],['pexels','Pexels','https://www.pexels.com/api/','media'],['pixabay','Pixabay','https://pixabay.com/api/docs/','media'],['unsplash','Unsplash','https://unsplash.com/developers','media'],
   ] as const;
   const availableProviders=providerOptions.filter(item=>!restrictToSection||item[3]===initialService||providerSupports(item[0],initialService)||(initialService==='image'&&['gemini','fal'].includes(item[0])));
   const currentProvider=availableProviders.find(item=>item[0]===provider);
@@ -1474,6 +1490,9 @@ function ProviderForm({initial,initialService,restrictToSection,onClose,onSave,p
   return <Modal title={initial?tx(lang,'تعديل المفتاح','Edit provider key'):tx(lang,'إضافة مفتاح مزوّد','Add provider key')} subtitle={tx(lang,'لن يُعرض المفتاح بعد حفظه. الأسماء بين قوسين مراجع شائعة فقط؛ تُحفظ القيمة مشفّرة لحسابك ولا تُضاف تلقائيًا إلى بيئة الخادم.','The key is hidden after saving. Names in parentheses are common references only; the value is encrypted for your account and is not injected into the server environment.')} onClose={onClose}><form className="form-stack" onSubmit={e=>{e.preventDefault();onSave({provider,label,apiKey: localVideoProvider && !apiKey ? 'local' : apiKey,serviceType:effectiveServiceType,enabled,priority})}}>
     <label><span className="field-label">{tx(lang,'اسم المزوّد','Provider')}</span><select className="studio-input" value={provider} onChange={e=>{const value=e.target.value;setProvider(value);const selected=availableProviders.find(item=>item[0]===value);if(selected)setServiceType(restrictToSection?initialService:selected[3]);}}>{availableProviders.map(item=><option key={item[0]} value={item[0]}>{item[1]}</option>)}</select></label>
     {currentProvider && <a className="text-link provider-official-link" href={currentProvider[2]} target="_blank" rel="noopener noreferrer">{tx(lang,'زيارة الموقع الرسمي للحصول على المفتاح','Visit the official site to get a key')}<ExternalLink size={14}/></a>}
+    {providerPlanInfo[provider]&&<div className="service-purpose-hint"><b>{tx(lang,'حصة وتسعير الخدمة','Plan and usage classification')}</b><span>{tx(lang,providerPlanInfo[provider].ar,providerPlanInfo[provider].en)}</span><a className="text-link" href={providerPlanInfo[provider].url} target="_blank" rel="noopener noreferrer">{tx(lang,'التحقق من المصدر الرسمي','Check official source')}<ExternalLink size={14}/></a></div>}
+    {provider==='cloudflare'&&<div className="service-purpose-hint is-unavailable"><b>{tx(lang,'إعداد إضافي مطلوب','Additional setup required')}</b><span>{tx(lang,'يتطلب الخادم CLOUDFLARE_ACCOUNT_ID (معرّف الحساب من 32 خانة) لاختبار صلاحية Workers AI وتشغيله. أضفه كإعداد خادم غير سري.','The server needs CLOUDFLARE_ACCOUNT_ID (your 32-character account ID) to test Workers AI access and use it. Configure it as a non-secret server setting.')}</span></div>}
+    {provider==='stability'&&<div className="service-purpose-hint is-unavailable"><b>{tx(lang,'التحقق الآمن غير متاح رسميًا','Safe verification is not officially available')}</b><span>{tx(lang,'توثيق Stability AI الحالي لا يوفّر نقطة GET مستقلة للتحقق من المفتاح؛ لذلك لن يتم إرسال طلب توليد كاختبار، وسيبقى المفتاح غير موثّق.','Current Stability AI docs do not provide a standalone GET key-validation endpoint; no generation request will be used as a test, so the key remains unverified.')}</span></div>}
     <label><span className="field-label">{tx(lang,'تسمية المفتاح','Key label')}</span><input required className="studio-input" value={label} onChange={e=>setLabel(e.target.value)} placeholder={tx(lang,'مثال: مفتاح الإنتاج','e.g. Production key')} /></label>
     <label><span className="field-label">{tx(lang,'مفتاح API أو معرّف محلي','API key or local marker')}</span><div className="secret-input-row"><input required={!initial && !localVideoProvider} type={revealed?'text':'password'} autoComplete="new-password" className="studio-input" value={apiKey} onChange={e=>{setApiKey(e.target.value);setCopied(false);}} placeholder={localVideoProvider?tx(lang,'لا يحتاج مفتاحًا؛ سيُستخدم معرّف local','No key required; a local marker will be used'):initial?tx(lang,'اتركه فارغًا للإبقاء على المفتاح الحالي','Leave blank to keep the current key'):'API key'} data-testid="input-provider-secret" />{apiKey && <button type="button" className="btn btn-ghost !p-2" aria-label={revealed?tx(lang,'إخفاء المفتاح','Hide key'):tx(lang,'إظهار المفتاح','Show key')} onClick={()=>setRevealed(v=>!v)}>{revealed?<EyeOff size={16}/>:<Eye size={16}/>}</button>}{apiKey && <button type="button" className="btn btn-ghost !p-2" aria-label={tx(lang,'نسخ المفتاح غير المحفوظ','Copy unsaved key')} onClick={()=>{void navigator.clipboard.writeText(apiKey).then(()=>{setCopied(true);window.setTimeout(()=>setCopied(false),1500);});}}>{copied?<Check size={16}/>:<Copy size={16}/>}</button>}</div></label>
     <div className="form-two">{restrictToSection?<div><span className="field-label">{tx(lang,'وظيفة المفتاح','Key purpose')}</span><div className="studio-input" aria-readonly="true">{purpose.label}</div></div>:<label><span className="field-label">{tx(lang,'وظيفة المفتاح','Key purpose')}</span><select className="studio-input" value={serviceType} onChange={e=>setServiceType(e.target.value as typeof serviceType)}>{serviceTypes.map(item=><option key={item.value} value={item.value}>{item.label}</option>)}</select></label>}<label><span className="field-label">{tx(lang,'الأولوية','Priority')}</span><input type="number" min="0" className="studio-input" value={priority} onChange={e=>setPriority(Number(e.target.value))}/></label></div>
