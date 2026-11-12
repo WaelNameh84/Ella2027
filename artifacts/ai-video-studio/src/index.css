@@ -259,17 +259,29 @@ body { min-height: 100dvh; }
 .project-card-content { padding: 14px 15px 13px; }
 .project-title { color: hsl(var(--foreground)); font-size: 15px; font-weight: 700; text-decoration: none; }
 .project-card-content > p { height: 38px; overflow: hidden; color: hsl(var(--muted-foreground)); font-size: 11px; line-height: 1.6; margin-top: 6px; }
-.project-meta { display: flex; justify-content: space-between; border-top: 1px solid hsl(var(--border)); margin-top: 11px; padding-top: 9px; color: hsl(var(--muted-foreground)); font-size: 10px; }
-.project-meta span:first-child { display: inline-flex; align-items: center; gap: 6px; text-transform: capitalize; }
-.status-dot { width: 6px; height: 6px; border-radius: 50%; background: hsl(var(--accent)); }
+	.project-meta { display: flex; justify-content: space-between; border-top: 1px solid hsl(var(--border)); margin-top: 11px; padding-top: 9px; color: hsl(var(--muted-foreground)); font-size: 10px; }
+	.project-meta span:first-child { display: inline-flex; align-items: center; gap: 6px; text-transform: capitalize; }
+	.project-continue { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; color: hsl(var(--primary)); font-size: 11px; font-weight: 700; text-decoration: none; }
+	.project-continue:hover { color: hsl(var(--accent)); }
+	.dashboard-journey { display: grid; grid-template-columns: minmax(180px, .7fr) 1.3fr; gap: 1.2rem; align-items: center; margin: 0 0 2rem; padding: 1rem 1.15rem; background: linear-gradient(110deg, hsl(var(--primary) / .1), hsl(var(--card) / .82)); border-color: hsl(var(--primary) / .18); }
+	.dashboard-journey h3 { margin-top: .25rem; font-size: 1rem; font-weight: 650; }
+	.dashboard-journey-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .65rem; }
+	.dashboard-journey-steps > div { display: grid; gap: .28rem; min-width: 0; padding-inline-start: .7rem; border-inline-start: 1px solid hsl(var(--primary) / .25); }
+	.dashboard-journey-steps span { color: hsl(var(--accent)); font: .68rem var(--app-font-mono); }
+	.dashboard-journey-steps b { font-size: .73rem; line-height: 1.35; }
+	@media (max-width: 760px) { .dashboard-journey { grid-template-columns: 1fr; } .dashboard-journey-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+	.status-dot { width: 6px; height: 6px; border-radius: 50%; background: hsl(var(--accent)); }
 .status-completed { background: hsl(var(--primary)); }.status-failed { background: hsl(var(--destructive)); }.status-exporting { animation: blink 1s infinite alternate; }
 @keyframes blink { to { opacity: .35; } }
 .dashboard-footnote { display: flex; align-items: center; gap: 10px; color: hsl(var(--muted-foreground)); font-size: 11px; margin-top: 26px; }
 .page-toolbar { margin: 4px 0 25px; align-items: flex-end; }
 .list-controls { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 17px; }
-.searchbox { display: flex; align-items: center; gap: 10px; width: min(100%, 440px); min-height: 43px; padding: 0 13px; color: hsl(var(--muted-foreground)); border: 1px solid hsl(var(--border)); border-radius: 10px; background: hsl(var(--card)); }
-.searchbox input { width: 100%; border: 0; outline: 0; background: transparent; color: hsl(var(--foreground)); font-size: 13px; }
-.result-count { color: hsl(var(--muted-foreground)); font: 11px var(--app-font-mono); }
+	.searchbox { display: flex; align-items: center; gap: 10px; width: min(100%, 440px); min-height: 43px; padding: 0 13px; color: hsl(var(--muted-foreground)); border: 1px solid hsl(var(--border)); border-radius: 10px; background: hsl(var(--card)); }
+	.searchbox input { width: 100%; border: 0; outline: 0; background: transparent; color: hsl(var(--foreground)); font-size: 13px; }
+	.project-sort { display: flex; align-items: center; gap: 8px; min-width: 170px; }
+	.project-sort .field-label { margin: 0; white-space: nowrap; }
+	.project-sort .studio-input { min-height: 43px; padding-block: 8px; }
+	.result-count { color: hsl(var(--muted-foreground)); font: 11px var(--app-font-mono); }
 .modal-backdrop { position: fixed; z-index: 60; inset: 0; display: grid; place-items: center; padding: 16px; background: hsl(203 23% 10% / .56); backdrop-filter: blur(4px); }
 .modal { width: min(100%, 590px); max-height: min(92dvh, 850px); overflow: auto; padding: 23px; box-shadow: var(--shadow); }
 .modal-head { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
