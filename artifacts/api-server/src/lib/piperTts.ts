@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 export const PIPER_LOCAL_PROVIDER = "piper-local" as const;
-export const PIPER_LOCAL_PROVIDER_KEY = "00000000-0000-0000-0000-000000000001";
+export const PIPER_LOCAL_PROVIDER_KEY = "00000000-0000-4000-8000-000000000001";
 export const PIPER_VOICE_ID = "ar_JO-kareem-low";
 
 const execFile = promisify(execFileCallback);

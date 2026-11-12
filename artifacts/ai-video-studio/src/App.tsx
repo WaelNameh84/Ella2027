@@ -73,8 +73,8 @@ const Context = createContext<AppCtx>({ lang: 'ar', setLang: () => {}, dark: fal
 const useApp = () => useContext(Context);
 const tx = (lang: Lang, ar: string, en: string) => lang === 'ar' ? ar : en;
 const FREE_TEST_KEYS: ProviderKey[] = [
-  { id: '00000000-0000-0000-0000-000000000000', provider: 'free-test', label: 'Free local image test', serviceType: 'image', enabled: true, priority: -100, status: 'valid', lastTestAt: null, testMessage: 'Offline fixture; no provider call.', usedCount: 0, cooldownUntil: null, createdAt: new Date(0).toISOString() },
-  { id: '00000000-0000-0000-0000-000000000001', provider: 'piper-local', label: 'Piper Arabic — local, free', serviceType: 'voice', enabled: true, priority: -100, status: 'valid', lastTestAt: null, testMessage: 'Local Arabic Jordanian narration. No provider API key or cloud inference fee.', usedCount: 0, cooldownUntil: null, createdAt: new Date(0).toISOString() },
+  { id: '00000000-0000-4000-8000-000000000000', provider: 'free-test', label: 'Free local image test', serviceType: 'image', enabled: true, priority: -100, status: 'valid', lastTestAt: null, testMessage: 'Offline fixture; no provider call.', usedCount: 0, cooldownUntil: null, createdAt: new Date(0).toISOString() },
+  { id: '00000000-0000-4000-8000-000000000001', provider: 'piper-local', label: 'Piper Arabic — local, free', serviceType: 'voice', enabled: true, priority: -100, status: 'valid', lastTestAt: null, testMessage: 'Local Arabic Jordanian narration. No provider API key or cloud inference fee.', usedCount: 0, cooldownUntil: null, createdAt: new Date(0).toISOString() },
 ];
 
 function providerKeyIsUsable(provider: string, status: ProviderKey['status']) {
@@ -1204,7 +1204,7 @@ function BatchVoiceGeneration({projectId,scenes,keys,lang,hasActiveJob,onQueued,
   const [voiceId,setVoiceId]=useState('');
   const [approved,setApproved]=useState(false);
   const [queueing,setQueueing]=useState(false);
-  const [progress,setProgress]=useState<{queued:number;failed:number;total:number;processed:number}|null>(null);
+  const [progress,setProgress]=useState<{queued:number;failed:number;total:number;processed:number;error?:string}|null>(null);
   const [summary,setSummary]=useState<{queued:number;failed:number;total:number}|null>(null);
   const activeKey=voiceKeys.find(key=>key.id===providerId)||voiceKeys[0];
   const firstVoiceProvider=voiceKeys[0]?.provider;
@@ -1214,18 +1214,20 @@ function BatchVoiceGeneration({projectId,scenes,keys,lang,hasActiveJob,onQueued,
     if(!activeKey||!voiceId.trim()||!approved||!scenesWithoutVoice.length||queueing||hasActiveJob)return;
     setQueueing(true);
     setProgress({queued:0,failed:0,total:scenesWithoutVoice.length,processed:0});
-    let queued=0,failed=0;
+    let queued=0,failed=0,lastError='';
     for(const scene of scenesWithoutVoice){
       try{
         await voiceJob.mutateAsync({projectId,sceneId:scene.id,data:{providerKeyId:activeKey.id,voiceId:voiceId.trim(),approvePotentialCharges:true}});
         queued++;
-      }catch{
+      }catch(error){
         failed++;
+        lastError=error instanceof Error?error.message:String(error);
       }
       setProgress({queued,failed,total:scenesWithoutVoice.length,processed:queued+failed});
     }
     setQueueing(false);
     setApproved(false);
+    setProgress({queued,failed,total:scenesWithoutVoice.length,processed:queued+failed,error:lastError});
     setSummary({queued,failed,total:scenesWithoutVoice.length});
     if(queued){setOpen(false);onQueued();}
   };
@@ -1248,7 +1250,7 @@ function BatchVoiceGeneration({projectId,scenes,keys,lang,hasActiveJob,onQueued,
         <p className="generation-note">{tx(lang,'القيمة الافتراضية تناسب المزوّد المختار؛ يمكنك تغييرها إلى صوت عربي متاح في حسابك.','The default matches the selected provider; you can change it to an Arabic voice available in your account.')}</p></>}
         {activeKey&&<CostEstimate provider={activeKey.provider} service="voice" units={scenesWithoutVoice.length} lang={lang}/>}
         <label className="checkline charge-consent"><input type="checkbox" checked={approved} onChange={e=>setApproved(e.target.checked)} data-testid="checkbox-batch-voice-consent"/>{activeKey?.provider==='piper-local'?tx(lang,`أوافق على توليد الصوت محليًا للمشاهد الـ ${scenesWithoutVoice.length}. لا توجد رسوم مزوّد خارجي.`,`I approve local voice generation for ${scenesWithoutVoice.length} scene(s). No external provider fees.`):tx(lang,`أوافق على إرسال ${scenesWithoutVoice.length} طلبات صوت، وقد تُحتسب رسوم لكل مشهد.`,`I approve ${scenesWithoutVoice.length} voice requests; each scene may incur a charge.`)}</label>
-        {progress&&<div className="export-confirm" role="status" data-testid="batch-voice-progress">{queueing?tx(lang,`جارٍ إرسال الطلب ${progress.processed} من ${progress.total}…`,`Sending request ${progress.processed} of ${progress.total}…`):progress.queued?tx(lang,`أُرسل ${progress.queued} طلبات وتعذّر ${progress.failed}.`,`Queued ${progress.queued}; ${progress.failed} failed.`):tx(lang,'تعذّر إرسال الطلبات. تحقّق من مفتاح الصوت ومعرّف الصوت.','Requests could not be queued. Check the voice key and voice ID.')}</div>}
+        {progress&&<div className="export-confirm" role="status" data-testid="batch-voice-progress">{queueing?tx(lang,`جارٍ إرسال الطلب ${progress.processed} من ${progress.total}…`,`Sending request ${progress.processed} of ${progress.total}…`):progress.queued?tx(lang,`أُرسل ${progress.queued} طلبات وتعذّر ${progress.failed}.`,`Queued ${progress.queued}; ${progress.failed} failed.`):progress.error||tx(lang,'تعذّر إرسال الطلبات.','The server could not queue the requests.')}</div>}
         <div className="modal-actions"><button type="button" className="btn btn-quiet" onClick={close} disabled={queueing}>{tx(lang,'إلغاء','Cancel')}</button><button type="button" className="btn btn-primary" disabled={!activeKey||!voiceId.trim()||!approved||!scenesWithoutVoice.length||queueing||hasActiveJob} onClick={()=>void begin()} data-testid="button-submit-batch-voice">{queueing?<LoaderCircle size={15} className="animate-spin"/>:<Languages size={15}/ >}{queueing?tx(lang,'جارٍ إرسال الطلبات…','Queueing narration…'):tx(lang,'ابدأ توليد الصوت','Start voice generation')}</button></div>
       </div>
     </Modal>}

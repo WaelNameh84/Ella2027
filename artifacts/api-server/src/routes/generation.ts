@@ -31,7 +31,7 @@ const router: IRouter = Router();
 
 type JobKind = "image" | "video" | "voice";
 type ServiceKind = "image" | "video" | "voice";
-const FREE_TEST_PROVIDER_KEY = "00000000-0000-0000-0000-000000000000";
+const FREE_TEST_PROVIDER_KEY = "00000000-0000-4000-8000-000000000000";
 
 function userIdOf(res: Response): string {
   return String(res.locals.userId);
