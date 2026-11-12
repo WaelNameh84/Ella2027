@@ -139,8 +139,11 @@
 }
 
 html { min-width: 320px; }
+html, body, #root { min-height: 100%; }
+button, a, input, textarea, select { -webkit-tap-highlight-color: transparent; }
 body { min-height: 100dvh; }
-.app-shell { min-height: 100dvh; background: hsl(var(--background)); }
+.app-shell { min-height: 100dvh; padding-top: env(safe-area-inset-top, 0px); background: hsl(var(--background)); }
+@media (display-mode: standalone) { html, body { overscroll-behavior-y: none; } }
 .grain { position: fixed; inset: 0; pointer-events: none; z-index: 40; opacity: .025; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.4'/%3E%3C/svg%3E"); }
 .page-enter { animation: page-in .36s ease both; }
 @keyframes page-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
