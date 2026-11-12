@@ -463,18 +463,18 @@ const projectTemplates = [
 ] as const;
 function buildFreeTemplateScenes(templateId:string,idea:string,lang:Lang,visualStyle:string,sceneCount:number,sceneDurationSeconds:number) {
   const ar=lang==='ar';
-  const beats=ar?[
-    ['الافتتاح','قدّم المكان أو اللحظة التي تبدأ منها الفكرة.','لقطة تأسيسية واسعة تُظهر عالم القصة وتفاصيله.','كل حكاية تبدأ من تفصيل صغير يستحق أن ننتبه له.'],
-    ['السياق','عرّف المشاهد على الشخصية أو الحاجة الأساسية.','لقطة متوسطة لشخصية في بيئتها، بتكوين واضح.','هنا نلتقي بمن تقوده هذه الحكاية.'],
-    ['التحدي','أظهر العقبة أو السؤال الذي يحرّك القصة.','لقطة قريبة تكشف توترًا أو قرارًا مهمًا.','لكن الطريق لا يخلو من سؤال أو تحدٍّ.'],
-    ['التحوّل','قدّم لحظة اكتشاف أو خطوة إلى الأمام.','حركة كاميرا هادئة نحو لحظة اكتشاف ذات معنى.','تبدأ الأمور بالتغيّر عندما نجرؤ على المحاولة.'],
-    ['الخاتمة','اختم بصورة أو فكرة تبقى في الذاكرة.','لقطة ختامية متوازنة تترك مساحة بصرية مريحة.','وهكذا تترك الفكرة أثرها بعد أن تنتهي الحكاية.'],
+  const beats:[string,string,string,string,string,string,string,string][]=ar?[
+    ['الافتتاح','قدّم المكان أو اللحظة التي تبدأ منها الفكرة.','establishing','pan','المكان الذي تدور فيه الفكرة','إضاءة تأسيسية ناعمة تبرز المكان','لقطة واسعة تكشف عالم القصة وتفاصيله.','كل حكاية تبدأ من تفصيل صغير يستحق أن ننتبه له.'],
+    ['السياق','عرّف المشاهد على الشخصية أو الحاجة الأساسية.','medium','tracking','بيئة الشخصية الرئيسية','إضاءة طبيعية متوازنة على الشخصية والخلفية','لقطة متوسطة تتبع الشخصية في بيئة واضحة.','هنا نلتقي بالشخصية التي تقود هذه الحكاية.'],
+    ['التحدي','أظهر العقبة أو السؤال الذي يحرّك القصة.','close-up','handheld','مكان ظهور التحدي','إضاءة جانبية تصنع تباينًا وتكشف التوتر','لقطة قريبة تكشف توترًا أو قرارًا مهمًا.','لكن الطريق لا يخلو من سؤال أو تحدٍّ.'],
+    ['التحوّل','قدّم لحظة اكتشاف أو خطوة إلى الأمام.','over-the-shoulder','dolly-in','موضع لحظة الاكتشاف','إضاءة دافئة تتسع تدريجيًا حول نقطة التحول','حركة كاميرا هادئة نحو لحظة اكتشاف ذات معنى.','تبدأ الأمور بالتغيّر عندما نجرؤ على المحاولة.'],
+    ['الخاتمة','اختم بصورة أو فكرة تبقى في الذاكرة.','wide','zoom','المكان الختامي للقصة','إضاءة ختامية دافئة وهادئة','لقطة ختامية متوازنة تترك مساحة بصرية مريحة.','وهكذا تترك الفكرة أثرها بعد أن تنتهي الحكاية.'],
   ]:[
-    ['Opening','Introduce the place or moment where the idea begins.','Wide establishing shot that reveals the story world and its details.','Every story begins with a small detail worth noticing.'],
-    ['Context','Introduce the character or the central need.','Medium shot of a character in a clearly defined environment.','Here we meet the person this story follows.'],
-    ['Challenge','Show the obstacle or question that drives the story.','Close shot revealing tension or an important decision.','But the path holds a question or a challenge.'],
-    ['Turning point','Offer a discovery or a step forward.','Gentle camera move into a meaningful moment of discovery.','Things begin to change when we dare to try.'],
-    ['Resolution','End on an image or idea that stays with the viewer.','Balanced closing shot with calm negative space.','And the idea leaves an impression after the story ends.'],
+    ['Opening','Introduce the place or moment where the idea begins.','establishing','pan','The setting where the idea unfolds','Soft establishing light that reveals the location','Wide establishing shot revealing the story world and its details.','Every story begins with a small detail worth noticing.'],
+    ['Context','Introduce the character or central need.','medium','tracking','The lead character’s environment','Balanced natural light on the character and background','Medium shot tracking a character in a clearly defined environment.','Here we meet the character who leads this story.'],
+    ['Challenge','Show the obstacle or question driving the story.','close-up','handheld','The place where the challenge appears','Side lighting that adds contrast and reveals tension','Close shot revealing tension or an important decision.','But the path holds a question or a challenge.'],
+    ['Turning point','Offer a discovery or a step forward.','over-the-shoulder','dolly-in','The location of the discovery','Warm light gradually opening around the turning point','Gentle camera move into a meaningful moment of discovery.','Things begin to change when we dare to try.'],
+    ['Resolution','End on an image or idea that stays with the viewer.','wide','zoom','The story’s final setting','Calm, warm closing light','Balanced closing shot with calm negative space.','And the idea leaves an impression after the story ends.'],
   ];
   const template=projectTemplates.find(item=>item.id===templateId);
   return Array.from({length:sceneCount},(_,index)=>{
@@ -482,8 +482,8 @@ function buildFreeTemplateScenes(templateId:string,idea:string,lang:Lang,visualS
     const repeat=index>=beats.length?` ${Math.floor(index/beats.length)+1}`:'';
     return {
       title:`${beat[0]}${repeat}`, description:`${beat[1]} ${ar?'فكرة المشروع':'Project idea'}: ${idea.trim()}`,
-      imagePrompt:`${visualStyle||template?.visualStyle||'Cinematic'}; ${beat[2]} ${ar?'من دون نص مكتوب داخل الصورة.':'No text or lettering in the image.'} ${idea.trim()}`,
-      narration:beat[3], durationSeconds:sceneDurationSeconds,
+      imagePrompt:`${visualStyle||template?.visualStyle||'Cinematic'}; ${beat[6]} ${ar?'الموقع':'Location'}: ${beat[4]}. ${ar?'الإضاءة':'Lighting'}: ${beat[5]}. ${ar?'من دون نص مكتوب داخل الصورة.':'No text or lettering in the image.'} ${idea.trim()}`,
+      narration:beat[7], durationSeconds:sceneDurationSeconds, shotType:beat[2], cameraMovement:beat[3], location:beat[4], lighting:beat[5],
     };
   });
 }
@@ -832,6 +832,23 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
   }, [projectJobsQuery.data]);
   const currentJob = projectJobsQuery.data?.find(job => job.status === 'queued' || job.status === 'running') ?? projectJobsQuery.data?.[0];
   const latestExportJob = projectJobsQuery.data?.find(job => job.jobType === 'export');
+  const [applyingLocalTemplate,setApplyingLocalTemplate]=useState(false);
+  const [localTemplateError,setLocalTemplateError]=useState('');
+  const localTemplateLock=useRef(false);
+  const applyLocalTemplate=async(templateId:string)=>{
+    if(!project||localTemplateLock.current||currentJob?.status==='queued'||currentJob?.status==='running')return;
+    localTemplateLock.current=true;
+    setApplyingLocalTemplate(true);setLocalTemplateError('');
+    try{
+      const perScene=Math.max(1,Math.floor(project.durationSeconds/5));
+      const seeds=buildFreeTemplateScenes(templateId,project.idea,lang,project.visualStyle,5,perScene);
+      for(const [index,seed] of seeds.entries())await createScene.mutateAsync({projectId,data:{...seed,sortOrder:index}});
+      refresh();
+    }catch(error){
+      await projectQuery.refetch();
+      setLocalTemplateError(error instanceof Error?error.message:tx(lang,'تعذّر حفظ القالب؛ أعد المحاولة.','Could not save the template; try again.'));
+    }finally{localTemplateLock.current=false;setApplyingLocalTemplate(false);}
+  };
   const duration = scenes.reduce((sum,s)=>sum+s.durationSeconds,0);
   const exportPreflight=buildExportPreflight(scenes,project?.durationSeconds??0,exportSettings.includeSubtitles,lang);
   const scenesReadyForExport=exportPreflight.errors.length===0;
@@ -874,7 +891,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
         <div className="timeline-panel panel"><div className="section-heading !mb-4"><div><span className="eyebrow">{tx(lang,'خط الإنتاج','EDIT TIMELINE')}</span><h3>{tx(lang,'ترتيب المشاهد','Scene sequence')}</h3></div><button className="btn btn-quiet" onClick={()=>createScene.mutate({projectId,data:{sortOrder:scenes.length,title:tx(lang,`مشهد ${scenes.length+1}`,`Scene ${scenes.length+1}`),description:'',imagePrompt:'',narration:'',durationSeconds:6,assetUrl:null,assetType:null}},{onSuccess:s=>{refresh();setSelected(s.id)}})} disabled={createScene.isPending}><Plus size={16}/>{tx(lang,'إضافة مشهد','Add scene')}</button></div>
            {scenes.length === 0 ? <div className="timeline-empty"><span className="timeline-empty-line"/><span>{tx(lang,'لم تُنشأ مشاهد بعد','No scenes yet')}</span><button className="text-link" onClick={()=>createScene.mutate({projectId,data:{sortOrder:0,title:tx(lang,'المشهد الأول','Scene one'),description:'',imagePrompt:'',narration:'',durationSeconds:6}},{onSuccess:s=>{refresh();setSelected(s.id)}})}>{tx(lang,'أضف أول مشهد','Add the first scene')}</button></div> : <FilmTimeline scenes={scenes} selectedId={activeScene?.id ?? null} musicUrl={project.musicUrl} musicVolume={project.musicVolume} lang={lang} previewing={previewing} onPreview={()=>void requestPreview()} onSelect={setSelected} onReorder={(source,target)=>void reorderDrop(source,target)} onSaveScene={(sceneId,data)=>updateScene.mutateAsync({projectId,sceneId,data}).then(()=>{refresh()})} onSaveProject={data=>updateProject.mutateAsync({projectId,data}).then(()=>{refresh()})} />}
         </div>
-          {freeMode && scenes.length===0 && <div className="script-bar panel"><div className="script-symbol"><ShieldCheck size={18}/></div><div className="script-copy"><b>{tx(lang,'أنشئ Storyboard بلا تكلفة','Create a no-cost storyboard')}</b><p>{tx(lang,'اختر قالبًا محليًا لإضافة خمس مشاهد قابلة للتحرير دون استدعاء مزوّد.','Choose a local template to add five editable scenes without calling a provider.')}</p><div className="flex flex-wrap gap-2 mt-3">{projectTemplates.slice(0,5).map(item=><button key={item.id} className="btn btn-quiet" disabled={createScene.isPending} onClick={()=>{const perScene=Math.max(1,Math.floor(project.durationSeconds/5));const seeds=buildFreeTemplateScenes(item.id,project.idea,lang,project.visualStyle,5,perScene);void (async()=>{for(const [index,seed] of seeds.entries())await createScene.mutateAsync({projectId,data:{...seed,sortOrder:index}});refresh();})();}}>{tx(lang,item.ar,item.en)}</button>)}</div></div></div>}
+          {scenes.length===0 && <div className="script-bar panel"><div className="script-symbol"><ShieldCheck size={18}/></div><div className="script-copy"><b>{tx(lang,'قوالب سيناريو مجانية — ليست ذكاءً اصطناعيًا','Free script templates — not AI-generated')}</b><p>{tx(lang,'اختر قالبًا لإضافة خمس مشاهد محفوظة وقابلة للتحرير دون مفتاح أو اتصال بمزوّد. هذه بنية ثابتة وليست كتابة ذكية: عدّل أسماء الشخصيات والحوار يدويًا من المحرر.','Choose a template to add five saved, editable scenes without a key or provider call. These are fixed templates, not AI writing; edit character names and dialogue manually in the editor.')}</p><div className="flex flex-wrap gap-2 mt-3">{projectTemplates.map(item=><button key={item.id} className="btn btn-quiet" disabled={applyingLocalTemplate||createScene.isPending||currentJob?.status==='queued'||currentJob?.status==='running'} onClick={()=>void applyLocalTemplate(item.id)}>{applyingLocalTemplate?<LoaderCircle size={15} className="animate-spin"/>:null}{tx(lang,item.ar,item.en)}</button>)}</div>{localTemplateError&&<p className="inline-error" role="alert">{localTemplateError}</p>}</div></div>}
          {scenes.length ? <div className="script-bar panel" role="status" data-testid="story-scenes-ready"><div className="script-symbol"><Check size={18}/></div><div className="script-copy"><b>{tx(lang,'المشاهد موجودة بالفعل','Scenes already exist')}</b><p>{tx(lang,'تابع تعديل المشاهد من الخط الزمني. لا يمكن بدء تأليف جديد فوق مشاهد موجودة.','Continue editing these scenes in the timeline. A new storyboard cannot be generated over existing scenes.')}</p></div></div> : !freeMode && <><div className="script-bar panel"><div className="script-symbol"><WandSparkles size={18}/></div><div className="script-copy"><b>{tx(lang,'حوّل الفكرة إلى سيناريو','Turn the idea into a storyboard')}</b><p>{textProviderReady ? tx(lang,'أنشئ مسودة مشاهد باستخدام مزوّد نص مضبوط.','Generate a scene draft using a configured text provider.') : tx(lang,'لا يوجد مفتاح نص جاهز؛ أضف مفتاحًا صالحًا قبل التوليد.','No available text provider. Add an enabled key before generating.')}</p><label className="checkline charge-consent"><input type="checkbox" checked={chargeApproved} onChange={e=>setChargeApproved(e.target.checked)}/>{tx(lang,'أوافق على احتمال احتساب رسوم من المزوّد الأساسي أو الاحتياطي.','I approve possible charges from the primary or fallback provider.')}</label><div className="form-two mt-3"><label><span className="field-label">{tx(lang,'عدد المشاهد','Number of scenes')}</span><input className="studio-input" type="number" min="1" max="24" value={scriptSettings.sceneCount} onChange={e=>setScriptSettings(v=>({...v,sceneCount:Math.max(1,Math.min(24,Number(e.target.value)||1))}))} /></label><label><span className="field-label">{tx(lang,'مدة كل مشهد (ثانية)','Seconds per scene')}</span><input className="studio-input" type="number" min="1" max="600" value={scriptSettings.sceneDurationSeconds} onChange={e=>setScriptSettings(v=>({...v,sceneDurationSeconds:Math.max(1,Math.min(600,Number(e.target.value)||1))}))} /></label><label><span className="field-label">{tx(lang,'أسلوب المشاهد','Scene style')}</span><select className="studio-input" value={scriptSettings.sceneStyle} onChange={e=>setScriptSettings(v=>({...v,sceneStyle:e.target.value}))}>{visualStyles.map(([value,ar])=><option key={value} value={value}>{tx(lang,ar,value)}</option>)}</select></label></div></div><button disabled={!textProviderReady || generate.isPending || !chargeApproved || Boolean(currentJob?.status === 'running' || currentJob?.status === 'queued')} className="btn btn-primary" onClick={()=>generate.mutate({projectId,data:{providerKeyId:null,allowRotation:true,approvePotentialCharges:chargeApproved,...scriptSettings}},{onSuccess:refresh})} data-testid="button-generate-script">{generate.isPending ? <LoaderCircle size={16} className="animate-spin"/> : <WandSparkles size={16}/ >}{tx(lang,'توليد المشاهد','Generate scenes')}</button></div>
          {generate.isError && <div className="inline-error">{tx(lang,'تعذّر بدء التوليد. تحقق من مفتاح النص أو أعد المحاولة.','Could not start generation. Check your text key or try again.')}</div>}</>}
          {scenes.length > 0 && <BatchVoiceGeneration projectId={projectId} scenes={scenes} keys={generationKeys} lang={lang} freeMode={freeMode} hasActiveJob={Boolean(currentJob && (currentJob.status === 'queued' || currentJob.status === 'running'))} onQueued={refresh}/>}
