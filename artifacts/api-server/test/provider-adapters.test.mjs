@@ -53,8 +53,12 @@ test("HTTP 400 classification exposes only a concise provider rejection reason",
   assert.match(elevenLabs.message, /Voice not found for this account/);
 
   const generic = classifyProviderResponse(400, "not-json");
-  assert.match(generic.message, /Check the voice ID, request settings, and provider access/);
+  assert.match(generic.message, /Check the model, request parameters, and provider access/);
+  assert.doesNotMatch(generic.message, /voice ID/i);
   assert.doesNotMatch(generic.message, /not-json/);
+
+  const modelError = classifyProviderResponse(400, JSON.stringify({ error: { message: "The selected model is not available to this account." } }));
+  assert.match(modelError.message, /selected model is not available/i);
 });
 
 test("OpenAI script adapter sends the expected request and reads the response", async (t) => {
@@ -70,6 +74,19 @@ test("OpenAI script adapter sends the expected request and reads the response", 
   assert.equal(captured.url, "https://api.openai.com/v1/chat/completions");
   assert.equal(captured.init.headers.Authorization, "Bearer test-only-key");
   assert.equal(captured.body.messages[0].content, "Write a scene.");
+});
+
+test("script adapter preserves the provider's model-specific HTTP 400 reason", async (t) => {
+  mockFetch(t, async () => jsonResponse({ error: { message: "The selected model is not available to this account." } }, 400));
+
+  await assert.rejects(
+    generateWithProvider("openai", "test-only-key", "Write a scene."),
+    (error) => {
+      assert.equal(error.providerStatus, 400);
+      assert.match(classifyProviderResponse(error.providerStatus, error.responseBody).message, /selected model is not available/i);
+      return true;
+    },
+  );
 });
 
 test("Gemini adapter reads its provider-specific response shape", async (t) => {

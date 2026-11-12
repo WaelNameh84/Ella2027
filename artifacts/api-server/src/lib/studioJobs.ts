@@ -450,7 +450,19 @@ async function processScriptJob(job: typeof studioJobsTable.$inferSelect): Promi
           : { status: "unavailable" as const, message: "The provider could not be reached." };
         lastError = classification.status === "quota_limited"
           ? `Quota/billing limit from ${keyRow.provider}: the provider reports no available quota or credits. This is a provider-account limit, not proof that the key is malformed. Check that provider's usage/quota page, wait for its free quota reset, or use another provider with available quota. The app did not purchase credits or upgrade the account.`
-          : classification.message;
+          : details.providerStatus
+            ? `${keyRow.provider}: ${classification.message}`
+            : classification.message;
+        if (details.providerStatus === 400) {
+          await db.update(providerKeysTable).set({
+            testMessage: `${keyRow.provider}: ${classification.message}`,
+          }).where(eq(providerKeysTable.id, keyRow.id));
+          const canRotate = userSettings?.rotateOnConnectionFailure;
+          if (!canRotate || !rotate) break;
+          const delay = Math.min(userSettings?.retryDelaySeconds ?? 0, 10);
+          if (delay > 0) await new Promise((resolvePromise) => setTimeout(resolvePromise, delay * 1000));
+          continue;
+        }
         await db.update(providerKeysTable).set({
           status: classification.status,
           testMessage: classification.message,

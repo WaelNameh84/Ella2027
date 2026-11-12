@@ -96,6 +96,14 @@ function userFacingJobError(message: string | null | undefined, lang: Lang): str
       `${quota[1]} reports that its account has no quota or credits available. This does not necessarily mean the key is malformed. The key remains enabled and becomes selectable again after cooldown. Check the provider's Usage/Quota page, wait for its quota reset, or use another provider with available free quota. The app did not buy credits or upgrade the account.`,
     );
   }
+  const rejected = /^([^:]+): The provider rejected the request \(HTTP 400\):?\s*(.*)$/i.exec(message);
+  if (rejected) {
+    const detail = rejected[2].trim();
+    return tx(lang,
+      `المزوّد ${rejected[1]} رفض طلب كتابة السيناريو (HTTP 400). ${detail ? `السبب الذي أرسله المزوّد: ${detail}.` : 'غالبًا المشكلة في النموذج أو إعدادات/صيغة الطلب، وليست مجرد مفتاح غير صحيح.'} لم نعدّ المفتاح غير صالح ولم نعطّله بسبب هذا الرد.`,
+      `${rejected[1]} rejected the script request (HTTP 400). ${detail ? `Provider detail: ${detail}.` : 'This usually points to the model or request settings/format, not simply a bad key.'} The app did not mark the key invalid or disable it for this response.`,
+    );
+  }
   if (/quota(?:\/billing| or billing) limit/i.test(message)) {
     return tx(lang,
       'المزوّد أبلغ عن نفاد الحصة أو الرصيد. هذا لا يعني بالضرورة أن المفتاح خطأ؛ راجع صفحة الاستخدام/الحصة لدى المزوّد أو انتظر تجدد الحصة، أو استخدم مزوّدًا آخر لديه حصة متاحة.',

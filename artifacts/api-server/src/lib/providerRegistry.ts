@@ -285,7 +285,7 @@ export function classifyProviderResponse(
       status: "unavailable",
       message: detail
         ? `The provider rejected the request (HTTP 400): ${detail}`
-        : "The provider rejected the request (HTTP 400). Check the voice ID, request settings, and provider access.",
+        : "The provider rejected the request (HTTP 400). Check the model, request parameters, and provider access.",
     };
   }
   return { status: "unavailable", message: `Provider returned HTTP ${status}.` };
@@ -373,7 +373,7 @@ export async function generateWithProvider(
     if (!response.ok) {
       throw Object.assign(new Error(result.error?.message ?? "Provider request failed."), {
         providerStatus: response.status,
-        responseBody: result.error?.message ?? "",
+        responseBody: JSON.stringify({ error: { message: result.error?.message ?? "Provider request failed." } }),
       });
     }
     return result.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("") ?? "";
@@ -424,7 +424,7 @@ export async function generateWithProvider(
   if (!response.ok) {
     throw Object.assign(new Error(result.error?.message ?? "Provider request failed."), {
       providerStatus: response.status,
-      responseBody: result.error?.message ?? "",
+      responseBody: JSON.stringify({ error: { message: result.error?.message ?? "Provider request failed." } }),
     });
   }
   const content =

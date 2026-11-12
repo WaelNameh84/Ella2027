@@ -974,7 +974,7 @@ router.post("/projects/:projectId/generate-script", async (req, res): Promise<vo
     } catch (error) {
       const details = error as Error & { providerStatus?: number; responseBody?: string };
       finalMessage = details.providerStatus
-        ? classifyProviderResponse(details.providerStatus, details.responseBody ?? "").message
+        ? `${keyRow.provider}: ${classifyProviderResponse(details.providerStatus, details.responseBody ?? "").message}`
         : (details.message || "Provider request failed.");
       if (!details.providerStatus) {
         await db.update(providerKeysTable).set({
@@ -984,6 +984,16 @@ router.post("/projects/:projectId/generate-script", async (req, res): Promise<vo
         if (!settings?.rotateOnConnectionFailure) break;
       } else {
         const classification = classifyProviderResponse(details.providerStatus, details.responseBody ?? "");
+        if (details.providerStatus === 400) {
+          await db.update(providerKeysTable).set({
+            testMessage: `${keyRow.provider}: ${classification.message}`,
+          }).where(eq(providerKeysTable.id, keyRow.id));
+          if (!isRotationEligible(classification.status, settings)) break;
+          if (!rotate) break;
+          const delay = Math.min(settings?.retryDelaySeconds ?? 0, 10);
+          if (delay > 0) await new Promise((resolvePromise) => setTimeout(resolvePromise, delay * 1000));
+          continue;
+        }
         const cooldownUntil = ["rate_limited", "quota_limited"].includes(classification.status)
           ? new Date(Date.now() + Math.max(60, settings?.retryDelaySeconds ?? 60) * 1000)
           : null;
