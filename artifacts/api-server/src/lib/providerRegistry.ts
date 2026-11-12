@@ -36,7 +36,7 @@ export const providerDefinitions: Record<string, ProviderDefinition> = {
     testUrl: () => "https://api.openai.com/v1/models",
   },
   gemini: {
-    label: "Google Gemini",
+    label: "Google AI Studio (Gemini)",
     officialUrl: "https://aistudio.google.com/app/apikey",
     testUrl: (key) => `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}`,
     chatUrl: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
@@ -195,6 +195,9 @@ export const providerCatalog = [
     canGenerateScript: Boolean(provider.chatUrl),
   })),
   { id: "runway", name: "Runway", officialUrl: "https://dev.runwayml.com/", canGenerateScript: false },
+  { id: "segmind", name: "Segmind", officialUrl: "https://www.segmind.com/console/api-keys", canGenerateScript: false },
+  { id: "cartesia", name: "Cartesia", officialUrl: "https://play.cartesia.ai/keys", canGenerateScript: false },
+  { id: "luma", name: "Luma AI", officialUrl: "https://lumalabs.ai/dream-machine/api", canGenerateScript: false },
   { id: "wan22", name: "Wan 2.2 (local GPU)", officialUrl: "https://github.com/Wan-Video/Wan2.2", canGenerateScript: false },
   { id: "cogvideox", name: "CogVideoX (local GPU)", officialUrl: "https://github.com/zai-org/CogVideo", canGenerateScript: false },
   { id: "ltx-video", name: "LTX-Video (local GPU)", officialUrl: "https://github.com/Lightricks/ltx-video", canGenerateScript: false },
