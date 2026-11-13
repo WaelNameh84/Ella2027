@@ -824,8 +824,13 @@ function buildExportPreflight(scenes:Scene[],targetDuration:number,includeSubtit
   return {errors,warnings};
 }
 
-function ProductionStages({ lang, scenes, jobs, hasExport }: { lang: Lang; scenes: Scene[]; jobs: StudioJob[]; hasExport: boolean }) {
+function ProductionStages({ lang, scenes, jobs, hasExport, onSelectScene }: { lang: Lang; scenes: Scene[]; jobs: StudioJob[]; hasExport: boolean; onSelectScene: (sceneId: string) => void }) {
   const hasJob = (type: StudioJob['jobType']) => jobs.some(job => job.jobType === type && job.status === 'completed');
+  const missingAssets = scenes.filter(scene => !scene.assetUrl || !['image', 'video'].includes(scene.assetType || ''));
+  const missingVoices = scenes.filter(scene => scene.narration.trim() && !scene.voiceUrl);
+  const failedJobs = jobs.filter(job => job.status === 'failed');
+  const activeJob = jobs.find(job => job.status === 'queued' || job.status === 'running');
+  const blockers = [...missingAssets.map(scene => ({ scene, label: tx(lang, 'أضف صورة أو فيديو', 'Attach image or video') })), ...missingVoices.map(scene => ({ scene, label: tx(lang, 'أضف الصوت أو أفرغ التعليق', 'Add voice or clear narration') }))].slice(0, 6);
   const stages = [
     { ar: 'الفكرة', en: 'Idea', done: true },
     { ar: 'السيناريو', en: 'Script', done: scenes.length > 0 || hasJob('script') },
@@ -838,7 +843,10 @@ function ProductionStages({ lang, scenes, jobs, hasExport }: { lang: Lang; scene
   return <section className="panel production-stages" aria-label={tx(lang, 'مراحل إنتاج الفيلم', 'Film production stages')}>
     <div className="production-stages-head"><div><span className="eyebrow">{tx(lang, 'ONE IDEA TO FULL MOVIE', 'ONE IDEA TO FULL MOVIE')}</span><h3>{tx(lang, 'خريطة إنتاج الفيلم', 'Film production map')}</h3></div><span className="small-mono">{completed}/{stages.length} {tx(lang, 'مراحل مكتملة', 'stages complete')}</span></div>
     <div className="production-stage-list">{stages.map((stage, index) => <div className={`production-stage ${stage.done ? 'is-done' : ''}`} key={stage.en}><span className="production-stage-mark">{stage.done ? <Check size={13}/> : String(index + 1).padStart(2, '0')}</span><span>{tx(lang, stage.ar, stage.en)}</span></div>)}</div>
-    <p className="production-stage-note">{tx(lang, 'كل مرحلة تحفظ تقدمها. لا يبدأ أي مزوّد خارجي أو خدمة مدفوعة تلقائيًا؛ الإرسال يحتاج موافقة صريحة من المستخدم.', 'Each stage saves its progress. No external or paid provider starts automatically; every request requires explicit user approval.')}</p>
+    <div className="production-dashboard-summary"><div><span className="field-label">{tx(lang, 'عوائق حالية', 'Current blockers')}</span><strong className={blockers.length ? 'text-destructive' : 'is-ready'}>{blockers.length}</strong></div><div><span className="field-label">{tx(lang, 'مهام فاشلة', 'Failed jobs')}</span><strong className={failedJobs.length ? 'text-destructive' : 'is-ready'}>{failedJobs.length}</strong></div><div><span className="field-label">{tx(lang, 'المهمة الحالية', 'Active job')}</span><strong>{activeJob ? `${activeJob.progress}%` : tx(lang, 'لا توجد', 'None')}</strong></div></div>
+    {blockers.length > 0 && <div className="production-blockers"><span className="field-label">{tx(lang, 'إجراءات مطلوبة', 'Required actions')}</span>{blockers.map(({ scene, label }) => <button type="button" className="production-blocker" key={`${scene.id}-${label}`} onClick={() => onSelectScene(scene.id)}><span>{scene.title || tx(lang, 'مشهد بلا عنوان', 'Untitled scene')}</span><small>{label}<ArrowLeft size={13}/></small></button>)}</div>}
+    {failedJobs.length > 0 && <div className="production-job-alert" role="status"><AlertTriangle size={15}/><span>{tx(lang, `هناك ${failedJobs.length} مهمة فشلت. افتح صفحة المهام للمحاولة مجددًا.`, `${failedJobs.length} job(s) failed. Open Jobs to retry them.`)}</span><Link className="text-link" href="/jobs">{tx(lang, 'عرض المهام', 'View jobs')}<ArrowLeft size={13}/></Link></div>}
+    <p className="production-stage-note">{tx(lang, 'الأرقام هنا مبنية على المشاهد والمهام المحفوظة فعلًا. لا يبدأ أي مزوّد خارجي أو خدمة مدفوعة تلقائيًا.', 'These numbers come from saved scenes and jobs. No external or paid provider starts automatically.')}</p>
   </section>;
 }
 
@@ -1004,7 +1012,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
   };
   return <AppFrame title={project.title} crumb={tx(lang,'استوديو المشروع','PROJECT STUDIO')}>
     <div className="workspace-head"><div><Link href="/projects" className="back-link"><ArrowRight size={15}/>{tx(lang,'كل المشاريع','All projects')}</Link><h2>{project.title}</h2><p>{project.idea}</p></div><div className="workspace-actions"><Link href={`/media?projectId=${projectId}${activeScene ? `&sceneId=${activeScene.id}` : ''}`} className="btn btn-quiet"><ImagePlus size={16}/>{tx(lang,'إضافة وسائط','Add media')}</Link><button className="btn btn-quiet" onClick={downloadScript} disabled={!scenes.length}><Download size={16}/>{tx(lang,'تنزيل السيناريو','Download script')}</button><button className="btn btn-quiet" onClick={downloadSubtitles} disabled={!scenes.some(scene => (scene.subtitleText || scene.narration || '').trim())}><Download size={16}/>{tx(lang,'تنزيل SRT','Download SRT')}</button><button className="btn btn-quiet" onClick={()=>setEditProjectOpen(true)}><Settings2 size={16}/>{tx(lang,'تفاصيل','Details')}</button></div></div>
-    <ProductionStages lang={lang} scenes={scenes} jobs={projectJobsQuery.data || []} hasExport={latestExportJob?.status === 'completed' || Boolean(project.exportUrl)} />
+    <ProductionStages lang={lang} scenes={scenes} jobs={projectJobsQuery.data || []} hasExport={latestExportJob?.status === 'completed' || Boolean(project.exportUrl)} onSelectScene={setSelected} />
     <StoryboardBoard lang={lang} scenes={scenes} selectedId={activeScene?.id ?? null} onSelect={setSelected} />
     <div className="editor-grid">
       <section className="editor-main">
