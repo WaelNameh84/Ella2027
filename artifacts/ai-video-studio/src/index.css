@@ -1222,3 +1222,21 @@ body { min-height: 100dvh; }
 .storyboard-card-actions button.is-danger:hover { background: hsl(var(--destructive) / .08); color: hsl(var(--destructive)); }
 .storyboard-card-actions button:disabled { opacity: .45; cursor: not-allowed; }
 @media (max-width: 767px) { .storyboard-card-actions button { min-height: 38px; } }
+
+/* ── Writing assistant ─────────────────────────────────────── */
+.writing-assistant { display: grid; gap: 7px; }
+.writing-assistant-toggle { align-self: flex-start; }
+.writing-assistant-panel { display: grid; gap: 9px; padding: 11px; border: 1px solid hsl(var(--primary) / .22); border-radius: 10px; background: hsl(var(--primary) / .035); }
+.writing-assistant-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.writing-assistant-head h4 { margin-top: 3px; font-size: 11px; }
+.writing-assistant-targets { display: flex; flex-wrap: wrap; gap: 4px; }
+.writing-assistant-targets button { padding: 4px 8px; border: 1px solid hsl(var(--border)); border-radius: 99px; background: hsl(var(--card)); color: hsl(var(--muted-foreground)); font-size: 8.5px; cursor: pointer; }
+.writing-assistant-targets button.is-active { border-color: hsl(var(--primary)); background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+.writing-assistant-suggestion { display: grid; gap: 7px; }
+.writing-assistant-rationale { padding: 6px 8px; border-radius: 6px; background: hsl(var(--muted) / .45); color: hsl(var(--muted-foreground)); font-size: 8.5px; line-height: 1.5; }
+.writing-assistant-note, .writing-assistant-source { color: hsl(var(--muted-foreground)); font-size: 7.5px; line-height: 1.5; }
+.writing-assistant-applied { display: flex; align-items: center; gap: 5px; color: hsl(158 42% 30%); font-size: 8.5px; }
+.writing-assistant-actions { display: flex; flex-wrap: wrap; gap: 5px; }
+.writing-assistant-actions .btn-primary { margin-inline-start: auto; }
+.writing-assistant-empty { color: hsl(var(--muted-foreground)); font-size: 9px; line-height: 1.5; }
+@media (max-width: 560px) { .writing-assistant-actions .btn { flex: 1 1 auto; } .writing-assistant-actions .btn-primary { margin-inline-start: 0; width: 100%; } }
