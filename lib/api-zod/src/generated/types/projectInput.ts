@@ -7,6 +7,7 @@
  */
 import type { CharacterProfile } from './characterProfile';
 import type { ProjectInputAspectRatio } from './projectInputAspectRatio';
+import type { StudioBrandKit } from './studioBrandKit';
 
 export interface ProjectInput {
   /**
@@ -29,6 +30,7 @@ export interface ProjectInput {
   audience: string;
   visualStyle: string;
   aspectRatio: ProjectInputAspectRatio;
+  brandKit?: StudioBrandKit;
   /** @maxItems 24 */
   characters?: CharacterProfile[];
   /** @nullable */

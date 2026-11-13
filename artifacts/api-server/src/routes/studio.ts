@@ -324,6 +324,7 @@ function studioJobDto(row: typeof studioJobsTable.$inferSelect) {
   return {
     id: row.id,
     projectId: row.projectId,
+    sceneId: typeof (row.input as { sceneId?: unknown } | null)?.sceneId === "string" ? (row.input as { sceneId: string }).sceneId : null,
     jobType: row.jobType,
     status: row.status,
     stage: row.stage,

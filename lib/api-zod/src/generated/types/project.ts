@@ -7,6 +7,7 @@
  */
 import type { CharacterProfile } from './characterProfile';
 import type { ProjectStatus } from './projectStatus';
+import type { StudioBrandKit } from './studioBrandKit';
 
 export interface Project {
   id: string;
@@ -18,6 +19,7 @@ export interface Project {
   audience: string;
   visualStyle: string;
   aspectRatio: string;
+  brandKit: StudioBrandKit;
   characters: CharacterProfile[];
   /** @nullable */
   musicUrl: string | null;

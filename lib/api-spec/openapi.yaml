@@ -885,6 +885,15 @@ components:
           type: array
           items: { $ref: "#/components/schemas/Project" }
       required: [projectCount, activeCount, sceneCount, providerCount, recentProjects]
+    StudioBrandKit:
+      type: object
+      properties:
+        primaryColor: { type: string, pattern: "^#[0-9a-fA-F]{6}$" }
+        accentColor: { type: string, pattern: "^#[0-9a-fA-F]{6}$" }
+        fontFamily: { type: string, enum: [sans, serif, mono] }
+        watermarkText: { type: string, maxLength: 160 }
+        watermarkPosition: { type: string, enum: [top-left, top-right, bottom-left, bottom-right] }
+      required: [primaryColor, accentColor, fontFamily, watermarkText, watermarkPosition]
     Project:
       type: object
       properties:
@@ -897,6 +906,7 @@ components:
         audience: { type: string }
         visualStyle: { type: string }
         aspectRatio: { type: string }
+        brandKit: { $ref: "#/components/schemas/StudioBrandKit" }
         characters:
           type: array
           items: { $ref: "#/components/schemas/CharacterProfile" }
@@ -910,7 +920,7 @@ components:
         exportUrl: { type: ["string", "null"] }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
-      required: [id, title, idea, videoType, language, durationSeconds, audience, visualStyle, aspectRatio, characters, musicUrl, musicVolume, soundEffectsUrl, soundEffectsVolume, status, progress, sceneCount, exportUrl, createdAt, updatedAt]
+      required: [id, title, idea, videoType, language, durationSeconds, audience, visualStyle, aspectRatio, brandKit, characters, musicUrl, musicVolume, soundEffectsUrl, soundEffectsVolume, status, progress, sceneCount, exportUrl, createdAt, updatedAt]
     CharacterProfile:
       type: object
       properties:
@@ -941,6 +951,7 @@ components:
         audience: { type: string }
         visualStyle: { type: string }
         aspectRatio: { type: string, enum: ["16:9", "9:16", "1:1", "4:5", "4:3", "3:2"] }
+        brandKit: { $ref: "#/components/schemas/StudioBrandKit" }
         characters:
           type: array
           maxItems: 24
@@ -961,6 +972,7 @@ components:
         audience: { type: string }
         visualStyle: { type: string }
         aspectRatio: { type: string, enum: ["16:9", "9:16", "1:1", "4:5", "4:3", "3:2"] }
+        brandKit: { $ref: "#/components/schemas/StudioBrandKit" }
         characters:
           type: array
           maxItems: 24
@@ -1106,6 +1118,7 @@ components:
       properties:
         id: { type: string, format: uuid }
         projectId: { type: string, format: uuid }
+        sceneId: { type: ["string", "null"], format: uuid }
         jobType: { type: string, enum: [script, export, image, video, voice] }
         status: { type: string, enum: [queued, running, completed, failed] }
         stage: { type: string }
@@ -1117,7 +1130,7 @@ components:
         completedAt: { type: ["string", "null"], format: date-time }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
-      required: [id, projectId, jobType, status, stage, progress, message, error, attempts, startedAt, completedAt, createdAt, updatedAt]
+      required: [id, projectId, sceneId, jobType, status, stage, progress, message, error, attempts, startedAt, completedAt, createdAt, updatedAt]
     ProviderKey:
       type: object
       properties:

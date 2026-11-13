@@ -7,6 +7,7 @@
  */
 import type { CharacterProfile } from './characterProfile';
 import type { ProjectUpdateAspectRatio } from './projectUpdateAspectRatio';
+import type { StudioBrandKit } from './studioBrandKit';
 
 export interface ProjectUpdate {
   /**
@@ -26,6 +27,7 @@ export interface ProjectUpdate {
   audience?: string;
   visualStyle?: string;
   aspectRatio?: ProjectUpdateAspectRatio;
+  brandKit?: StudioBrandKit;
   /** @maxItems 24 */
   characters?: CharacterProfile[];
   /** @nullable */

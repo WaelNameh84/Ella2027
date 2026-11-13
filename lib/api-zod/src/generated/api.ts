@@ -7,14 +7,6 @@
  */
 import * as zod from 'zod';
 
-export const StudioBrandKit = zod.object({
-  primaryColor: zod.string().regex(/^#[0-9a-fA-F]{6}$/),
-  accentColor: zod.string().regex(/^#[0-9a-fA-F]{6}$/),
-  fontFamily: zod.enum(['sans', 'serif', 'mono']),
-  watermarkText: zod.string().max(160),
-  watermarkPosition: zod.enum(['top-left', 'top-right', 'bottom-left', 'bottom-right']),
-});
-
 
 /**
  * @summary Health check
@@ -27,6 +19,10 @@ export const HealthCheckResponse = zod.object({
 /**
  * @summary Get dashboard summary
  */
+export const getStudioSummaryResponseRecentProjectsItemBrandKitPrimaryColorRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
+export const getStudioSummaryResponseRecentProjectsItemBrandKitAccentColorRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
+export const getStudioSummaryResponseRecentProjectsItemBrandKitWatermarkTextMax = 160;
+
 export const getStudioSummaryResponseRecentProjectsItemCharactersItemIdMax = 100;
 
 export const getStudioSummaryResponseRecentProjectsItemCharactersItemNameMax = 160;
@@ -60,7 +56,13 @@ export const GetStudioSummaryResponse = zod.object({
   "audience": zod.string(),
   "visualStyle": zod.string(),
   "aspectRatio": zod.string(),
-  "brandKit": StudioBrandKit,
+  "brandKit": zod.object({
+  "primaryColor": zod.string().regex(getStudioSummaryResponseRecentProjectsItemBrandKitPrimaryColorRegExp),
+  "accentColor": zod.string().regex(getStudioSummaryResponseRecentProjectsItemBrandKitAccentColorRegExp),
+  "fontFamily": zod.enum(['sans', 'serif', 'mono']),
+  "watermarkText": zod.string().max(getStudioSummaryResponseRecentProjectsItemBrandKitWatermarkTextMax),
+  "watermarkPosition": zod.enum(['top-left', 'top-right', 'bottom-left', 'bottom-right'])
+}),
   "characters": zod.array(zod.object({
   "id": zod.string().min(1).max(getStudioSummaryResponseRecentProjectsItemCharactersItemIdMax),
   "name": zod.string().min(1).max(getStudioSummaryResponseRecentProjectsItemCharactersItemNameMax),
@@ -86,6 +88,10 @@ export const GetStudioSummaryResponse = zod.object({
 /**
  * @summary List the current user's projects
  */
+export const listProjectsResponseBrandKitPrimaryColorRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
+export const listProjectsResponseBrandKitAccentColorRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
+export const listProjectsResponseBrandKitWatermarkTextMax = 160;
+
 export const listProjectsResponseCharactersItemIdMax = 100;
 
 export const listProjectsResponseCharactersItemNameMax = 160;
@@ -114,7 +120,13 @@ export const ListProjectsResponseItem = zod.object({
   "audience": zod.string(),
   "visualStyle": zod.string(),
   "aspectRatio": zod.string(),
-  "brandKit": StudioBrandKit,
+  "brandKit": zod.object({
+  "primaryColor": zod.string().regex(listProjectsResponseBrandKitPrimaryColorRegExp),
+  "accentColor": zod.string().regex(listProjectsResponseBrandKitAccentColorRegExp),
+  "fontFamily": zod.enum(['sans', 'serif', 'mono']),
+  "watermarkText": zod.string().max(listProjectsResponseBrandKitWatermarkTextMax),
+  "watermarkPosition": zod.enum(['top-left', 'top-right', 'bottom-left', 'bottom-right'])
+}),
   "characters": zod.array(zod.object({
   "id": zod.string().min(1).max(listProjectsResponseCharactersItemIdMax),
   "name": zod.string().min(1).max(listProjectsResponseCharactersItemNameMax),
@@ -147,6 +159,10 @@ export const createProjectBodyIdeaMax = 12000;
 export const createProjectBodyDurationSecondsMin = 5;
 export const createProjectBodyDurationSecondsMax = 3600;
 
+export const createProjectBodyBrandKitPrimaryColorRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
+export const createProjectBodyBrandKitAccentColorRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
+export const createProjectBodyBrandKitWatermarkTextMax = 160;
+
 export const createProjectBodyCharactersItemIdMax = 100;
 
 export const createProjectBodyCharactersItemNameMax = 160;
@@ -176,7 +192,13 @@ export const CreateProjectBody = zod.object({
   "audience": zod.string(),
   "visualStyle": zod.string(),
   "aspectRatio": zod.enum(['16:9', '9:16', '1:1', '4:5', '4:3', '3:2']),
-  "brandKit": StudioBrandKit,
+  "brandKit": zod.object({
+  "primaryColor": zod.string().regex(createProjectBodyBrandKitPrimaryColorRegExp),
+  "accentColor": zod.string().regex(createProjectBodyBrandKitAccentColorRegExp),
+  "fontFamily": zod.enum(['sans', 'serif', 'mono']),
+  "watermarkText": zod.string().max(createProjectBodyBrandKitWatermarkTextMax),
+  "watermarkPosition": zod.enum(['top-left', 'top-right', 'bottom-left', 'bottom-right'])
+}).optional(),
   "characters": zod.array(zod.object({
   "id": zod.string().min(1).max(createProjectBodyCharactersItemIdMax),
   "name": zod.string().min(1).max(createProjectBodyCharactersItemNameMax),
@@ -190,6 +212,10 @@ export const CreateProjectBody = zod.object({
   "soundEffectsUrl": zod.string().nullish(),
   "soundEffectsVolume": zod.number().int().min(createProjectBodySoundEffectsVolumeMin).max(createProjectBodySoundEffectsVolumeMax).optional()
 })
+
+export const createProjectResponseBrandKitPrimaryColorRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
+export const createProjectResponseBrandKitAccentColorRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
+export const createProjectResponseBrandKitWatermarkTextMax = 160;
 
 export const createProjectResponseCharactersItemIdMax = 100;
 
@@ -219,7 +245,13 @@ export const CreateProjectResponse = zod.object({
   "audience": zod.string(),
   "visualStyle": zod.string(),
   "aspectRatio": zod.string(),
-  "brandKit": StudioBrandKit,
+  "brandKit": zod.object({
+  "primaryColor": zod.string().regex(createProjectResponseBrandKitPrimaryColorRegExp),
+  "accentColor": zod.string().regex(createProjectResponseBrandKitAccentColorRegExp),
+  "fontFamily": zod.enum(['sans', 'serif', 'mono']),
+  "watermarkText": zod.string().max(createProjectResponseBrandKitWatermarkTextMax),
+  "watermarkPosition": zod.enum(['top-left', 'top-right', 'bottom-left', 'bottom-right'])
+}),
   "characters": zod.array(zod.object({
   "id": zod.string().min(1).max(createProjectResponseCharactersItemIdMax),
   "name": zod.string().min(1).max(createProjectResponseCharactersItemNameMax),
@@ -247,6 +279,10 @@ export const CreateProjectResponse = zod.object({
 export const GetProjectParams = zod.object({
   "projectId": zod.string().uuid()
 })
+
+export const getProjectResponseOneBrandKitPrimaryColorRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
+export const getProjectResponseOneBrandKitAccentColorRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
+export const getProjectResponseOneBrandKitWatermarkTextMax = 160;
 
 export const getProjectResponseOneCharactersItemIdMax = 100;
 
@@ -292,7 +328,13 @@ export const GetProjectResponse = zod.object({
   "audience": zod.string(),
   "visualStyle": zod.string(),
   "aspectRatio": zod.string(),
-  "brandKit": StudioBrandKit,
+  "brandKit": zod.object({
+  "primaryColor": zod.string().regex(getProjectResponseOneBrandKitPrimaryColorRegExp),
+  "accentColor": zod.string().regex(getProjectResponseOneBrandKitAccentColorRegExp),
+  "fontFamily": zod.enum(['sans', 'serif', 'mono']),
+  "watermarkText": zod.string().max(getProjectResponseOneBrandKitWatermarkTextMax),
+  "watermarkPosition": zod.enum(['top-left', 'top-right', 'bottom-left', 'bottom-right'])
+}),
   "characters": zod.array(zod.object({
   "id": zod.string().min(1).max(getProjectResponseOneCharactersItemIdMax),
   "name": zod.string().min(1).max(getProjectResponseOneCharactersItemNameMax),
@@ -364,6 +406,10 @@ export const updateProjectBodyIdeaMax = 12000;
 export const updateProjectBodyDurationSecondsMin = 5;
 export const updateProjectBodyDurationSecondsMax = 3600;
 
+export const updateProjectBodyBrandKitPrimaryColorRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
+export const updateProjectBodyBrandKitAccentColorRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
+export const updateProjectBodyBrandKitWatermarkTextMax = 160;
+
 export const updateProjectBodyCharactersItemIdMax = 100;
 
 export const updateProjectBodyCharactersItemNameMax = 160;
@@ -393,7 +439,13 @@ export const UpdateProjectBody = zod.object({
   "audience": zod.string().optional(),
   "visualStyle": zod.string().optional(),
   "aspectRatio": zod.enum(['16:9', '9:16', '1:1', '4:5', '4:3', '3:2']).optional(),
-  "brandKit": StudioBrandKit.optional(),
+  "brandKit": zod.object({
+  "primaryColor": zod.string().regex(updateProjectBodyBrandKitPrimaryColorRegExp),
+  "accentColor": zod.string().regex(updateProjectBodyBrandKitAccentColorRegExp),
+  "fontFamily": zod.enum(['sans', 'serif', 'mono']),
+  "watermarkText": zod.string().max(updateProjectBodyBrandKitWatermarkTextMax),
+  "watermarkPosition": zod.enum(['top-left', 'top-right', 'bottom-left', 'bottom-right'])
+}).optional(),
   "characters": zod.array(zod.object({
   "id": zod.string().min(1).max(updateProjectBodyCharactersItemIdMax),
   "name": zod.string().min(1).max(updateProjectBodyCharactersItemNameMax),
@@ -407,6 +459,10 @@ export const UpdateProjectBody = zod.object({
   "soundEffectsUrl": zod.string().nullish(),
   "soundEffectsVolume": zod.number().int().min(updateProjectBodySoundEffectsVolumeMin).max(updateProjectBodySoundEffectsVolumeMax).optional()
 })
+
+export const updateProjectResponseBrandKitPrimaryColorRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
+export const updateProjectResponseBrandKitAccentColorRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
+export const updateProjectResponseBrandKitWatermarkTextMax = 160;
 
 export const updateProjectResponseCharactersItemIdMax = 100;
 
@@ -436,7 +492,13 @@ export const UpdateProjectResponse = zod.object({
   "audience": zod.string(),
   "visualStyle": zod.string(),
   "aspectRatio": zod.string(),
-  "brandKit": StudioBrandKit,
+  "brandKit": zod.object({
+  "primaryColor": zod.string().regex(updateProjectResponseBrandKitPrimaryColorRegExp),
+  "accentColor": zod.string().regex(updateProjectResponseBrandKitAccentColorRegExp),
+  "fontFamily": zod.enum(['sans', 'serif', 'mono']),
+  "watermarkText": zod.string().max(updateProjectResponseBrandKitWatermarkTextMax),
+  "watermarkPosition": zod.enum(['top-left', 'top-right', 'bottom-left', 'bottom-right'])
+}),
   "characters": zod.array(zod.object({
   "id": zod.string().min(1).max(updateProjectResponseCharactersItemIdMax),
   "name": zod.string().min(1).max(updateProjectResponseCharactersItemNameMax),
@@ -756,6 +818,7 @@ export const queueSceneImageGenerationResponseAttemptsMin = 0;
 export const QueueSceneImageGenerationResponse = zod.object({
   "id": zod.string().uuid(),
   "projectId": zod.string().uuid(),
+  "sceneId": zod.string().uuid().nullable(),
   "jobType": zod.enum(['script', 'export', 'image', 'video', 'voice']),
   "status": zod.enum(['queued', 'running', 'completed', 'failed']),
   "stage": zod.string(),
@@ -799,6 +862,7 @@ export const queueSceneVideoGenerationResponseAttemptsMin = 0;
 export const QueueSceneVideoGenerationResponse = zod.object({
   "id": zod.string().uuid(),
   "projectId": zod.string().uuid(),
+  "sceneId": zod.string().uuid().nullable(),
   "jobType": zod.enum(['script', 'export', 'image', 'video', 'voice']),
   "status": zod.enum(['queued', 'running', 'completed', 'failed']),
   "stage": zod.string(),
@@ -841,6 +905,7 @@ export const queueSceneVoiceGenerationResponseAttemptsMin = 0;
 export const QueueSceneVoiceGenerationResponse = zod.object({
   "id": zod.string().uuid(),
   "projectId": zod.string().uuid(),
+  "sceneId": zod.string().uuid().nullable(),
   "jobType": zod.enum(['script', 'export', 'image', 'video', 'voice']),
   "status": zod.enum(['queued', 'running', 'completed', 'failed']),
   "stage": zod.string(),
@@ -882,6 +947,10 @@ export const GenerateProjectScriptBody = zod.object({
   "sceneDurationSeconds": zod.number().int().min(1).max(generateProjectScriptBodySceneDurationSecondsMax).default(generateProjectScriptBodySceneDurationSecondsDefault),
   "sceneStyle": zod.string().min(1).max(generateProjectScriptBodySceneStyleMax).default(generateProjectScriptBodySceneStyleDefault)
 })
+
+export const generateProjectScriptResponseOneBrandKitPrimaryColorRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
+export const generateProjectScriptResponseOneBrandKitAccentColorRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
+export const generateProjectScriptResponseOneBrandKitWatermarkTextMax = 160;
 
 export const generateProjectScriptResponseOneCharactersItemIdMax = 100;
 
@@ -927,7 +996,13 @@ export const GenerateProjectScriptResponse = zod.object({
   "audience": zod.string(),
   "visualStyle": zod.string(),
   "aspectRatio": zod.string(),
-  "brandKit": StudioBrandKit,
+  "brandKit": zod.object({
+  "primaryColor": zod.string().regex(generateProjectScriptResponseOneBrandKitPrimaryColorRegExp),
+  "accentColor": zod.string().regex(generateProjectScriptResponseOneBrandKitAccentColorRegExp),
+  "fontFamily": zod.enum(['sans', 'serif', 'mono']),
+  "watermarkText": zod.string().max(generateProjectScriptResponseOneBrandKitWatermarkTextMax),
+  "watermarkPosition": zod.enum(['top-left', 'top-right', 'bottom-left', 'bottom-right'])
+}),
   "characters": zod.array(zod.object({
   "id": zod.string().min(1).max(generateProjectScriptResponseOneCharactersItemIdMax),
   "name": zod.string().min(1).max(generateProjectScriptResponseOneCharactersItemNameMax),
@@ -1023,6 +1098,7 @@ export const queueProjectScriptResponseAttemptsMin = 0;
 export const QueueProjectScriptResponse = zod.object({
   "id": zod.string().uuid(),
   "projectId": zod.string().uuid(),
+  "sceneId": zod.string().uuid().nullable(),
   "jobType": zod.enum(['script', 'export', 'image', 'video', 'voice']),
   "status": zod.enum(['queued', 'running', 'completed', 'failed']),
   "stage": zod.string(),
@@ -1086,6 +1162,7 @@ export const queueProjectExportResponseAttemptsMin = 0;
 export const QueueProjectExportResponse = zod.object({
   "id": zod.string().uuid(),
   "projectId": zod.string().uuid(),
+  "sceneId": zod.string().uuid().nullable(),
   "jobType": zod.enum(['script', 'export', 'image', 'video', 'voice']),
   "status": zod.enum(['queued', 'running', 'completed', 'failed']),
   "stage": zod.string(),
@@ -1138,6 +1215,7 @@ export const listStudioJobsResponseAttemptsMin = 0;
 export const ListStudioJobsResponseItem = zod.object({
   "id": zod.string().uuid(),
   "projectId": zod.string().uuid(),
+  "sceneId": zod.string().uuid().nullable(),
   "jobType": zod.enum(['script', 'export', 'image', 'video', 'voice']),
   "status": zod.enum(['queued', 'running', 'completed', 'failed']),
   "stage": zod.string(),
@@ -1176,6 +1254,7 @@ export const retryStudioJobResponseAttemptsMin = 0;
 export const RetryStudioJobResponse = zod.object({
   "id": zod.string().uuid(),
   "projectId": zod.string().uuid(),
+  "sceneId": zod.string().uuid().nullable(),
   "jobType": zod.enum(['script', 'export', 'image', 'video', 'voice']),
   "status": zod.enum(['queued', 'running', 'completed', 'failed']),
   "stage": zod.string(),

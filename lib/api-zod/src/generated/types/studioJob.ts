@@ -11,6 +11,8 @@ import type { StudioJobStatus } from './studioJobStatus';
 export interface StudioJob {
   id: string;
   projectId: string;
+  /** @nullable */
+  sceneId: string | null;
   jobType: StudioJobJobType;
   status: StudioJobStatus;
   stage: string;
