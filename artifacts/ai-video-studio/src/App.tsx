@@ -32,8 +32,10 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { FilmTimeline } from '@/components/film-timeline';
 import { ProductionRail, StageTools, StudioProgress, type ProductionStage, type StudioStageId } from '@/components/studio-layout';
 import { StudioStatusBoard } from '@/components/studio-status';
+import { AssetVersionCompare } from '@/components/asset-versions';
 import { FilmPlanCard } from '@/components/film-plan';
 import { buildFilmPlan, type FilmPlan } from '@/lib/film-plan';
+import { defaultVideoModel, defaultVoiceId, estimateCostText } from '@/lib/provider-costs';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { downloadProjectBackup, PROJECT_BACKUP_MAX_BYTES, parseProjectBackup } from '@/lib/project-backup';
@@ -1198,7 +1200,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
         {stage==='idea'&&<div className="stage-tool-stack"><div className="stage-tool-summary"><span className="eyebrow">{tx(lang,'ملخص الفكرة','IDEA SUMMARY')}</span><h4>{project.title}</h4><p>{project.idea||tx(lang,'لا يوجد ملخص بعد.','No summary yet.')}</p><dl><div><dt>{tx(lang,'النوع','Format')}</dt><dd>{project.videoType}</dd></div><div><dt>{tx(lang,'المدة','Duration')}</dt><dd>{formatTime(project.durationSeconds)}</dd></div><div><dt>{tx(lang,'الأبعاد','Aspect')}</dt><dd>{project.aspectRatio}</dd></div><div><dt>{tx(lang,'الأسلوب','Style')}</dt><dd>{project.visualStyle}</dd></div></dl></div><button className="btn btn-primary w-full" onClick={()=>setEditProjectOpen(true)}><Settings2 size={16}/>{tx(lang,'تعديل تفاصيل المشروع','Edit project details')}</button><button className="btn btn-quiet w-full" onClick={()=>setStage('script')}><WandSparkles size={16}/>{tx(lang,'الانتقال إلى السيناريو','Go to script')}</button></div>}
         {stage==='script'&&<div className="stage-tool-stack">{scriptGeneration}{scenes.length>0&&sceneListTools}</div>}
         {stage==='storyboard'&&<div className="stage-tool-stack">{activeScene?<><SceneFields key={activeScene.id} projectId={projectId} scene={activeScene} characters={project.characters||[]} lang={lang} onSave={(field,value)=>updateCurrent(field,value)} pending={updateScene.isPending}/>{sceneListTools}</>:<><div className="inspector-blank"><Film size={22}/><span>{tx(lang,'اختر مشهدًا من الخط الزمني أو أنشئ واحدًا.','Select a scene from the timeline or create one.')}</span></div>{sceneListTools}</>}</div>}
-        {stage==='images'&&<div className="stage-tool-stack">{activeScene?<><GenerationPanel projectId={projectId} scene={activeScene} keys={generationKeys} lang={lang} freeMode={freeMode} onQueued={refresh} services={['image']}/><SceneAssetHistory projectId={projectId} scene={activeScene} lang={lang}/><Link href={`/media?projectId=${projectId}&sceneId=${activeScene.id}`} className="btn btn-quiet w-full"><ImagePlus size={16}/>{tx(lang,'اختيار صورة مرخّصة','Choose licensed media')}</Link></>:<div className="inspector-blank"><ImagePlus size={22}/><span>{tx(lang,'اختر مشهدًا لتوليد صورته.','Select a scene to generate its image.')}</span></div>}</div>}
+        {stage==='images'&&<div className="stage-tool-stack">{activeScene?<><GenerationPanel projectId={projectId} scene={activeScene} keys={generationKeys} lang={lang} freeMode={freeMode} onQueued={refresh} services={['image']}/><AssetVersionCompare projectId={projectId} scene={activeScene} keys={generationKeys} lang={lang} onQueued={refresh}/><Link href={`/media?projectId=${projectId}&sceneId=${activeScene.id}`} className="btn btn-quiet w-full"><ImagePlus size={16}/>{tx(lang,'اختيار صورة مرخّصة','Choose licensed media')}</Link></>:<div className="inspector-blank"><ImagePlus size={22}/><span>{tx(lang,'اختر مشهدًا لتوليد صورته.','Select a scene to generate its image.')}</span></div>}</div>}
         {stage==='video'&&<div className="stage-tool-stack">{!activeScene?<div className="inspector-blank"><Film size={22}/><span>{tx(lang,'اختر مشهدًا لتوليد الفيديو.','Select a scene to generate video.')}</span></div>:!activeScene.assetUrl&&!activeScene.description.trim()&&!activeScene.imagePrompt.trim()?<div className="service-purpose-hint is-unavailable"><b>{tx(lang,'مدخلات الفيديو غير متوفرة','Video inputs are missing')}</b><span>{tx(lang,'أضف وصفًا أو صورة للمشهد أولًا، ثم ستظهر أدوات توليد الفيديو.','Add a scene description or image first; video tools will appear after that.')}</span><button className="btn btn-quiet" onClick={()=>setStage('storyboard')}>{tx(lang,'فتح محرر المشهد','Open scene editor')}</button></div>:<><GenerationPanel projectId={projectId} scene={activeScene} keys={generationKeys} lang={lang} freeMode={freeMode} onQueued={refresh} services={['video']}/><BatchVideoGeneration projectId={projectId} scenes={scenes} keys={generationKeys} lang={lang} freeMode={freeMode} hasActiveJob={Boolean(currentJob && (currentJob.status === 'queued' || currentJob.status === 'running'))} onQueued={refresh}/></>}</div>}
         {stage==='voice'&&<div className="stage-tool-stack">{!narratedScenes.length?<div className="service-purpose-hint is-unavailable"><b>{tx(lang,'لا يوجد نص تعليق بعد','No narration text yet')}</b><span>{tx(lang,'اكتب الحوار أو التعليق في محرر المشهد، ثم ستظهر أدوات الصوت.','Write dialogue or narration in the scene editor; voice tools will appear after that.')}</span><button className="btn btn-quiet" onClick={()=>setStage('storyboard')}>{tx(lang,'فتح محرر المشهد','Open scene editor')}</button></div>:<>{activeScene&&activeScene.narration.trim()&&<GenerationPanel projectId={projectId} scene={activeScene} keys={generationKeys} lang={lang} freeMode={freeMode} onQueued={refresh} services={['voice']}/>}<BatchVoiceGeneration projectId={projectId} scenes={scenes} keys={generationKeys} lang={lang} freeMode={freeMode} hasActiveJob={Boolean(currentJob && (currentJob.status === 'queued' || currentJob.status === 'running'))} onQueued={refresh}/>{activeScene&&<TranscriptionPanel projectId={projectId} sceneId={activeScene.id} language={project.language} keys={keysQuery.data || []} lang={lang} freeMode={freeMode}/>}</>}</div>}
         {stage==='export'&&exportTools}
@@ -1441,36 +1443,8 @@ function CharacterProfiles({projectId,characters,onSave,pending}:{projectId:stri
     <div className="character-save"><span className={`save-state ${saveError?'text-destructive':''}`}>{saveError?tx(lang,'تعذر الحفظ تلقائيًا؛ أعد المحاولة.','Auto-save failed; retry the save.'):pending?tx(lang,'جارٍ الحفظ...','Saving...'):dirty?tx(lang,'سيتم الحفظ تلقائيًا بعد التوقف عن الكتابة.','Changes auto-save when you stop typing.'):tx(lang,'ملفات الشخصيات محفوظة تلقائيًا.','Character profiles are saved automatically.')}</span><button className="btn btn-primary" disabled={!dirty||pending||draft.some(c=>!c.name.trim())} onClick={()=>void saveDraft().catch(()=>{})}>{pending?<LoaderCircle size={15} className="animate-spin"/>:<Check size={15}/ >}{tx(lang,'حفظ الآن','Save now')}</button></div>
   </section>;
 }
-function defaultVideoModel(provider:string|undefined,mode:'text'|'image') {
-  if(provider==='fal')return mode==='image'?'minimax/h3-max/image-to-video':'minimax/h3-max/text-to-video';
-  if(provider==='replicate')return 'minimax/video-01';
-  return '';
-}
-function defaultVoiceId(provider:string|undefined) {
-  if(provider==='free-test')return 'free-test-voice';
-  if(provider==='piper-local')return 'ar_JO-kareem-low';
-  if(provider==='elevenlabs')return 'EXAVitQu4vr4xnSDxMaL';
-  if(provider==='openai'||provider==='openai-audio')return 'alloy';
-  if(provider==='google-tts')return 'en-US-Neural2-C';
-  if(provider==='azure-speech')return 'en-US:en-US-JennyNeural';
-  return '';
-}
-const providerCostRanges: Record<string, { image: [number, number]; video: [number, number]; voice: [number, number] }> = {
-  'free-test': { image: [0, 0], video: [0, 0], voice: [0, 0] },
-  'ai-horde': { image: [0, 0], video: [0, 0], voice: [0, 0] },
-  'piper-local': { image: [0, 0], video: [0, 0], voice: [0, 0] },
-  openai: { image: [0.02, 0.12], video: [0.05, 2], voice: [0.01, 0.3] },
-  stability: { image: [0.02, 0.08], video: [0.05, 2], voice: [0.01, 0.3] },
-  replicate: { image: [0.01, 0.2], video: [0.08, 3], voice: [0.01, 0.3] },
-  fal: { image: [0.01, 0.2], video: [0.08, 3], voice: [0.01, 0.3] },
-  elevenlabs: { image: [0.01, 0.2], video: [0.08, 3], voice: [0.01, 0.3] },
-  'google-tts': { image: [0.01, 0.2], video: [0.08, 3], voice: [0.005, 0.15] },
-  'azure-speech': { image: [0.01, 0.2], video: [0.08, 3], voice: [0.005, 0.15] },
-  'openai-audio': { image: [0.01, 0.2], video: [0.08, 3], voice: [0.01, 0.3] },
-};
 function CostEstimate({ provider, service, units, lang }: { provider?: string; service: 'image' | 'video' | 'voice'; units: number; lang: Lang }) {
-  const range = providerCostRanges[provider || '']?.[service];
-  const amount = provider === 'piper-local' ? tx(lang, 'مجاني — صوت عربي محلي على الخادم', 'Free — local Arabic voice on the app server') : provider === 'ai-horde' ? tx(lang, 'مجاني — استخدام مجهول، أولوية منخفضة', 'Free — anonymous use, low priority') : provider === 'free-test' ? tx(lang, 'مجاني — اختبار محلي', 'Free — local test') : range ? `$${(range[0] * units).toFixed(2)}–$${(range[1] * units).toFixed(2)}` : tx(lang, 'غير متاح لهذا المزوّد', 'Not available for this provider');
+  const amount = estimateCostText(provider, service, units, lang);
   const note = provider === 'piper-local' ? tx(lang, 'يعمل صوت Piper العربي على الخادم؛ لا يستخدم API أو رصيد مزوّد خارجي.', 'Piper Arabic runs on the app server; no provider API or external inference credits are used.') : provider === 'ai-horde' ? tx(lang, 'لا يلزم حساب أو مفتاح شخصي. قد يطول الانتظار أو يتوقف الاستخدام عند الضغط؛ الطلبات المجهولة بأقل أولوية وتُشارك المطالبات/الصور مع LAION وفق توثيق Horde.', 'No account or personal key is needed. Anonymous requests have the lowest priority, may be restricted under load, and prompts/images are shared with LAION per Horde documentation.') : tx(lang, `تقدير إرشادي لـ ${units} طلب؛ السعر النهائي يحدده النموذج والمزوّد وقد يختلف.`, `Guidance for ${units} request(s); final pricing depends on the model and provider and may vary.`);
   return <div className="cost-estimate" role="note"><div><b>{tx(lang, 'تقدير تقريبي قبل الإرسال', 'Preflight cost estimate')}</b><span>{amount}</span></div><small>{note}</small></div>;
 }

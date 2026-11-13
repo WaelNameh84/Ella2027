@@ -554,8 +554,29 @@ router.patch("/projects/:projectId/scenes/:sceneId", async (req, res): Promise<v
     return;
   }
   const userId = userIdOf(res);
+  const [existing] = await db.select().from(scenesTable).where(and(
+    eq(scenesTable.id, params.data.sceneId),
+    eq(scenesTable.projectId, params.data.projectId),
+    eq(scenesTable.userId, userId),
+  )).limit(1);
+  if (!existing) {
+    res.status(404).json({ error: "Scene not found." });
+    return;
+  }
+  let assetHistory = existing.assetHistory ?? [];
+  if (parsed.data.assetUrl !== undefined && parsed.data.assetUrl !== existing.assetUrl && existing.assetUrl && (existing.assetType === "image" || existing.assetType === "video")) {
+    if (!assetHistory.some((version) => version.url === existing.assetUrl)) {
+      assetHistory = [...assetHistory, {
+        id: randomUUID(),
+        url: existing.assetUrl,
+        type: existing.assetType,
+        prompt: existing.imagePrompt || "",
+        createdAt: new Date().toISOString(),
+      }];
+    }
+  }
   const [scene] = await db.update(scenesTable)
-    .set(parsed.data)
+    .set({ ...parsed.data, assetHistory })
     .where(and(
       eq(scenesTable.id, params.data.sceneId),
       eq(scenesTable.projectId, params.data.projectId),
