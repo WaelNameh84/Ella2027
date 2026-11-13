@@ -882,6 +882,33 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
   useEffect(() => { if (project?.scenes?.length && !selected) setSelected(project.scenes[0].id); }, [project, selected]);
   const scenes = [...(project?.scenes || [])].sort((a,b) => a.sortOrder-b.sortOrder);
   const activeScene = scenes.find(s => s.id === selected) || scenes[0];
+  const downloadScript = () => {
+    if (!project) return;
+    const safeName = project.title.replace(/[^a-z0-9\u0600-\u06ff]+/gi, '-').replace(/^-|-$/g, '') || 'ella-script';
+    const content = [`${project.title}`, '='.repeat(project.title.length), '', project.idea, '', ...scenes.flatMap((scene, index) => [
+      `${index + 1}. ${scene.title || tx(lang, `المشهد ${index + 1}`, `Scene ${index + 1}`)} (${scene.durationSeconds}s)`,
+      scene.description || '',
+      scene.narration ? `${tx(lang, 'التعليق', 'Narration')}: ${scene.narration}` : '',
+      scene.subtitleText && scene.subtitleText !== scene.narration ? `${tx(lang, 'الترجمة', 'Subtitle')}: ${scene.subtitleText}` : '',
+      '',
+    ])].join('\n');
+    downloadTextFile(`${safeName}.txt`, content);
+  };
+  const downloadSubtitles = () => {
+    if (!project) return;
+    let offset = 0;
+    const blocks = scenes.flatMap((scene, index) => {
+      const start = offset + (scene.subtitleStartSeconds ?? 0);
+      const end = offset + (scene.subtitleEndSeconds ?? scene.durationSeconds);
+      offset += scene.durationSeconds;
+      const text = (scene.subtitleText || scene.narration || '').trim();
+      return text ? [`${index + 1}\n${formatSrtTime(start)} --> ${formatSrtTime(end)}\n${text}\n`] : [];
+    });
+    if (blocks.length) {
+      const safeName = project.title.replace(/[^a-z0-9\u0600-\u06ff]+/gi, '-').replace(/^-|-$/g, '') || 'ella-subtitles';
+      downloadTextFile(`${safeName}.srt`, blocks.join('\n'), 'application/x-subrip;charset=utf-8');
+    }
+  };
   const textProviderReady=Boolean(keysQuery.data?.some(key=>key.serviceType==='text'&&providerSupports(key.provider,'text')&&key.enabled&&providerKeyIsUsable(key.provider,key.status,key.cooldownUntil)));
   const generationKeys=[...(keysQuery.data||[]),...FREE_TEST_KEYS];
   const freeMode=settingsQuery.data?.freeMode??true;
@@ -971,7 +998,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
     setSelected(copy.id);
   };
   return <AppFrame title={project.title} crumb={tx(lang,'استوديو المشروع','PROJECT STUDIO')}>
-    <div className="workspace-head"><div><Link href="/projects" className="back-link"><ArrowRight size={15}/>{tx(lang,'كل المشاريع','All projects')}</Link><h2>{project.title}</h2><p>{project.idea}</p></div><div className="workspace-actions"><Link href={`/media?projectId=${projectId}${activeScene ? `&sceneId=${activeScene.id}` : ''}`} className="btn btn-quiet"><ImagePlus size={16}/>{tx(lang,'إضافة وسائط','Add media')}</Link><button className="btn btn-quiet" onClick={()=>setEditProjectOpen(true)}><Settings2 size={16}/>{tx(lang,'تفاصيل','Details')}</button></div></div>
+    <div className="workspace-head"><div><Link href="/projects" className="back-link"><ArrowRight size={15}/>{tx(lang,'كل المشاريع','All projects')}</Link><h2>{project.title}</h2><p>{project.idea}</p></div><div className="workspace-actions"><Link href={`/media?projectId=${projectId}${activeScene ? `&sceneId=${activeScene.id}` : ''}`} className="btn btn-quiet"><ImagePlus size={16}/>{tx(lang,'إضافة وسائط','Add media')}</Link><button className="btn btn-quiet" onClick={downloadScript} disabled={!scenes.length}><Download size={16}/>{tx(lang,'تنزيل السيناريو','Download script')}</button><button className="btn btn-quiet" onClick={downloadSubtitles} disabled={!scenes.some(scene => (scene.subtitleText || scene.narration || '').trim())}><Download size={16}/>{tx(lang,'تنزيل SRT','Download SRT')}</button><button className="btn btn-quiet" onClick={()=>setEditProjectOpen(true)}><Settings2 size={16}/>{tx(lang,'تفاصيل','Details')}</button></div></div>
     <ProductionStages lang={lang} scenes={scenes} jobs={projectJobsQuery.data || []} hasExport={latestExportJob?.status === 'completed' || Boolean(project.exportUrl)} />
     <StoryboardBoard lang={lang} scenes={scenes} selectedId={activeScene?.id ?? null} onSelect={setSelected} />
     <div className="editor-grid">
@@ -1517,6 +1544,8 @@ function ProjectSoundEffects({url,volume,pending,onSave}:{url:string|null;volume
   return <section className="soundtrack-panel panel sound-effects-panel"><div><span className="eyebrow">{tx(lang,'المؤثرات الصوتية','SOUND EFFECTS')}</span><h3>{tx(lang,'مسار المؤثرات','Sound effects track')}</h3><p>{tx(lang,'اربط ملف مؤثرات مرخّصًا لمزجه أثناء التصدير. لا يتم توليد أو تشغيل أي خدمة تلقائيًا.','Attach a licensed sound-effects asset for export mixing. No provider runs automatically.')}</p></div><div className="soundtrack-controls"><label className="soundtrack-url"><span className="field-label">{tx(lang,'رابط ملف المؤثرات','Sound-effects asset URL')}</span><input className="studio-input" type="url" value={draftUrl} onChange={e=>{setDraftUrl(e.target.value);setDirty(true);setSaveError(false)}} placeholder="https://" /></label><label className="soundtrack-volume"><span className="field-label">{tx(lang,'مستوى المؤثرات','Effects volume')} · {draftVolume}%</span><input type="range" min="0" max="100" value={draftVolume} onChange={e=>{setDraftVolume(Number(e.target.value));setDirty(true);setSaveError(false)}} /></label><span className={`save-state ${saveError?'text-destructive':''}`}>{saveError?tx(lang,'تعذر الحفظ؛ أعد المحاولة.','Could not save; retry.'):pending?tx(lang,'جارٍ الحفظ...','Saving...'):dirty?tx(lang,'توجد تغييرات غير محفوظة.','Unsaved changes.'):tx(lang,'تم الحفظ.','Saved.')}</span><button className="btn btn-primary" disabled={!dirty||pending||!validUrl()} onClick={()=>void save().catch(()=>{})}>{pending?<LoaderCircle size={15} className="animate-spin"/>:<Check size={15}/ >}{tx(lang,'حفظ المؤثرات','Save effects')}</button>{url&&<audio className="audio-preview soundtrack-preview" src={url} controls aria-label={tx(lang,'معاينة المؤثرات','Sound-effects preview')}/>}</div></section>;
 }
 function formatTime(seconds:number) { const s=Math.max(0,Math.floor(seconds)); return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`; }
+function formatSrtTime(seconds:number) { const total=Math.max(0,Math.round(seconds*1000)); const ms=total%1000; const whole=Math.floor(total/1000); const sec=whole%60; const min=Math.floor(whole/60)%60; const hour=Math.floor(whole/3600); return `${String(hour).padStart(2,'0')}:${String(min).padStart(2,'0')}:${String(sec).padStart(2,'0')},${String(ms).padStart(3,'0')}`; }
+function downloadTextFile(filename:string, content:string, mime='text/plain;charset=utf-8') { const url=URL.createObjectURL(new Blob([content],{type:mime})); const anchor=document.createElement('a'); anchor.href=url; anchor.download=filename; document.body.appendChild(anchor); anchor.click(); anchor.remove(); URL.revokeObjectURL(url); }
 
 function MediaPage() {
   const { lang } = useApp();
