@@ -13,6 +13,7 @@ import {
   ProviderCallError,
 } from "../src/lib/mediaGeneration.ts";
 import { transcribeAudio } from "../src/lib/transcription.ts";
+import { validateUploadedImage } from "../src/lib/studioAssets.ts";
 
 function mockFetch(t, implementation) {
   const originalFetch = globalThis.fetch;
@@ -267,4 +268,16 @@ test("Hugging Face translation is rejected without making a provider call", asyn
     /connected for transcription/,
   );
   assert.equal(requestCount, 0);
+});
+
+test("manual scene uploads accept JPEG, PNG, and WebP signatures but reject SVG and unknown bytes", () => {
+  const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+  const jpeg = Buffer.from([255, 216, 255, 0]);
+  const webp = Buffer.from("RIFF0000WEBP", "ascii");
+  assert.equal(validateUploadedImage(jpeg).contentType, "image/jpeg");
+  assert.equal(validateUploadedImage(png).contentType, "image/png");
+  assert.equal(validateUploadedImage(webp).contentType, "image/webp");
+  assert.throws(() => validateUploadedImage(Buffer.from("<svg></svg>")), /JPEG, PNG, or WebP/);
+  assert.throws(() => validateUploadedImage(Buffer.from("not an image")), /unsupported image format/);
+  assert.throws(() => validateUploadedImage(Buffer.alloc(0)), /non-empty image/);
 });

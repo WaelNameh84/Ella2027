@@ -19,12 +19,12 @@ import {
   useListAdminUsers, getListAdminUsersQueryKey, useListAdminJobs, getListAdminJobsQueryKey,
   useListAdminProviderKeys, getListAdminProviderKeysQueryKey, useUpdateAdminUser,
 } from '@workspace/api-client-react';
-import type { Project, ProjectDetail, ProjectInput, Scene, SceneInput, SceneUpdate, ProviderKey, ProviderSettings, MediaResult, MediaFavorite, StudioJob, CharacterProfile, AdminUser, AdminUserUpdate, StudioBrandKit } from '@workspace/api-client-react';
+import type { Project, ProjectDetail, ProjectInput, Scene, SceneInput, SceneUpdate, ProviderKey, ProviderSettings, MediaResult, MediaFavorite, StudioJob, CharacterProfile, AdminUser, AdminUserUpdate, StudioBrandKit, SceneImageGenerationInputOutputs } from '@workspace/api-client-react';
 import { Route, Switch, Link, Redirect, useLocation, Router as WouterRouter } from 'wouter';
 import {
   Aperture, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, ChevronDown, Clapperboard, Sparkles,
   Clock3, Copy, ExternalLink, Eye, EyeOff, Film, Globe2, Heart, ImagePlus, KeyRound, Languages,
-  LoaderCircle, LogOut, Mic, Moon, Pause, Plus, Search, Settings2, ShieldCheck, Sun, Trash2, UserRound, WandSparkles, X,
+  LoaderCircle, LogOut, Mic, Moon, Pause, Plus, Search, Settings2, ShieldCheck, Sun, Trash2, UserRound, WandSparkles, X, AudioLines, Music2, Play,
   Activity, AlertTriangle, Ban, CheckCircle2, CircleUserRound, Download, FileUp, RefreshCw, Share2, Shield, Users,
 } from 'lucide-react';
 import NotFound from '@/pages/not-found';
@@ -340,7 +340,9 @@ function Landing() {
 
 function HomeRedirect() { return <><Show when="signed-in"><Redirect to="/dashboard" /></Show><Show when="signed-out"><Landing /></Show></>; }
 
-function Dashboard() {
+function Dashboard() { return <Projects homePage />; }
+
+function DashboardOverview() {
   const { lang } = useApp();
   const q = useGetStudioSummary();
   const jobsQuery = useListStudioJobs(undefined, { query: { queryKey: getListStudioJobsQueryKey(), refetchInterval: query => query.state.data?.some(job => job.status === 'queued' || job.status === 'running') ? 3000 : false, staleTime: 15000 } });
@@ -500,13 +502,15 @@ function buildFreeTemplateScenes(templateId:string,idea:string,lang:Lang,visualS
     };
   });
 }
-type ManualSceneDraft = { title: string; description: string; narration: string };
-const blankManualScene = (index: number, lang: Lang): ManualSceneDraft => ({ title: tx(lang, `المشهد ${index + 1}`, `Scene ${index + 1}`), description: '', narration: '' });
-function ProjectForm({ onClose, initial, initialMode = 'auto', onSave, pending, freeMode = true, textProviderReady = false, checkingProvider = false, generationError = false, projectCreated = false, onOpenCreated }: { onClose: () => void; initial?: Partial<ProjectInput>; onSave: (data: ProjectInput, approvePotentialCharges?: boolean, templateId?: string, mode?: 'auto' | 'manual', sceneCount?: number, sceneDurationSeconds?: number, allowExternalProviders?: boolean, manualScenes?: ManualSceneDraft[]) => void | Promise<void>; pending: boolean; freeMode?: boolean; textProviderReady?: boolean; checkingProvider?: boolean; generationError?: boolean; projectCreated?: boolean; onOpenCreated?: () => void; initialMode?: 'auto' | 'manual' }) {
+type ManualSceneDraft = { title: string; description: string; narration: string; imagePrompt: string; shotType: string; cameraMovement: string; location: string; lighting: string; imageFile: File | null };
+const blankManualScene = (index: number, lang: Lang): ManualSceneDraft => ({ title: tx(lang, `المشهد ${index + 1}`, `Scene ${index + 1}`), description: '', narration: '', imagePrompt: '', shotType: 'wide', cameraMovement: 'static', location: '', lighting: '', imageFile: null });
+const imageUploadContentType = (file: File) => file.type || ({ jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp' }[file.name.split('.').pop()?.toLowerCase() || ''] || '');
+function ProjectForm({ onClose, initial, initialMode = 'auto', onSave, pending, freeMode = true, textProviderReady = false, checkingProvider = false, generationError = false, projectCreated = false, onOpenCreated, inline = false }: { onClose: () => void; initial?: Partial<ProjectInput>; onSave: (data: ProjectInput, approvePotentialCharges?: boolean, templateId?: string, mode?: 'auto' | 'manual', sceneCount?: number, sceneDurationSeconds?: number, allowExternalProviders?: boolean, manualScenes?: ManualSceneDraft[]) => void | Promise<void>; pending: boolean; freeMode?: boolean; textProviderReady?: boolean; checkingProvider?: boolean; generationError?: boolean; projectCreated?: boolean; onOpenCreated?: () => void; initialMode?: 'auto' | 'manual'; inline?: boolean }) {
   const { lang } = useApp();
-  const [form, setForm] = useState<ProjectInput>({ ...blankProject, ...initial });
+  const [form, setForm] = useState<ProjectInput>({ ...blankProject, language: lang, ...initial });
   const [template, setTemplate] = useState('');
   const [mode, setMode] = useState<'auto' | 'manual'>(initialMode);
+  const [experienceMode, setExperienceMode] = useState<'quick' | 'pro'>(inline ? 'quick' : 'pro');
   const [customLanguage, setCustomLanguage] = useState('');
   const [approvePotentialCharges, setApprovePotentialCharges] = useState(false);
   const [sceneCount, setSceneCount] = useState(5);
@@ -530,26 +534,33 @@ function ProjectForm({ onClose, initial, initialMode = 'auto', onSave, pending, 
   };
   useEffect(() => setAllowExternalProviders(!freeMode), [freeMode]);
   useEffect(() => setManualScenes(current => Array.from({ length: sceneCount }, (_, index) => current[index] || blankManualScene(index, lang))), [sceneCount, lang]);
+  useEffect(() => { if (projectCreated && generationError) setApprovePotentialCharges(false); }, [projectCreated, generationError]);
+  const chooseExperienceMode = (next: 'quick' | 'pro') => { setExperienceMode(next); if (next === 'quick') { setMode('auto'); setTemplate(''); } };
+  const quickSceneCount = Math.max(1, Math.min(24, Math.ceil(Math.max(5, form.durationSeconds) / 12)));
+  const quickSceneDuration = Math.max(1, Math.floor(Math.max(5, form.durationSeconds) / quickSceneCount));
+  const quickPlannedDuration = quickSceneCount * quickSceneDuration;
   const submit = async () => {
     const idea = form.idea.trim();
     const firstLine = idea.split(/\r?\n/, 1)[0]?.trim() || idea;
     const firstSentence = firstLine.split(/[.!؟?]/, 1)[0]?.trim() || firstLine;
     const title = firstSentence.length > 72 ? `${firstSentence.slice(0, 71).trimEnd()}…` : firstSentence;
     const manualTitle = form.title.trim() || title;
+    const effectiveSceneCount = experienceMode === 'quick' ? quickSceneCount : sceneCount;
+    const effectiveSceneDuration = experienceMode === 'quick' ? quickSceneDuration : sceneDurationSeconds;
     const payload = editing ? { ...form, title: form.title.trim(), idea } : {
       ...form,
       title: mode === 'manual' ? manualTitle : title,
       idea: idea || manualTitle,
       videoType: form.videoType,
       language: form.language || (lang === 'ar' ? 'ar' : 'en'),
-      durationSeconds: sceneCount * sceneDurationSeconds,
+      durationSeconds: effectiveSceneCount * effectiveSceneDuration,
       audience: form.audience || (selectedTemplate ? (lang === 'ar' ? 'الجمهور العام' : selectedTemplate.audience) : (lang === 'ar' ? 'الجمهور العام' : 'General audience')),
       visualStyle: form.visualStyle || selectedTemplate?.visualStyle || (lang === 'ar' ? 'سينمائي' : 'Cinematic'),
       aspectRatio: form.aspectRatio || selectedTemplate?.aspectRatio || '16:9',
     };
     try {
       const useTextProvider = !editing && mode === 'auto' && !selectedTemplate && allowExternalProviders && textProviderReady;
-      await onSave(payload, useTextProvider && approvePotentialCharges, !editing ? selectedTemplate?.id : undefined, mode, sceneCount, sceneDurationSeconds, !editing && mode === 'auto' ? allowExternalProviders : undefined, mode === 'manual' ? manualScenes : undefined);
+      await onSave(payload, useTextProvider && approvePotentialCharges, !editing ? selectedTemplate?.id : undefined, mode, effectiveSceneCount, effectiveSceneDuration, !editing && mode === 'auto' ? allowExternalProviders : undefined, mode === 'manual' ? manualScenes : undefined);
       setSubmitError('');
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : tx(lang, 'تعذر حفظ إعدادات المشروع.', 'Could not save project settings.'));
@@ -559,10 +570,30 @@ function ProjectForm({ onClose, initial, initialMode = 'auto', onSave, pending, 
   const totalDurationSeconds = sceneCount * sceneDurationSeconds;
   const minSceneDuration = Math.ceil(5 / sceneCount);
   const maxSceneDuration = Math.floor(3600 / sceneCount);
-  const canSubmit = editing || (Boolean((mode === 'manual' ? form.title.trim() : form.idea.trim())) && (mode === 'manual' || !useTextProvider || approvePotentialCharges));
-  return <Modal onClose={onClose} title={editing ? tx(lang,'تعديل تفاصيل المشروع','Edit project details') : tx(lang, 'فكرتك إلى قصة', 'Turn your idea into a story')} subtitle={editing ? tx(lang, 'عدّل تفاصيل المشروع ومشاهده.', 'Update the project details.') : tx(lang, 'اكتب فكرة قصيرة، وسنؤلف منها القصة والمشاهد.', 'Write a short idea and we’ll turn it into a story and scenes.')}>
+  const manualScenesReady = manualScenes.length === sceneCount && manualScenes.every(scene => Boolean(scene.description.trim()));
+  const retryingStory = projectCreated && mode === 'auto' && useTextProvider && generationError;
+  const canSubmit = editing || (retryingStory && approvePotentialCharges) || (!projectCreated && Boolean((experienceMode === 'quick' || mode === 'auto' ? form.idea.trim() : form.title.trim())) && (experienceMode === 'quick' || mode !== 'manual' || manualScenesReady) && (!useTextProvider || approvePotentialCharges));
+  const submitLabel = editing ? tx(lang,'حفظ التعديلات','Save changes') : pending ? projectCreated ? tx(lang,'جارٍ إنشاء السيناريو…','Creating story…') : tx(lang,'جارٍ إنشاء المشروع…','Creating project…') : experienceMode === 'quick' ? generationError ? tx(lang,'إعادة المحاولة','Retry') : tx(lang,'تحليل الفكرة','Analyze idea') : mode === 'manual' ? tx(lang,'أنشئ المشروع والمشاهد','Create project and scenes') : useTextProvider ? generationError ? tx(lang,'إعادة محاولة التأليف','Retry story generation') : tx(lang,'اكتب القصة','Write the story') : tx(lang,'أنشئ المشاهد تلقائيًا','Create scenes automatically');
+  const submitButton = <button type="submit" disabled={pending || !canSubmit} className="btn btn-primary" data-testid="button-create-project">{pending ? <LoaderCircle className="animate-spin" size={16}/> : editing ? <Check size={16}/> : <WandSparkles size={16}/ >}{submitLabel}</button>;
+  return <Modal inline={inline} onClose={onClose} title={editing ? tx(lang,'تعديل تفاصيل المشروع','Edit project details') : tx(lang, 'فكرتك إلى قصة', 'Turn your idea into a story')} subtitle={editing ? tx(lang, 'عدّل تفاصيل المشروع ومشاهده.', 'Update the project details.') : tx(lang, 'اكتب فكرة قصيرة، ثم اختر المسار السريع أو تحكم بالمشاهد في الوضع الاحترافي.', 'Describe your idea, then choose the quick path or control each scene in Professional mode.')}>
     <form onSubmit={e => { e.preventDefault(); void submit(); }} className="form-stack">
-      {!editing ? <>
+      {!editing && inline && <div className="experience-mode-switch" role="tablist" aria-label={tx(lang,'مستوى التحكم','Experience mode')}>
+        <button type="button" role="tab" aria-selected={experienceMode==='quick'} className={experienceMode==='quick'?'is-selected':''} onClick={()=>chooseExperienceMode('quick')} disabled={projectCreated}>{tx(lang,'سريع','Quick')}</button>
+        <button type="button" role="tab" aria-selected={experienceMode==='pro'} className={experienceMode==='pro'?'is-selected':''} onClick={()=>chooseExperienceMode('pro')} disabled={projectCreated}>{tx(lang,'احترافي','Professional')}</button>
+      </div>}
+      {!editing && inline && experienceMode === 'quick' ? <>
+        <div className="quick-idea-entry is-inline"><label><span className="field-label">{tx(lang,'فكرة الفيلم','Film idea')}</span><textarea required maxLength={1500} rows={5} className="studio-input resize-y quick-idea-input" value={form.idea} onChange={e=>update('idea',e.target.value)} placeholder={tx(lang,'اكتب فكرتك وسنحوّلها إلى فيلم كامل…','Write your idea and we’ll shape it into a complete film…')} data-testid="input-project-idea" disabled={projectCreated} autoFocus /></label>{submitButton}</div>
+        <div className="form-two"><label><span className="field-label">{tx(lang,'نوع العمل','Format')}</span><select className="studio-input" value={form.videoType} disabled={projectCreated} onChange={e=>update('videoType',e.target.value)}>{videoTypes.map(([value,ar,en])=><option key={value} value={value}>{tx(lang,ar,en)}</option>)}</select></label><label><span className="field-label">{tx(lang,'لغة الفيلم','Film language')}</span><select className="studio-input" value={form.language} disabled={projectCreated} onChange={e=>update('language',e.target.value)}><option value="ar">العربية</option><option value="en">English</option><option value="fr">Français</option><option value="es">Español</option><option value="de">Deutsch</option><option value="sv">Svenska</option></select></label></div>
+        <div className="form-two"><label><span className="field-label">{tx(lang,'المدة المستهدفة بالثواني','Target duration in seconds')}</span><input type="number" min="5" max="3600" className="studio-input" value={form.durationSeconds} disabled={projectCreated} onChange={e=>update('durationSeconds',Math.max(5,Math.min(3600,Number(e.target.value)||5)))}/></label><label><span className="field-label">{tx(lang,'الجمهور','Audience')}</span><input maxLength={300} className="studio-input" value={form.audience} disabled={projectCreated} onChange={e=>update('audience',e.target.value)} placeholder={tx(lang,'مثال: العائلة، الشباب','e.g. families, young adults')}/></label></div>
+        <div className="quick-duration-hint">{tx(lang,`المدة المستهدفة ${form.durationSeconds} ثانية؛ الخطة الحالية ${quickSceneCount} مشاهد × ${quickSceneDuration} ثوانٍ = ${quickPlannedDuration} ثانية.`,`Target ${form.durationSeconds}s; the current plan is ${quickSceneCount} scenes × ${quickSceneDuration}s = ${quickPlannedDuration}s.`)}</div>
+        <div className="form-two"><label><span className="field-label">{tx(lang,'الأسلوب البصري','Visual style')}</span><select className="studio-input" value={visualStyles.some(([value])=>value===form.visualStyle)?form.visualStyle:'custom'} disabled={projectCreated} onChange={e=>{if(e.target.value!=='custom')update('visualStyle',e.target.value);else if(visualStyles.some(([value])=>value===form.visualStyle))update('visualStyle','');}}><option value="custom">{tx(lang,'أسلوب مخصص','Custom style')}</option>{visualStyles.map(([value,ar])=><option key={value} value={value}>{lang==='ar'?ar:value}</option>)}</select>{!visualStyles.some(([value])=>value===form.visualStyle)&&<input className="studio-input mt-2" value={form.visualStyle} disabled={projectCreated} onChange={e=>update('visualStyle',e.target.value)} placeholder={tx(lang,'اكتب أسلوبك الخاص','Describe your style')}/>}</label><label><span className="field-label">{tx(lang,'نسبة العرض','Aspect ratio')}</span><select className="studio-input" value={form.aspectRatio} disabled={projectCreated} onChange={e=>update('aspectRatio',e.target.value)}><option>16:9</option><option>9:16</option><option>1:1</option></select></label></div>
+        <label className="rotation-row"><span><b>{tx(lang,'السماح بمزوّد كتابة خارجي (قد تكون هناك رسوم)','Allow an external writing provider (may cost)')}</b><small>{tx(lang,'لا يُرسل النص قبل موافقتك. الموافقة تخص طلب كتابة واحدًا؛ إعادة المحاولة تحتاج موافقة جديدة.','Nothing is sent before your approval. Consent covers one writing request; retries require fresh approval.')}</small></span><input type="checkbox" checked={allowExternalProviders} disabled={pending||projectCreated} onChange={e=>setAllowExternalProviders(e.target.checked)} data-testid="checkbox-allow-external-providers" /></label>
+        {allowExternalProviders && checkingProvider && <Busy text={tx(lang,'جارٍ التحقق من مزوّد الكتابة…','Checking the writing provider…')} />}
+        {allowExternalProviders && !checkingProvider && !textProviderReady && <div className="service-purpose-hint is-unavailable"><b>{tx(lang,'لا يوجد مزوّد كتابة جاهز','No writing provider is ready')}</b><span>{tx(lang,'يمكنك المتابعة بقالب Storyboard محلي؛ هذا ليس تحليلًا أو كتابة AI.','You can continue with a local storyboard template; this is not AI analysis or writing.')}</span><Link href="/settings/providers" className="text-link">{tx(lang,'إعداد المزوّدات','Set up providers')}<ArrowLeft size={14}/></Link></div>}
+        {!useTextProvider && !allowExternalProviders && <div className="service-purpose-hint"><b>{tx(lang,'وضع محلي بلا تكلفة مزوّد','Local, no provider charge')}</b><span>{tx(lang,'سينشأ Storyboard أولي من قالب واضح، لا تحليل AI.','A starter storyboard template will be created, not an AI analysis.')}</span></div>}
+        {useTextProvider && <label className="checkline charge-consent"><input type="checkbox" checked={approvePotentialCharges} disabled={projectCreated && !generationError} onChange={e=>setApprovePotentialCharges(e.target.checked)} data-testid="checkbox-story-charge-consent"/>{tx(lang,'أوافق على إرسال الفكرة إلى مزوّد نص واحد؛ قد تُحتسب رسوم حسب خطتي. لا يُفعّل تدوير المزوّدات، وكل إعادة محاولة تحتاج موافقة جديدة.','I approve sending this idea to one text provider; charges may apply. Provider rotation is off and every retry needs fresh approval.')}</label>}
+        {generationError && <div className="inline-error" role="alert">{tx(lang,'تعذّر بدء كتابة السيناريو. أعد الموافقة قبل أي محاولة جديدة أو افتح المشروع المحفوظ.','Story generation failed. Approve again before any retry or open the saved project.')}{onOpenCreated && <button type="button" className="text-link mt-2" onClick={onOpenCreated}>{tx(lang,'فتح المشروع','Open project')}<ArrowLeft size={14}/></button>}</div>}
+      </> : !editing ? <>
         <div className="workflow-mode-grid" role="radiogroup" aria-label={tx(lang,'طريقة إنشاء الفيديو','Video creation mode')}>
           <button type="button" className={`workflow-mode-card ${mode === 'auto' ? 'is-selected' : ''}`} onClick={() => setMode('auto')} role="radio" aria-checked={mode === 'auto'}>
             <WandSparkles size={19}/><strong>{tx(lang,'تلقائي','Automatic')}</strong><span>{tx(lang,'أدخل الفكرة ونوع الفيديو وعدد المشاهد ومدتها؛ ينشئ Storyboard تلقائيًا. توليد الفيديو يحتاج مفتاح مزوّد وموافقة منفصلة.','Enter the idea, format, scene count, and timing; it creates a storyboard automatically. Video generation needs a provider key and separate approval.')}</span>
@@ -578,7 +609,21 @@ function ProjectForm({ onClose, initial, initialMode = 'auto', onSave, pending, 
           <div className="form-two"><label><span className="field-label">{tx(lang,'عدد المشاهد','Number of scenes')}</span><input type="number" min="1" max="24" step="1" className="studio-input" value={sceneCount} onChange={e => { const next = Math.max(1, Math.min(24, Number(e.target.value) || 1)); setSceneCount(next); setSceneDurationSeconds(value => Math.min(Math.floor(3600 / next), Math.max(Math.ceil(5 / next), value))); }} data-testid="input-manual-scene-count" /></label><label><span className="field-label">{tx(lang,'مدة كل مشهد بالثواني','Seconds per scene')}</span><input type="number" min={minSceneDuration} max={maxSceneDuration} step="1" className="studio-input" value={sceneDurationSeconds} onChange={e => setSceneDurationSeconds(Math.max(minSceneDuration, Math.min(maxSceneDuration, Number(e.target.value) || minSceneDuration)))} data-testid="input-manual-scene-duration" /></label></div>
           <div className="form-two"><label><span className="field-label">{tx(lang,'نسبة أبعاد الفيديو','Video aspect ratio')}</span><select className="studio-input" value={form.aspectRatio} onChange={e => update('aspectRatio', e.target.value)}><option>16:9</option><option>9:16</option><option>1:1</option><option>4:5</option></select></label><div className="service-purpose-hint"><b>{tx(lang,'المدة الإجمالية','Total duration')}</b><span>{tx(lang,`${sceneCount * sceneDurationSeconds} ثانية محفوظة مع المشروع`,`${sceneCount * sceneDurationSeconds} seconds saved with the project`)}</span></div></div>
           <label><span className="field-label">{tx(lang,'ملخص القصة (اختياري)','Story summary (optional)')}</span><textarea maxLength={12000} rows={3} className="studio-input resize-y" value={form.idea} onChange={e => update('idea', e.target.value)} placeholder={tx(lang,'أضف ملخصًا يساعدك أثناء كتابة المشاهد…','Add an optional summary to guide your scene writing…')} data-testid="input-manual-story-summary" /></label>
-          <section className="manual-scene-drafts" aria-label={tx(lang, 'مسودات المشاهد اليدوية', 'Manual scene drafts')}><div className="section-heading"><div><span className="eyebrow">{tx(lang, 'SCENE DRAFTS', 'SCENE DRAFTS')}</span><h3>{tx(lang, 'اكتب المشاهد قبل الإنشاء', 'Write scenes before creating')}</h3></div><span className="small-mono">{sceneCount} {tx(lang, 'مشاهد', 'scenes')}</span></div><p className="generation-note">{tx(lang, 'هذه الحقول تُحفظ مباشرة في المشاهد ولا تُرسل إلى أي مزوّد كتابة. يمكنك تعديل كل التفاصيل لاحقًا من المحرر.', 'These fields are saved directly into the scenes and are never sent to a writing provider. You can edit every detail later in the workspace.')}</p><div className="manual-scene-draft-list">{manualScenes.map((scene, index) => <article className="manual-scene-draft" key={index}><div className="manual-scene-draft-head"><span className="storyboard-number">{String(index + 1).padStart(2, '0')}</span><b>{tx(lang, `المشهد ${index + 1}`, `Scene ${index + 1}`)}</b></div><label><span className="field-label">{tx(lang, 'العنوان', 'Title')}</span><input className="studio-input" value={scene.title} onChange={e => setManualScenes(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, title: e.target.value } : item))} maxLength={160} data-testid={`input-manual-scene-title-${index + 1}`} /></label><label><span className="field-label">{tx(lang, 'وصف الأحداث والمكان', 'Action and setting')}</span><textarea className="studio-input" rows={2} value={scene.description} onChange={e => setManualScenes(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, description: e.target.value } : item))} maxLength={4000} data-testid={`input-manual-scene-description-${index + 1}`} /></label><label><span className="field-label">{tx(lang, 'الحوار أو التعليق الصوتي', 'Dialogue or narration')}</span><textarea className="studio-input" rows={2} value={scene.narration} onChange={e => setManualScenes(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, narration: e.target.value } : item))} maxLength={12000} data-testid={`input-manual-scene-narration-${index + 1}`} /></label></article>)}</div></section>
+          <section className="manual-scene-drafts" aria-label={tx(lang, 'مسودات المشاهد اليدوية', 'Manual scene drafts')}>
+            <div className="section-heading"><div><span className="eyebrow">SCENE DRAFTS</span><h3>{tx(lang, 'اكتب المشاهد قبل الإنشاء', 'Write scenes before creating')}</h3></div><span className="small-mono">{sceneCount} {tx(lang, 'مشاهد', 'scenes')}</span></div>
+            <p className="generation-note">{tx(lang, 'هذه الحقول تُحفظ مباشرة في المشاهد ولا تُرسل إلى أي مزوّد كتابة. يمكنك تعديل كل التفاصيل لاحقًا من المحرر.', 'These fields are saved directly into the scenes and are never sent to a writing provider. You can edit every detail later in the workspace.')}</p>
+            <div className="manual-scene-draft-list">{manualScenes.map((scene, index) => <article className="manual-scene-draft" key={index}>
+              <div className="manual-scene-draft-head"><span className="storyboard-number">{String(index + 1).padStart(2, '0')}</span><b>{tx(lang, `المشهد ${index + 1}`, `Scene ${index + 1}`)}</b></div>
+              <label><span className="field-label">{tx(lang, 'العنوان', 'Title')}</span><input className="studio-input" disabled={projectCreated} value={scene.title} onChange={e => setManualScenes(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, title: e.target.value } : item))} maxLength={160} data-testid={`input-manual-scene-title-${index + 1}`} /></label>
+              <label><span className="field-label">{tx(lang, 'وصف الأحداث والمكان', 'Action and setting')}</span><textarea className="studio-input" disabled={projectCreated} rows={2} value={scene.description} onChange={e => setManualScenes(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, description: e.target.value } : item))} maxLength={4000} data-testid={`input-manual-scene-description-${index + 1}`} /></label>
+              <label><span className="field-label">{tx(lang, 'الحوار أو التعليق الصوتي', 'Dialogue or narration')}</span><textarea className="studio-input" disabled={projectCreated} rows={2} value={scene.narration} onChange={e => setManualScenes(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, narration: e.target.value } : item))} maxLength={12000} data-testid={`input-manual-scene-narration-${index + 1}`} /></label>
+              <label><span className="field-label">{tx(lang, 'وصف الصورة (اختياري)', 'Image prompt (optional)')}</span><textarea className="studio-input" disabled={projectCreated} rows={2} value={scene.imagePrompt} onChange={e => setManualScenes(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, imagePrompt: e.target.value } : item))} maxLength={3000} /></label>
+              <div className="form-two"><label><span className="field-label">{tx(lang, 'نوع اللقطة', 'Shot type')}</span><select className="studio-input" disabled={projectCreated} value={scene.shotType} onChange={e => setManualScenes(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, shotType: e.target.value } : item))}><option value="wide">{tx(lang, 'لقطة واسعة', 'Wide shot')}</option><option value="medium">{tx(lang, 'لقطة متوسطة', 'Medium shot')}</option><option value="close-up">{tx(lang, 'لقطة قريبة', 'Close-up')}</option><option value="establishing">{tx(lang, 'لقطة تأسيسية', 'Establishing shot')}</option><option value="over-the-shoulder">{tx(lang, 'من فوق الكتف', 'Over the shoulder')}</option></select></label><label><span className="field-label">{tx(lang, 'حركة الكاميرا', 'Camera movement')}</span><select className="studio-input" disabled={projectCreated} value={scene.cameraMovement} onChange={e => setManualScenes(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, cameraMovement: e.target.value } : item))}><option value="static">{tx(lang, 'ثابتة', 'Static')}</option><option value="pan">Pan</option><option value="tilt">Tilt</option><option value="tracking">Tracking</option><option value="dolly-in">Dolly in</option><option value="handheld">Handheld</option><option value="zoom">Zoom</option></select></label></div>
+              <div className="form-two"><label><span className="field-label">{tx(lang, 'موقع المشهد (اختياري)', 'Scene location (optional)')}</span><input className="studio-input" disabled={projectCreated} maxLength={500} value={scene.location} onChange={e => setManualScenes(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, location: e.target.value } : item))} /></label><label><span className="field-label">{tx(lang, 'الإضاءة (اختياري)', 'Lighting (optional)')}</span><input className="studio-input" disabled={projectCreated} maxLength={2000} value={scene.lighting} onChange={e => setManualScenes(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, lighting: e.target.value } : item))} /></label></div>
+              <label><span className="field-label">{tx(lang, 'صورة لهذا المشهد (اختياري)', 'Image for this scene (optional)')}</span><input className="studio-input file-input" type="file" accept="image/jpeg,image/png,image/webp" disabled={projectCreated} onChange={e => { const file = e.currentTarget.files?.[0] ?? null; if (file && (file.size > 8 * 1024 * 1024 || !['image/jpeg', 'image/png', 'image/webp'].includes(imageUploadContentType(file)))) { setManualScenes(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, imageFile: null } : item)); setSubmitError(tx(lang, 'اختر صورة JPG أو PNG أو WebP بحجم أقل من 8 MB.', 'Choose a JPG, PNG, or WebP image smaller than 8 MB.')); e.currentTarget.value = ''; return; } setSubmitError(''); setManualScenes(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, imageFile: file } : item)); }} /><small className="field-hint">{scene.imageFile ? scene.imageFile.name : tx(lang, 'اختر صورة من الهاتف. JPG / PNG / WebP، حتى 8 MB.', 'Choose a photo from your phone. JPG / PNG / WebP, up to 8 MB.')}</small></label>
+            </article>)}</div>
+          </section>
+          <div className="service-purpose-hint"><b>{tx(lang, 'رفع يدوي دون مفتاح', 'Manual upload, no API key')}</b><span>{tx(lang, 'تُحفظ الصور في مساحة ملفات الخادم الحالية. على Render قد يكون التخزين مؤقتًا ما لم يكن قرص دائم مفعّلًا.', 'Images use the server’s current file storage. On Render, files may be temporary unless a persistent disk is configured.')}</span></div>
         </>}
         {mode === 'auto' && <>
           <div className="section-heading"><div><span className="eyebrow">{tx(lang,'بداية سريعة','QUICK START')}</span><h3>{tx(lang,'اختر نقطة انطلاق','Choose a starting point')}</h3></div><span className="small-mono">{tx(lang,'إعداد بنقرة واحدة','One-click setup')}</span></div>
@@ -599,9 +644,9 @@ function ProjectForm({ onClose, initial, initialMode = 'auto', onSave, pending, 
           {!selectedTemplate && !useTextProvider && <div className="service-purpose-hint"><b>{tx(lang,'إنشاء تلقائي محلي','Automatic local storyboard')}</b><span>{tx(lang,'سيحوّل التطبيق فكرتك إلى مشاهد قابلة للتعديل دون طلب خارجي. هذا Storyboard أولي وليس فيديو AI مولّدًا. أضف مفتاح الكتابة لاحقًا لتأليف أذكى.','The app will turn your idea into editable scenes without an external request. This is a starter storyboard, not an AI-generated video. Add a text key later for AI writing.')}</span></div>}
           {allowExternalProviders && !selectedTemplate && checkingProvider && <Busy text={tx(lang,'جارٍ التحقق من مفتاح الكتابة…','Checking your writing key…')} />}
           {allowExternalProviders && !selectedTemplate && !checkingProvider && !textProviderReady && <div className="service-purpose-hint is-unavailable"><b>{tx(lang,'لا يوجد مفتاح كتابة جاهز بعد','No text-generation key is ready yet')}</b><span>{tx(lang,'يمكنك إنشاء Storyboard محلي الآن، أو إضافة مفتاح نص من الإعدادات لاحقًا.','You can create a local storyboard now, or add a text provider key in Settings later.')}</span><Link href="/settings/providers" className="text-link">{tx(lang,'إعداد مفاتيح الخدمات','Set up provider keys')}<ArrowLeft size={14}/></Link></div>}
-          {useTextProvider && <label className="checkline charge-consent"><input type="checkbox" checked={approvePotentialCharges} disabled={projectCreated} onChange={e=>setApprovePotentialCharges(e.target.checked)} data-testid="checkbox-story-charge-consent"/>{tx(lang,'أوافق على إرسال الفكرة لمزوّد النص؛ قد تُحتسب رسوم حسب خطتي.','I approve sending this idea to my text provider; charges may apply.')}</label>}
+          {useTextProvider && <label className="checkline charge-consent"><input type="checkbox" checked={approvePotentialCharges} disabled={projectCreated && !generationError} onChange={e=>setApprovePotentialCharges(e.target.checked)} data-testid="checkbox-story-charge-consent"/>{tx(lang,'أوافق على إرسال الفكرة إلى مزوّد نص واحد؛ قد تُحتسب رسوم حسب خطتي. لا يُفعّل تدوير المزوّدات، وكل إعادة محاولة تحتاج موافقة جديدة.','I approve sending this idea to one text provider; charges may apply. Provider rotation is off and every retry needs fresh approval.')}</label>}
         </>}
-        {generationError && <div className="inline-error" role="alert">{tx(lang,'تم حفظ الفكرة، لكن تعذّر بدء تأليف القصة. أعد المحاولة أو افتح المشروع.','Your idea was saved, but story generation could not start. Retry or open the project.')}{onOpenCreated && <button type="button" className="text-link mt-2" onClick={onOpenCreated}>{tx(lang,'فتح المشروع','Open project')}<ArrowLeft size={14}/></button>}</div>}
+        {generationError && <div className="inline-error" role="alert">{mode === 'manual' ? tx(lang,'تم إنشاء المشروع، لكن تعذّر حفظ كل المشاهد أو الصور. افتح المشروع لمتابعة ما تم حفظه.','The project was created, but some scenes or images could not be saved. Open it to continue.') : tx(lang,'تم حفظ الفكرة، لكن تعذّر بدء تأليف القصة. أعد الموافقة قبل المحاولة أو افتح المشروع.','Your idea was saved, but story generation could not start. Approve again before retrying or open the project.')}{onOpenCreated && <button type="button" className="text-link mt-2" onClick={onOpenCreated}>{tx(lang,'فتح المشروع','Open project')}<ArrowLeft size={14}/></button>}</div>}
       </> : <>
         <label><span className="field-label">{tx(lang,'عنوان المشروع','Project title')}</span><input required maxLength={160} className="studio-input" value={form.title} onChange={e => update('title',e.target.value)} placeholder={tx(lang,'مثال: ذاكرة البحر','e.g. Memory of the sea')} data-testid="input-project-title" /></label>
         <label><span className="field-label">{tx(lang,'الفكرة','Concept')}</span><textarea required maxLength={12000} rows={3} className="studio-input resize-y" value={form.idea} onChange={e => update('idea',e.target.value)} placeholder={tx(lang,'ما القصة التي تريد روايتها؟','What story do you want to tell?')} data-testid="input-project-idea" /></label>
@@ -611,15 +656,17 @@ function ProjectForm({ onClose, initial, initialMode = 'auto', onSave, pending, 
         <div className="form-two"><label><span className="field-label">{tx(lang,'الجمهور','Audience')}</span><input className="studio-input" value={form.audience} onChange={e => update('audience',e.target.value)} /></label><label><span className="field-label">{tx(lang,'الأسلوب البصري','Visual style')}</span><select className="studio-input" value={visualStyles.some(([value])=>value===form.visualStyle)?form.visualStyle:'custom'} onChange={e=>{if(e.target.value!=='custom')update('visualStyle',e.target.value);else if(visualStyles.some(([value])=>value===form.visualStyle))update('visualStyle','');}}><option value="custom">{tx(lang,'أسلوب مخصص','Custom style')}</option>{visualStyles.map(([value,ar])=><option key={value} value={value}>{lang==='ar'?ar:value}</option>)}</select>{!visualStyles.some(([value])=>value===form.visualStyle)&&<input className="studio-input mt-2" value={form.visualStyle} onChange={e=>update('visualStyle',e.target.value)} placeholder={tx(lang,'اكتب أسلوبك الخاص','Describe your own style')} />}</label></div>
       </>}
       {submitError && <p className="inline-error" role="alert">{submitError}</p>}
-      <div className="modal-actions"><button type="button" className="btn btn-quiet" onClick={onClose}>{tx(lang,'إلغاء','Cancel')}</button><button disabled={pending || !canSubmit} className="btn btn-primary" data-testid="button-create-project">{pending ? <LoaderCircle className="animate-spin" size={16}/> : editing ? <Check size={16}/> : <WandSparkles size={16}/ >}{editing ? tx(lang,'حفظ التعديلات','Save changes') : pending ? projectCreated ? tx(lang,'جارٍ بدء كتابة القصة…','Starting story generation…') : tx(lang,'جارٍ إنشاء المشروع…','Creating project…') : useTextProvider ? generationError ? tx(lang,'إعادة محاولة التأليف','Retry story generation') : tx(lang,'اكتب القصة','Write the story') : tx(lang,'أنشئ المشاهد تلقائيًا','Create scenes automatically')}</button></div>
+      {(!inline || experienceMode !== 'quick') && <div className="modal-actions">{!inline && <button type="button" className="btn btn-quiet" onClick={onClose}>{tx(lang,'إلغاء','Cancel')}</button>}{submitButton}</div>}
     </form>
   </Modal>;
 }
-function Modal({ title, subtitle, onClose, children }: { title: string; subtitle?: string; onClose: () => void; children: ReactNode }) {
-  return <div className="modal-backdrop" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}><section role="dialog" aria-modal="true" className="modal panel"><div className="modal-head"><div><h2>{title}</h2>{subtitle && <p>{subtitle}</p>}</div><button className="btn btn-ghost !p-2" onClick={onClose} aria-label="Close"><X size={18}/></button></div>{children}</section></div>;
+function Modal({ title, subtitle, onClose, children, inline = false }: { title: string; subtitle?: string; onClose: () => void; children: ReactNode; inline?: boolean }) {
+  const content = <><div className="modal-head"><div><h2>{title}</h2>{subtitle && <p>{subtitle}</p>}</div>{!inline && <button className="btn btn-ghost !p-2" onClick={onClose} aria-label="Close"><X size={18}/></button>}</div>{children}</>;
+  if (inline) return <section className="inline-project-form panel">{content}</section>;
+  return <div className="modal-backdrop" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}><section role="dialog" aria-modal="true" className="modal panel">{content}</section></div>;
 }
 
-function Projects() {
+function Projects({ homePage = false }: { homePage?: boolean }) {
   const { lang } = useApp();
   const [location, setLocation] = useLocation();
   const q = useListProjects();
@@ -632,10 +679,12 @@ function Projects() {
   const generate = useQueueProjectScript();
   const remove = useDeleteProject();
   const [open, setOpen] = useState(false);
-  useEffect(() => { const params = new URLSearchParams(location.split('?')[1] || ''); const requestedMode = params.get('mode'); if (params.get('new') === '1') setOpen(true); if (requestedMode === 'manual' || requestedMode === 'auto') setOpen(true); }, [location]);
+  useEffect(() => { const params = new URLSearchParams(location.split('?')[1] || ''); const requestedMode = params.get('mode'); if (!homePage && params.get('new') === '1') setOpen(true); if (!homePage && (requestedMode === 'manual' || requestedMode === 'auto')) setOpen(true); }, [location, homePage]);
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<'updated' | 'name' | 'status'>('updated');
   const [createdProjectId, setCreatedProjectId] = useState<string | null>(null);
+  const [projectSaveError, setProjectSaveError] = useState(false);
+  const [savingManualScenes, setSavingManualScenes] = useState(false);
   const [backupExportingId, setBackupExportingId] = useState<string | null>(null);
   const [backupImporting, setBackupImporting] = useState(false);
   const [backupProgress, setBackupProgress] = useState('');
@@ -731,7 +780,7 @@ function Projects() {
       setBackupImporting(false);
     }
   };
-  const startStory = (projectId: string, sceneCount: number, sceneDurationSeconds: number, sceneStyle: string) => generate.mutate({ projectId, data: { providerKeyId: null, allowRotation: true, approvePotentialCharges: true, sceneCount, sceneDurationSeconds, sceneStyle } }, {
+  const startStory = (projectId: string, sceneCount: number, sceneDurationSeconds: number, sceneStyle: string) => generate.mutate({ projectId, data: { providerKeyId: null, allowRotation: false, approvePotentialCharges: true, sceneCount, sceneDurationSeconds, sceneStyle } }, {
     onSuccess: () => {
       afterChange();
       setOpen(false);
@@ -739,6 +788,16 @@ function Projects() {
       setLocation(`/projects/${projectId}`);
     },
   });
+  const uploadManualSceneImage = async (projectId: string, sceneId: string, file: File) => {
+    const response = await fetch(`${basePath}/api/projects/${projectId}/scenes/${sceneId}/assets/upload`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': imageUploadContentType(file) },
+      body: file,
+    });
+    const result = await response.json().catch(() => ({})) as { error?: string };
+    if (!response.ok) throw new Error(result.error || tx(lang, 'تعذر رفع صورة المشهد.', 'Could not upload the scene image.'));
+  };
   const saveProjectAndWriteStory = async (data: ProjectInput, approvePotentialCharges = false, templateId?: string, mode: 'auto' | 'manual' = 'auto', sceneCount = 5, sceneDurationSeconds = 8, allowExternalProviders?: boolean, manualScenes?: ManualSceneDraft[]) => {
     if (createdProjectId) {
       if (!approvePotentialCharges || allowExternalProviders !== true) throw new Error(tx(lang, 'أكّد السماح بالمزوّدات والموافقة على الرسوم المحتملة قبل إعادة المحاولة.', 'Confirm external providers and possible charges before retrying.'));
@@ -755,22 +814,39 @@ function Projects() {
     const project = await create.mutateAsync({ data });
     afterChange();
     if (mode === 'manual') {
-      for (let index = 0; index < sceneCount; index += 1) {
-        await createScene.mutateAsync({
-          projectId: project.id,
-          data: {
+      setCreatedProjectId(project.id);
+      setProjectSaveError(false);
+      setSavingManualScenes(true);
+      try {
+        const createdScenes: { id: string; draft: ManualSceneDraft }[] = [];
+        for (const [index, draft] of (manualScenes ?? []).entries()) {
+          const scene = await createScene.mutateAsync({ projectId: project.id, data: {
             sortOrder: index,
-            title: manualScenes?.[index]?.title.trim() || tx(lang, `المشهد ${index + 1}`, `Scene ${index + 1}`),
-            description: manualScenes?.[index]?.description.trim() || '',
-            imagePrompt: '',
-            narration: manualScenes?.[index]?.narration.trim() || '',
+            title: draft.title.trim() || tx(lang, `المشهد ${index + 1}`, `Scene ${index + 1}`),
+            description: draft.description.trim(),
+            imagePrompt: draft.imagePrompt.trim() || draft.description.trim(),
+            narration: draft.narration.trim(),
             durationSeconds: sceneDurationSeconds,
+            shotType: draft.shotType,
+            cameraMovement: draft.cameraMovement,
+            location: draft.location.trim(),
+            lighting: draft.lighting.trim(),
             assetUrl: null,
             assetType: null,
-          },
-        });
+          } });
+          createdScenes.push({ id: scene.id, draft });
+        }
+        for (const { id, draft } of createdScenes) if (draft.imageFile) await uploadManualSceneImage(project.id, id, draft.imageFile);
+      } catch (error) {
+        setProjectSaveError(true);
+        afterChange();
+        throw new Error(error instanceof Error ? error.message : tx(lang, 'تعذر حفظ أحد المشاهد أو صوره. افتح المشروع لمتابعة ما تم حفظه.', 'A scene or image could not be saved. Open the project to continue with what was saved.'));
+      } finally {
+        setSavingManualScenes(false);
       }
       afterChange();
+      setProjectSaveError(false);
+      setCreatedProjectId(null);
       setOpen(false);
       setLocation(`/projects/${project.id}`);
       return;
@@ -792,11 +868,32 @@ function Projects() {
       setLocation(`/projects/${project.id}`);
     }
   };
+  const readyProviderCount = (keysQuery.data ?? []).filter(key => key.enabled && providerSupports(key.provider, key.serviceType) && providerKeyIsUsable(key.provider, key.status, key.cooldownUntil)).length;
+  const openCreatedProject = () => { if (createdProjectId) { setOpen(false); setCreatedProjectId(null); setProjectSaveError(false); setLocation(`/projects/${createdProjectId}`); } };
+  const projectForm = (inline = false) => <ProjectForm inline={inline} onClose={() => { setOpen(false); setCreatedProjectId(null); setProjectSaveError(false); }} pending={create.isPending || generate.isPending || createScene.isPending || updateProviderSettings.isPending || savingManualScenes} freeMode={freeMode} textProviderReady={textProviderReady} checkingProvider={keysQuery.isLoading} generationError={projectSaveError || (generate.isError && Boolean(createdProjectId))} projectCreated={Boolean(createdProjectId)} onOpenCreated={createdProjectId ? openCreatedProject : undefined} onSave={saveProjectAndWriteStory} />;
+  if (homePage) {
+    const recentProjects = [...(q.data ?? [])].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()).slice(0, 4);
+    return <AppFrame title={tx(lang, 'استوديو الفيديو', 'Video Studio')}>
+      <div className="studio-home-layout">
+        <main className="studio-home-main">
+          <header className="studio-home-hero"><span className="eyebrow">ONE IDEA → FULL MOVIE</span><h1>{tx(lang, 'فكرتك تبدأ هنا.', 'Your idea starts here.')}</h1><p>{tx(lang, 'اكتب الفكرة، اختر اتجاه الفيلم، ثم انتقل إلى المشاهد والصورة والصوت والتصدير.', 'Write the idea, set the film direction, then move into scenes, visuals, sound, and export.')}</p></header>
+          {projectForm(true)}
+        </main>
+        <aside className="studio-home-side">
+          <section className="home-status-card panel"><span className="eyebrow">{tx(lang, 'حالة الاستوديو', 'STUDIO STATUS')}</span><div className="home-status-number">{readyProviderCount}</div><h3>{tx(lang, 'مزوّدات جاهزة', 'Ready providers')}</h3><p>{freeMode ? tx(lang, 'الوضع الحالي يفضّل القوالب المحلية؛ لن يُرسل نص إلى مزوّد إلا بعد تفعيل الخيار والموافقة.', 'Local templates are preferred; text is not sent to a provider unless you enable it and approve.') : tx(lang, 'المزوّدات الخارجية مفعّلة؛ كل طلب مدفوع يتطلب موافقة مستقلة.', 'External providers are enabled; each potentially paid request requires separate approval.')}</p><div className="home-status-foot"><span><i className={`status-dot ${freeMode ? 'status-done' : 'status-running'}`}/>{freeMode ? tx(lang, 'المسار المحلي مفضّل', 'Local path preferred') : tx(lang, 'المزوّدات الخارجية مفعّلة', 'External providers enabled')}</span><Link href="/settings/providers" className="text-link">{tx(lang, 'الإعدادات', 'Settings')}<ArrowLeft size={14}/></Link></div></section>
+          <section className="panel home-recent-card"><div className="home-section-head"><div><span className="eyebrow">{tx(lang, 'آخر ما عملت عليه', 'RECENT WORK')}</span><h3>{tx(lang, 'مشاريعك الأخيرة', 'Recent projects')}</h3></div><Link href="/projects" className="text-link">{tx(lang, 'عرض الكل', 'View all')}<ArrowLeft size={14}/></Link></div>
+            {q.isLoading ? <div className="home-recent-list"><SkeletonBlock className="h-12"/><SkeletonBlock className="h-12"/></div> : recentProjects.length ? <div className="home-recent-list">{recentProjects.map(project => <Link key={project.id} href={`/projects/${project.id}`} className="home-recent-row"><span className="home-recent-mark"><Film size={16}/></span><span className="home-recent-copy"><b>{project.title}</b><small>{tx(lang, `تحديث ${new Date(project.updatedAt).toLocaleDateString('ar')}`, `Updated ${new Date(project.updatedAt).toLocaleDateString()}`)}</small></span><span className="status-chip">{project.status}</span><ArrowLeft size={14}/></Link>)}</div> : <p className="home-recent-empty">{tx(lang, 'لا توجد مشاريع بعد. ابدأ من فكرتك.', 'No projects yet. Start with your idea.')}</p>}
+          </section>
+          <section className="home-status-card panel home-flow-panel"><span className="eyebrow">{tx(lang, 'مسار الإنتاج', 'PRODUCTION FLOW')}</span><ol><li>{tx(lang, 'الفكرة والسيناريو', 'Idea & screenplay')}</li><li>{tx(lang, 'المشاهد والوسائط', 'Scenes & media')}</li><li>{tx(lang, 'الصوت والتركيب', 'Voice & composition')}</li><li>{tx(lang, 'المعاينة والتصدير', 'Preview & export')}</li></ol><Link href="/dashboard/overview" className="text-link">{tx(lang, 'فتح لوحة المتابعة الكاملة', 'Open full production overview')}<ArrowLeft size={14}/></Link></section>
+        </aside>
+      </div>
+    </AppFrame>;
+  }
   return <AppFrame title={tx(lang,'المشاريع','Projects')}><div className="page-toolbar"><div><span className="eyebrow">{tx(lang,'أرشيف الإنتاج','PRODUCTION ARCHIVE')}</span><h2>{tx(lang,'كل القصص التي بدأت.', 'Every story you started.')}</h2><p>{tx(lang,'مشاريعك وسيناريوهاتك محفوظة في مكان واحد.', 'Your projects and storyboards, kept in one place.')}</p></div><div className="flex flex-wrap gap-2"><input ref={importFileRef} className="sr-only" type="file" accept="application/json,.json" onChange={event=>{const file=event.target.files?.[0];event.target.value='';if(file)void importBackupFile(file)}}/><button onClick={()=>importFileRef.current?.click()} className="btn btn-quiet" disabled={backupImporting} data-testid="button-import-project-backup">{backupImporting?<LoaderCircle size={16} className="animate-spin"/>:<FileUp size={16}/ >}{tx(lang,'استيراد JSON','Import JSON')}</button><button onClick={() => setOpen(true)} className="btn btn-primary" data-testid="button-new-project"><Plus size={17}/>{tx(lang,'مشروع جديد','New project')}</button></div></div>
     {backupProgress&&<p className="save-state mt-2" role="status">{backupProgress}</p>}
     <div className="list-controls"><label className="searchbox"><Search size={17}/><input value={search} onChange={e => setSearch(e.target.value)} placeholder={tx(lang,'ابحث في مشاريعك','Search projects')} data-testid="input-project-search" /></label><label className="project-sort"><span className="field-label">{tx(lang,'ترتيب','Sort')}</span><select className="studio-input" value={sort} onChange={e => setSort(e.target.value as typeof sort)} data-testid="select-project-sort"><option value="updated">{tx(lang,'آخر تعديل','Recently updated')}</option><option value="name">{tx(lang,'الاسم','Name')}</option><option value="status">{tx(lang,'الحالة','Status')}</option></select></label><span className="result-count">{list.length} {tx(lang,'مشروع','projects')}</span></div>
     {q.isLoading ? <div className="project-grid">{[1,2,3].map(n=><SkeletonBlock key={n} className="h-52" />)}</div> : q.isError ? <StateError lang={lang} retry={() => q.refetch()} /> : list.length ? <div className="project-grid">{list.map(p=><ProjectCard key={p.id} project={p} onExport={exportBackup} exporting={backupExportingId===p.id} onDelete={id => { if (window.confirm(tx(lang,'هل تريد حذف المشروع وكل مشاهده؟','Delete this project and all its scenes?'))) remove.mutate({projectId:id},{onSuccess:()=>{afterChange();qc.invalidateQueries({queryKey:getGetProjectQueryKey(id)});}}); }} />)}</div> : <Empty title={search ? tx(lang,'لا توجد مطابقة','No matching projects') : tx(lang,'ابدأ بمشهد أول','Start with a first frame')} body={search ? tx(lang,'جرّب كلمات بحث أخرى.','Try another search term.') : tx(lang,'أنشئ مشروعًا ليصبح لديك مكان لصياغة الفكرة وبناء المشاهد.','Create a project to shape the idea and build your scenes.')} action={!search && <button className="btn btn-primary" onClick={() => setOpen(true)}><Plus size={16}/>{tx(lang,'إنشاء أول مشروع','Create your first project')}</button>} />}
-    {open && <ProjectForm initialMode={new URLSearchParams(location.split('?')[1] || '').get('mode') === 'manual' ? 'manual' : 'auto'} onClose={() => { setOpen(false); setCreatedProjectId(null); }} pending={create.isPending || generate.isPending || createScene.isPending || updateProviderSettings.isPending} freeMode={freeMode} textProviderReady={textProviderReady} checkingProvider={keysQuery.isLoading} generationError={generate.isError && Boolean(createdProjectId)} projectCreated={Boolean(createdProjectId)} onOpenCreated={createdProjectId ? () => { setOpen(false); setCreatedProjectId(null); setLocation(`/projects/${createdProjectId}`); } : undefined} onSave={saveProjectAndWriteStory} />}
+    {open && <ProjectForm initialMode={new URLSearchParams(location.split('?')[1] || '').get('mode') === 'manual' ? 'manual' : 'auto'} onClose={() => { setOpen(false); setCreatedProjectId(null); setProjectSaveError(false); }} pending={create.isPending || generate.isPending || createScene.isPending || updateProviderSettings.isPending || savingManualScenes} freeMode={freeMode} textProviderReady={textProviderReady} checkingProvider={keysQuery.isLoading} generationError={projectSaveError || (generate.isError && Boolean(createdProjectId))} projectCreated={Boolean(createdProjectId)} onOpenCreated={createdProjectId ? openCreatedProject : undefined} onSave={saveProjectAndWriteStory} />}
   </AppFrame>;
 }
 
@@ -1324,7 +1421,7 @@ function GenerationPanel({projectId,scene,keys,lang,onQueued,freeMode}:{projectI
   const [model,setModel]=useState('');
   const [voiceId,setVoiceId]=useState('');
   const [mode,setMode]=useState<'text'|'image'>('image');
-  const [outputs,setOutputs]=useState(1);
+  const [outputs,setOutputs]=useState<SceneImageGenerationInputOutputs>(1);
   const [approved,setApproved]=useState(false);
   const service=action==='image'?'image':action==='video'?'video':action==='voice'?'voice':null;
   const readyKeys=keys.filter(key=>key.enabled&&key.serviceType===service&&providerSupports(key.provider,service||'')&&providerKeyIsUsable(key.provider,key.status,key.cooldownUntil)).sort((a,b)=>Number(b.provider==='ai-horde')-Number(a.provider==='ai-horde')||Number(b.provider==='piper-local')-Number(a.provider==='piper-local'));
@@ -1353,7 +1450,7 @@ function GenerationPanel({projectId,scene,keys,lang,onQueued,freeMode}:{projectI
       {readyKeys.length>1&&<label><span className="field-label">{tx(lang,action==='voice'?'مزوّد الصوت':'مزوّد الخدمة',action==='voice'?'Voice provider':'Service provider')}</span><select className="studio-input" value={activeKey?.id||''} onChange={e=>{setProviderId(e.target.value);const selected=readyKeys.find(key=>key.id===e.target.value);if(action==='video')setModel(defaultVideoModel(selected?.provider,mode));if(action==='voice')setVoiceId(defaultVoiceId(selected?.provider));}}>{readyKeys.map(key=><option value={key.id} key={key.id}>{key.label} · {key.provider}</option>)}</select></label>}
       {aiHordeSelected&&<div className="export-confirm" role="note"><ShieldCheck size={17}/><div><b>{tx(lang,'تنبيه: طلب مجهول إلى AI Horde','Notice: anonymous request to AI Horde')}</b><p>{tx(lang,'لأن الاستخدام مجهول، يوضح توثيق Horde أن المطالبات والصور تُشارك مع LAION. استخدم وصفًا تقبل مشاركته. الطلب له أقل أولوية وقد يطول انتظاره أو يُقيّد عند الازدحام.','Horde documentation says anonymous prompts and images are shared with LAION. Only use prompts you are comfortable sharing. Anonymous requests have the lowest priority; waiting may be long or access may be restricted under load.')}</p></div></div>}
       {action!=='voice'&&(aiHordeSelected?<div><label><span className="field-label">{tx(lang,'نموذج صورة نشط على AI Horde','Active AI Horde image model')}</span>{aiHordeModels.length>0&&<select className="studio-input" value={model} onChange={e=>setModel(e.target.value)}>{aiHordeModels.map(item=><option key={item.name} value={item.name}>{item.name} · {item.workers} {tx(lang,'عمّال','workers')} · {item.etaSeconds>0?`~${Math.ceil(item.etaSeconds/60)} ${tx(lang,'دقيقة','min')}`:tx(lang,'وقت انتظار غير متاح','ETA n/a')}</option>)}</select>}</label>{aiHordeModelsQuery.isLoading&&<p className="generation-note">{tx(lang,'جارٍ تحميل النماذج النشطة مرة واحدة...','Loading currently active models…')}</p>}{aiHordeModelsQuery.isError&&<div className="inline-error" role="alert">{aiHordeModelsQuery.error instanceof Error?aiHordeModelsQuery.error.message:tx(lang,'تعذر الوصول إلى قائمة نماذج AI Horde.','Could not load AI Horde models.')} <button type="button" className="text-link" onClick={()=>void aiHordeModelsQuery.refetch()} disabled={aiHordeModelsQuery.isFetching}>{tx(lang,'إعادة المحاولة','Retry')}</button></div>}{!aiHordeModelsQuery.isLoading&&!aiHordeModelsQuery.isError&&!aiHordeModels.length&&<p className="inline-error">{tx(lang,'لا توجد نماذج صور نشطة الآن؛ جرّب لاحقًا.','No active image models are available right now; try again later.')}</p>}</div>:<label><span className="field-label">{tx(lang,'معرّف النموذج لدى المزوّد','Provider model ID')}</span><input required className="studio-input" value={model} onChange={e=>setModel(e.target.value)} placeholder={action==='image'&&activeKey?.provider==='huggingface'?'black-forest-labs/FLUX.1-schnell':action==='video'&&activeKey?.provider==='fal'?'minimax/h3-max/text-to-video':tx(lang,'أدخل معرّف النموذج المتاح لحسابك','Enter a model ID available to your account')} /></label>)}
-      {action==='image'&&!aiHordeSelected&&<label><span className="field-label">{tx(lang,'عدد النسخ','Number of variants')}</span><select className="studio-input" value={outputs} onChange={e=>setOutputs(Number(e.target.value))}><option value={1}>1</option><option value={2}>2</option><option value={3}>3</option><option value={4}>4</option></select><small className="generation-note">{tx(lang,'سيحفظ الخادم كل نسخة فعلية في سجل أصول المشهد لتختار بينها لاحقًا.','The server will save every generated variant in the scene asset history so you can choose later.')}</small></label>}
+      {action==='image'&&!aiHordeSelected&&<label><span className="field-label">{tx(lang,'عدد النسخ','Number of variants')}</span><select className="studio-input" value={outputs} onChange={e=>setOutputs(Number(e.target.value) as SceneImageGenerationInputOutputs)}><option value={1}>1</option><option value={2}>2</option><option value={3}>3</option><option value={4}>4</option></select><small className="generation-note">{tx(lang,'سيحفظ الخادم كل نسخة فعلية في سجل أصول المشهد لتختار بينها لاحقًا.','The server will save every generated variant in the scene asset history so you can choose later.')}</small></label>}
       {action==='video'&&<><label><span className="field-label">{tx(lang,'مصدر الفيديو','Video input')}</span><select className="studio-input" value={mode} onChange={e=>{const nextMode=e.target.value as 'text'|'image';setMode(nextMode);setModel(defaultVideoModel(activeKey?.provider,nextMode));}}><option value="image">{tx(lang,'من صورة المشهد','Use scene image')}</option><option value="text">{tx(lang,'من النص','Use text prompt')}</option></select></label><p className="generation-note">{tx(lang,'يُملأ معرّف النموذج تلقائيًا حسب المزوّد. مفاتيح الفيديو المستضافة ليست مجانية؛ ستحتاج موافقتك قبل كل طلب.','The model endpoint is filled in for your provider. Hosted video APIs are not free; each request still needs your approval.')}</p></>}
       {action==='voice'&&activeKey?.provider==='piper-local'&&<p className="generation-note">{tx(lang,'الصوت المحدد: Kareem — لهجة عربية أردنية. لا يلزم مفتاح أو معرّف صوت.','Selected voice: Kareem — Jordanian Arabic. No API key or voice ID is needed.')}</p>}
       {action==='voice'&&activeKey?.provider!=='piper-local'&&<label><span className="field-label">{tx(lang,'معرّف الصوت','Voice ID')}</span><input required className="studio-input" value={voiceId} onChange={e=>setVoiceId(e.target.value)} placeholder={tx(lang,'أدخل معرّفًا يقدّمه مزوّدك','Enter a voice ID from your provider')} /></label>}
@@ -1916,7 +2013,8 @@ function Router() {
         <Route path="/sign-in/*?" component={SignInPage}/>
         <Route path="/sign-up/*?" component={SignUpPage}/>
         <Route path="/dashboard" component={Dashboard}/>
-        <Route path="/projects" component={Projects}/>
+        <Route path="/dashboard/overview" component={DashboardOverview}/>
+        <Route path="/projects">{() => <Projects/>}</Route>
         <Route path="/projects/:projectId">{params=><ProjectWorkspace projectId={params.projectId}/>}</Route>
         <Route path="/jobs" component={JobsPage}/>
         <Route path="/media" component={MediaPage}/>

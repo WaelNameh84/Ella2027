@@ -23,7 +23,7 @@ import { decryptProviderKey } from "../lib/secretVault";
 import { classifyProviderResponse, providerCredentialUsable } from "../lib/providerRegistry";
 import { isProviderCallError } from "../lib/mediaGeneration";
 import { transcribeAudio, type TranscriptionMode } from "../lib/transcription";
-import { generatedAssetContentType, generatedAssetPath, readGeneratedAsset, saveGeneratedAsset, type GeneratedAssetKind } from "../lib/studioAssets";
+import { generatedAssetContentType, generatedAssetPath, readGeneratedAsset, saveGeneratedAsset, saveUploadedImageAsset, type GeneratedAssetKind } from "../lib/studioAssets";
 import { isZeroSpendMode, ZERO_SPEND_ERROR } from "../lib/spendingGuard";
 import { PIPER_LOCAL_PROVIDER_KEY } from "../lib/piperTts";
 import { AI_HORDE_PROVIDER_KEY, listAiHordeModels } from "../lib/aiHorde";
@@ -394,6 +394,55 @@ router.post(
       }
     }
     res.status(502).json({ error: lastError });
+  },
+);
+
+router.post(
+  "/projects/:projectId/scenes/:sceneId/assets/upload",
+  express.raw({ type: ["image/*", "application/octet-stream"], limit: "8mb" }),
+  async (req, res): Promise<void> => {
+    const { projectId, sceneId } = req.params;
+    const contentType = String(req.headers["content-type"] ?? "").split(";")[0].trim().toLowerCase();
+    if (!/^[a-f0-9-]{36}$/i.test(projectId) || !/^[a-f0-9-]{36}$/i.test(sceneId)) {
+      res.status(400).json({ error: "Invalid project or scene." });
+      return;
+    }
+    if (!["image/jpeg", "image/png", "image/webp"].includes(contentType)) {
+      res.status(415).json({ error: "Upload a JPEG, PNG, or WebP image smaller than 8 MB." });
+      return;
+    }
+    const bytes = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+    if (!bytes.length || bytes.byteLength > 8 * 1024 * 1024) {
+      res.status(400).json({ error: "Choose a non-empty image smaller than 8 MB." });
+      return;
+    }
+    const userId = userIdOf(res);
+    if (!await sceneOwnerExists(projectId, sceneId, userId)) {
+      res.status(404).json({ error: "Scene not found." });
+      return;
+    }
+    try {
+      const saved = await saveUploadedImageAsset(projectId, sceneId, bytes);
+      const [updated] = await db.update(scenesTable).set({
+        assetUrl: saved.url,
+        assetType: "image",
+        updatedAt: new Date(),
+      }).where(and(
+        eq(scenesTable.id, sceneId),
+        eq(scenesTable.projectId, projectId),
+        eq(scenesTable.userId, userId),
+      )).returning({ id: scenesTable.id });
+      if (!updated) {
+        res.status(404).json({ error: "Scene not found." });
+        return;
+      }
+      res.json({ assetUrl: saved.url, assetType: "image", contentType: saved.contentType });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not save the image.";
+      res.status(message.startsWith("Upload a JPEG") ? 415 : 500).json({
+        error: message.startsWith("Upload a JPEG") ? message : "Could not save the image. Try again.",
+      });
+    }
   },
 );
 
