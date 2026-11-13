@@ -73,19 +73,20 @@ export function ProductionRail({ lang, stages, active, onSelect }: {
   </aside>;
 }
 
-export function StageTools({ lang, stage, titleAr, titleEn, hintAr, hintEn, children }: {
+export function StageTools({ lang, stage, titleAr, titleEn, hintAr, hintEn, className = '', children }: {
   lang: 'ar' | 'en';
   stage: ProductionStage;
   titleAr: string;
   titleEn: string;
   hintAr: string;
   hintEn: string;
+  className?: string;
   children: ReactNode;
 }) {
   const t = (ar: string, en: string) => lang === 'ar' ? ar : en;
   const label = statusLabel[stage.status];
   const Icon = stageIcon(stage.id);
-  return <aside className="studio-tools panel" data-testid={`studio-tools-${stage.id}`}>
+  return <aside className={`studio-tools panel ${className}`} data-testid={`studio-tools-${stage.id}`}>
     <div className="studio-tools-head">
       <span className="studio-tools-icon"><Icon size={17} /></span>
       <div>
