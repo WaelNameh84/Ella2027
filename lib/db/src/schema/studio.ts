@@ -211,6 +211,20 @@ export const favoriteMediaTable = pgTable("studio_favorite_media", {
   ),
 ]);
 
+export const savedCharactersTable = pgTable("studio_saved_characters", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: text("user_id").notNull(),
+  name: text("name").notNull(),
+  description: text("description").notNull().default(""),
+  costume: text("costume").notNull().default(""),
+  voiceDescription: text("voice_description").notNull().default(""),
+  referenceImageUrl: text("reference_image_url"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+}, (table) => [
+  uniqueIndex("studio_saved_characters_user_name_idx").on(table.userId, table.name),
+]);
+
 export const dialogueLinesTable = pgTable("studio_dialogue_lines", {
   id: uuid("id").defaultRandom().primaryKey(),
   projectId: uuid("project_id").notNull().references(() => projectsTable.id, { onDelete: "cascade" }),

@@ -59,6 +59,7 @@ import {
 import {
   db,
   favoriteMediaTable,
+  savedCharactersTable,
   projectsTable,
   providerKeysTable,
   providerSettingsTable,
@@ -1129,6 +1130,44 @@ router.delete("/media/favorites/:favoriteId", async (req, res): Promise<void> =>
   )).returning({ id: favoriteMediaTable.id });
   if (!removed) {
     res.status(404).json({ error: "Saved media item not found." });
+    return;
+  }
+  res.sendStatus(204);
+});
+
+router.get("/characters/library", async (_req, res): Promise<void> => {
+  const rows = await db.select().from(savedCharactersTable)
+    .where(eq(savedCharactersTable.userId, userIdOf(res)))
+    .orderBy(desc(savedCharactersTable.updatedAt));
+  res.json(rows);
+});
+
+router.post("/characters/library", async (req, res): Promise<void> => {
+  const body = req.body as Record<string, unknown>;
+  const name = typeof body.name === "string" ? body.name.trim() : "";
+  if (!name || name.length > 160) {
+    res.status(400).json({ error: "Character name is required and must be at most 160 characters." });
+    return;
+  }
+  const values = {
+    userId: userIdOf(res),
+    name,
+    description: typeof body.description === "string" ? body.description.slice(0, 4000) : "",
+    costume: typeof body.costume === "string" ? body.costume.slice(0, 2000) : "",
+    voiceDescription: typeof body.voiceDescription === "string" ? body.voiceDescription.slice(0, 1000) : "",
+    referenceImageUrl: typeof body.referenceImageUrl === "string" && body.referenceImageUrl.trim() ? body.referenceImageUrl.trim() : null,
+  };
+  const [saved] = await db.insert(savedCharactersTable).values(values).onConflictDoUpdate({
+    target: [savedCharactersTable.userId, savedCharactersTable.name],
+    set: { description: values.description, costume: values.costume, voiceDescription: values.voiceDescription, referenceImageUrl: values.referenceImageUrl, updatedAt: new Date() },
+  }).returning();
+  res.status(201).json(saved);
+});
+
+router.delete("/characters/library/:characterId", async (req, res): Promise<void> => {
+  const [removed] = await db.delete(savedCharactersTable).where(and(eq(savedCharactersTable.id, req.params.characterId), eq(savedCharactersTable.userId, userIdOf(res)))).returning({ id: savedCharactersTable.id });
+  if (!removed) {
+    res.status(404).json({ error: "Saved character not found." });
     return;
   }
   res.sendStatus(204);
