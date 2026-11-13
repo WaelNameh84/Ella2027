@@ -89,6 +89,17 @@ export const providerDefinitions: Record<string, ProviderDefinition> = {
     chatModel: "meta-llama/Llama-3.1-8B-Instruct",
     chatMode: "openai",
   },
+  "colab-t5": {
+    label: "Google Colab T5 (free)",
+    officialUrl: "https://colab.research.google.com/",
+    testUrl: (baseUrl) => {
+      const base = baseUrl.trim().replace(/\/$/, "");
+      return /^https?:\/\//i.test(base) ? `${base}/health` : "";
+    },
+    chatUrl: "colab-t5://v1/chat/completions",
+    chatModel: "google/flan-t5-base",
+    chatMode: "openai",
+  },
   mistral: {
     label: "Mistral",
     officialUrl: "https://console.mistral.ai/api-keys/",
@@ -222,7 +233,7 @@ export const providerCatalog = [
 ];
 
 const providersRequiringSuccessfulTest = new Set([
-  "huggingface", "cloudflare", "stability", "groq", "assemblyai", "deepgram",
+  "huggingface", "colab-t5", "cloudflare", "stability", "groq", "assemblyai", "deepgram",
 ]);
 export function providerRequiresSuccessfulTest(provider: string): boolean {
   return providersRequiringSuccessfulTest.has(provider);
@@ -348,12 +359,17 @@ export async function generateWithProvider(
     throw new Error("This provider does not support script generation in this version.");
   }
 
+  const isColabT5 = provider === "colab-t5";
+  const colabBaseUrl = isColabT5 ? key.trim().replace(/\/$/, "") : "";
+  if (isColabT5 && !/^https?:\/\//i.test(colabBaseUrl)) {
+    throw new Error("Enter the public Colab URL, for example https://xxxx.trycloudflare.com.");
+  }
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    Authorization: `Bearer ${key}`,
+    ...(isColabT5 ? {} : { Authorization: `Bearer ${key}` }),
   };
   let body: unknown;
-  let chatUrl = definition.chatUrl;
+  let chatUrl = isColabT5 ? `${colabBaseUrl}/v1/chat/completions` : definition.chatUrl;
   if (definition.chatMode === "gemini") {
     const url = `${definition.chatUrl}?key=${encodeURIComponent(key)}`;
     const response = await fetch(url, {
