@@ -1210,3 +1210,15 @@ body { min-height: 100dvh; }
 .charge-approval-gate { display: flex; align-items: center; gap: 6px; padding: 7px 9px; border-radius: 7px; background: hsl(205 72% 48% / .08); color: hsl(205 72% 36%); font-size: 9px; }
 .charge-approval-note { color: hsl(var(--muted-foreground)); font-size: 8px; line-height: 1.5; }
 @media (max-width: 560px) { .charge-approval-rows { grid-template-columns: 1fr; } }
+
+/* ── Scene card actions ────────────────────────────────────── */
+.storyboard-card { display: flex; flex-direction: column; }
+.storyboard-card-main { display: block; width: 100%; padding: 0; border: 0; background: transparent; color: inherit; text-align: start; cursor: pointer; }
+.storyboard-card-main:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: -2px; }
+.storyboard-card-actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 1px solid hsl(var(--border)); }
+.storyboard-card-actions button { display: grid; place-items: center; min-height: 30px; border: 0; border-inline-end: 1px solid hsl(var(--border)); background: hsl(var(--muted) / .28); color: hsl(var(--muted-foreground)); cursor: pointer; }
+.storyboard-card-actions button:last-child { border-inline-end: 0; }
+.storyboard-card-actions button:hover { background: hsl(var(--primary) / .08); color: hsl(var(--primary)); }
+.storyboard-card-actions button.is-danger:hover { background: hsl(var(--destructive) / .08); color: hsl(var(--destructive)); }
+.storyboard-card-actions button:disabled { opacity: .45; cursor: not-allowed; }
+@media (max-width: 767px) { .storyboard-card-actions button { min-height: 38px; } }
