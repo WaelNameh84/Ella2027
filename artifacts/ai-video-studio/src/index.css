@@ -1240,3 +1240,16 @@ body { min-height: 100dvh; }
 .writing-assistant-actions .btn-primary { margin-inline-start: auto; }
 .writing-assistant-empty { color: hsl(var(--muted-foreground)); font-size: 9px; line-height: 1.5; }
 @media (max-width: 560px) { .writing-assistant-actions .btn { flex: 1 1 auto; } .writing-assistant-actions .btn-primary { margin-inline-start: 0; width: 100%; } }
+
+/* ── Error recovery ────────────────────────────────────────── */
+.error-recovery { display: grid; gap: 7px; padding: 10px 12px; border: 1px solid hsl(var(--destructive) / .28); border-radius: 9px; background: hsl(var(--destructive) / .055); }
+.error-recovery.is-compact { margin-top: 6px; }
+.error-recovery-head { display: flex; align-items: flex-start; gap: 7px; }
+.error-recovery-icon { color: hsl(var(--destructive)); margin-top: 1px; }
+.error-recovery-head b { display: block; font-size: 10px; }
+.error-recovery-scene { color: hsl(var(--muted-foreground)); font-size: 8px; }
+.error-recovery > p { color: hsl(var(--foreground)); font-size: 9px; line-height: 1.55; }
+.error-recovery-actions { display: flex; flex-wrap: wrap; gap: 5px; }
+.error-recovery-actions .btn { min-height: 30px; padding: 4px 8px; font-size: 8.5px; }
+.error-recovery-details summary { display: inline-flex; align-items: center; gap: 4px; color: hsl(var(--muted-foreground)); font-size: 8px; cursor: pointer; list-style: none; }
+.error-recovery-details pre { margin-top: 5px; padding: 7px; overflow: auto; max-height: 160px; border-radius: 6px; background: hsl(var(--muted) / .5); color: hsl(var(--muted-foreground)); font: 8px/1.5 var(--app-font-mono); white-space: pre-wrap; word-break: break-word; }
