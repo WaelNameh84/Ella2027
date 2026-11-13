@@ -1091,6 +1091,8 @@ components:
         model: { type: string, minLength: 1, maxLength: 200 }
         outputs: { type: integer, enum: [1, 2, 3, 4] }
         resolution: { type: integer, enum: [512, 768, 1024] }
+        seed: { type: ["integer", "null"], minimum: 0, maximum: 2147483647 }
+        negativePrompt: { type: ["string", "null"], maxLength: 2000 }
         approvePotentialCharges: { type: boolean }
       required: [model, outputs, resolution, approvePotentialCharges]
     SceneVideoGenerationInput:

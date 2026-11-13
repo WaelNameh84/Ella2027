@@ -798,6 +798,11 @@ export const QueueSceneImageGenerationParams = zod.object({
 
 export const queueSceneImageGenerationBodyModelMax = 200;
 
+export const queueSceneImageGenerationBodySeedMin = 0;
+export const queueSceneImageGenerationBodySeedMax = 2147483647;
+
+export const queueSceneImageGenerationBodyNegativePromptMax = 2000;
+
 
 
 export const QueueSceneImageGenerationBody = zod.object({
@@ -805,6 +810,8 @@ export const QueueSceneImageGenerationBody = zod.object({
   "model": zod.string().min(1).max(queueSceneImageGenerationBodyModelMax),
   "outputs": zod.union([zod.literal(1),zod.literal(2),zod.literal(3),zod.literal(4)]),
   "resolution": zod.union([zod.literal(512),zod.literal(768),zod.literal(1024)]),
+  "seed": zod.number().int().min(queueSceneImageGenerationBodySeedMin).max(queueSceneImageGenerationBodySeedMax).nullish(),
+  "negativePrompt": zod.string().max(queueSceneImageGenerationBodyNegativePromptMax).nullish(),
   "approvePotentialCharges": zod.boolean()
 })
 

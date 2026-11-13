@@ -56,6 +56,8 @@ type JobInput = {
   model?: string;
   mode?: "text" | "image";
   outputs?: number;
+  seed?: number | null;
+  negativePrompt?: string | null;
   voiceId?: string;
   sceneCount?: number;
   sceneDurationSeconds?: number;
@@ -690,6 +692,7 @@ async function processImageJob(job: typeof studioJobsTable.$inferSelect): Promis
         prompt,
         providerModel,
         imageResolution,
+        { seed: typeof input.seed === "number" ? input.seed : null, negativePrompt: typeof input.negativePrompt === "string" ? input.negativePrompt : null },
       );
       return bytes;
       });

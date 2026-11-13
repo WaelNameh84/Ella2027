@@ -1141,3 +1141,8 @@ body { min-height: 100dvh; }
 .asset-compare-side small { color: hsl(var(--muted-foreground)); font-size: 7.5px; }
 .asset-compare-side .btn { min-height: 30px; font-size: 8.5px; }
 @media (max-width: 420px) { .asset-version-grid { grid-template-columns: 1fr; } }
+
+/* ── Quick / professional generation mode ──────────────────── */
+.generation-mode-switch { display: inline-flex; align-self: flex-start; padding: 2px; border: 1px solid hsl(var(--border)); border-radius: 8px; background: hsl(var(--muted) / .5); }
+.generation-mode-switch button { padding: 5px 12px; border: 0; border-radius: 6px; background: transparent; color: hsl(var(--muted-foreground)); font-size: 9px; font-weight: 650; cursor: pointer; }
+.generation-mode-switch button.is-active { background: hsl(var(--card)); color: hsl(var(--foreground)); box-shadow: 0 1px 3px hsl(0 0% 0% / .12); }

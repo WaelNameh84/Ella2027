@@ -636,6 +636,17 @@ export interface SceneImageGenerationInput {
   model: string;
   outputs: SceneImageGenerationInputOutputs;
   resolution: SceneImageGenerationInputResolution;
+  /**
+     * @minimum 0
+     * @maximum 2147483647
+     * @nullable
+     */
+  seed?: number | null;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  negativePrompt?: string | null;
   approvePotentialCharges: boolean;
 }
 

@@ -225,6 +225,7 @@ export async function generateStill(
   prompt: string,
   model: string,
   resolution: 512 | 768 | 1024,
+  options: { seed?: number | null; negativePrompt?: string | null } = {},
 ): Promise<Buffer> {
   if (provider === "openai" || provider === "openai-audio") {
     const response = await providerResponse("https://api.openai.com/v1/images/generations", key, {
@@ -247,6 +248,8 @@ export async function generateStill(
     form.append("prompt", prompt);
     form.append("output_format", "png");
     form.append("aspect_ratio", resolution === 512 ? "1:1" : "16:9");
+    if (options.negativePrompt?.trim()) form.append("negative_prompt", options.negativePrompt.trim());
+    if (typeof options.seed === "number") form.append("seed", String(options.seed));
     const response = await fetch("https://api.stability.ai/v2beta/stable-image/generate/core", {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, Accept: "image/*" },
@@ -293,7 +296,15 @@ export async function generateStill(
           "Content-Type": "application/json",
           Accept: "image/*",
         },
-        body: JSON.stringify({ inputs: prompt, parameters: { width: resolution, height: resolution } }),
+        body: JSON.stringify({
+          inputs: prompt,
+          parameters: {
+            width: resolution,
+            height: resolution,
+            ...(options.negativePrompt?.trim() ? { negative_prompt: options.negativePrompt.trim() } : {}),
+            ...(typeof options.seed === "number" ? { seed: options.seed } : {}),
+          },
+        }),
         signal: AbortSignal.timeout(120_000),
         redirect: "error",
       },
