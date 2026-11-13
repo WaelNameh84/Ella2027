@@ -7,6 +7,14 @@
  */
 import * as zod from 'zod';
 
+export const StudioBrandKit = zod.object({
+  primaryColor: zod.string().regex(/^#[0-9a-fA-F]{6}$/),
+  accentColor: zod.string().regex(/^#[0-9a-fA-F]{6}$/),
+  fontFamily: zod.enum(['sans', 'serif', 'mono']),
+  watermarkText: zod.string().max(160),
+  watermarkPosition: zod.enum(['top-left', 'top-right', 'bottom-left', 'bottom-right']),
+});
+
 
 /**
  * @summary Health check
@@ -52,6 +60,7 @@ export const GetStudioSummaryResponse = zod.object({
   "audience": zod.string(),
   "visualStyle": zod.string(),
   "aspectRatio": zod.string(),
+  "brandKit": StudioBrandKit,
   "characters": zod.array(zod.object({
   "id": zod.string().min(1).max(getStudioSummaryResponseRecentProjectsItemCharactersItemIdMax),
   "name": zod.string().min(1).max(getStudioSummaryResponseRecentProjectsItemCharactersItemNameMax),
@@ -105,6 +114,7 @@ export const ListProjectsResponseItem = zod.object({
   "audience": zod.string(),
   "visualStyle": zod.string(),
   "aspectRatio": zod.string(),
+  "brandKit": StudioBrandKit,
   "characters": zod.array(zod.object({
   "id": zod.string().min(1).max(listProjectsResponseCharactersItemIdMax),
   "name": zod.string().min(1).max(listProjectsResponseCharactersItemNameMax),
@@ -166,6 +176,7 @@ export const CreateProjectBody = zod.object({
   "audience": zod.string(),
   "visualStyle": zod.string(),
   "aspectRatio": zod.enum(['16:9', '9:16', '1:1', '4:5', '4:3', '3:2']),
+  "brandKit": StudioBrandKit,
   "characters": zod.array(zod.object({
   "id": zod.string().min(1).max(createProjectBodyCharactersItemIdMax),
   "name": zod.string().min(1).max(createProjectBodyCharactersItemNameMax),
@@ -208,6 +219,7 @@ export const CreateProjectResponse = zod.object({
   "audience": zod.string(),
   "visualStyle": zod.string(),
   "aspectRatio": zod.string(),
+  "brandKit": StudioBrandKit,
   "characters": zod.array(zod.object({
   "id": zod.string().min(1).max(createProjectResponseCharactersItemIdMax),
   "name": zod.string().min(1).max(createProjectResponseCharactersItemNameMax),
@@ -280,6 +292,7 @@ export const GetProjectResponse = zod.object({
   "audience": zod.string(),
   "visualStyle": zod.string(),
   "aspectRatio": zod.string(),
+  "brandKit": StudioBrandKit,
   "characters": zod.array(zod.object({
   "id": zod.string().min(1).max(getProjectResponseOneCharactersItemIdMax),
   "name": zod.string().min(1).max(getProjectResponseOneCharactersItemNameMax),
@@ -380,6 +393,7 @@ export const UpdateProjectBody = zod.object({
   "audience": zod.string().optional(),
   "visualStyle": zod.string().optional(),
   "aspectRatio": zod.enum(['16:9', '9:16', '1:1', '4:5', '4:3', '3:2']).optional(),
+  "brandKit": StudioBrandKit.optional(),
   "characters": zod.array(zod.object({
   "id": zod.string().min(1).max(updateProjectBodyCharactersItemIdMax),
   "name": zod.string().min(1).max(updateProjectBodyCharactersItemNameMax),
@@ -422,6 +436,7 @@ export const UpdateProjectResponse = zod.object({
   "audience": zod.string(),
   "visualStyle": zod.string(),
   "aspectRatio": zod.string(),
+  "brandKit": StudioBrandKit,
   "characters": zod.array(zod.object({
   "id": zod.string().min(1).max(updateProjectResponseCharactersItemIdMax),
   "name": zod.string().min(1).max(updateProjectResponseCharactersItemNameMax),
@@ -912,6 +927,7 @@ export const GenerateProjectScriptResponse = zod.object({
   "audience": zod.string(),
   "visualStyle": zod.string(),
   "aspectRatio": zod.string(),
+  "brandKit": StudioBrandKit,
   "characters": zod.array(zod.object({
   "id": zod.string().min(1).max(generateProjectScriptResponseOneCharactersItemIdMax),
   "name": zod.string().min(1).max(generateProjectScriptResponseOneCharactersItemNameMax),

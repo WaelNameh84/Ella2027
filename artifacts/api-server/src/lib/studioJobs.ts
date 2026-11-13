@@ -837,6 +837,9 @@ async function processExportJob(job: typeof studioJobsTable.$inferSelect): Promi
     input.codec ?? "h264",
     project.id,
     input.subtitleStyle ?? "classic",
+    project.soundEffectsUrl,
+    project.soundEffectsVolume,
+    project.brandKit,
   );
   const downloadUrl = `/api/projects/${project.id}/export/file`;
   await db.transaction(async (tx) => {

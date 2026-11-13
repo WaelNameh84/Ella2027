@@ -179,6 +179,31 @@ export const ProjectStatus = {
   failed: 'failed',
 } as const;
 
+export type StudioBrandKitFontFamily = typeof StudioBrandKitFontFamily[keyof typeof StudioBrandKitFontFamily];
+
+export const StudioBrandKitFontFamily = {
+  sans: 'sans',
+  serif: 'serif',
+  mono: 'mono',
+} as const;
+
+export type StudioBrandKitWatermarkPosition = typeof StudioBrandKitWatermarkPosition[keyof typeof StudioBrandKitWatermarkPosition];
+
+export const StudioBrandKitWatermarkPosition = {
+  'top-left': 'top-left',
+  'top-right': 'top-right',
+  'bottom-left': 'bottom-left',
+  'bottom-right': 'bottom-right',
+} as const;
+
+export interface StudioBrandKit {
+  primaryColor: string;
+  accentColor: string;
+  fontFamily: StudioBrandKitFontFamily;
+  watermarkText: string;
+  watermarkPosition: StudioBrandKitWatermarkPosition;
+}
+
 export interface Project {
   id: string;
   title: string;
@@ -189,6 +214,7 @@ export interface Project {
   audience: string;
   visualStyle: string;
   aspectRatio: string;
+  brandKit: StudioBrandKit;
   characters: CharacterProfile[];
   /** @nullable */
   musicUrl: string | null;
@@ -327,6 +353,7 @@ export interface ProjectInput {
   audience: string;
   visualStyle: string;
   aspectRatio: ProjectInputAspectRatio;
+  brandKit?: StudioBrandKit;
   /** @maxItems 24 */
   characters?: CharacterProfile[];
   /** @nullable */
@@ -372,6 +399,7 @@ export interface ProjectUpdate {
   audience?: string;
   visualStyle?: string;
   aspectRatio?: ProjectUpdateAspectRatio;
+  brandKit?: StudioBrandKit;
   /** @maxItems 24 */
   characters?: CharacterProfile[];
   /** @nullable */

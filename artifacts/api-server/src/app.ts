@@ -42,6 +42,9 @@ app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 app.use(cors({ credentials: true, origin: true }));
 app.use(express.json({ limit: "12mb" }));
 app.use(express.urlencoded({ extended: true }));
+// Reference-image uploads use the same durable generated-artifacts storage as provider outputs.
+// Keep this parser scoped to supported image content types and bounded to prevent oversized bodies.
+app.use("/api", express.raw({ type: ["image/png", "image/jpeg", "image/webp", "image/svg+xml"], limit: "20mb" }));
 
 app.use(
   clerkMiddleware((req) => ({

@@ -28,6 +28,22 @@ export type SceneAssetVersion = {
   createdAt: string;
 };
 
+export type StudioBrandKit = {
+  primaryColor: string;
+  accentColor: string;
+  fontFamily: "sans" | "serif" | "mono";
+  watermarkText: string;
+  watermarkPosition: "top-left" | "top-right" | "bottom-left" | "bottom-right";
+};
+
+export const defaultBrandKit: StudioBrandKit = {
+  primaryColor: "#F4F0E8",
+  accentColor: "#C96B4B",
+  fontFamily: "sans",
+  watermarkText: "",
+  watermarkPosition: "bottom-right",
+};
+
 export const projectsTable = pgTable("studio_projects", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: text("user_id").notNull(),
@@ -39,6 +55,7 @@ export const projectsTable = pgTable("studio_projects", {
   audience: text("audience").notNull(),
   visualStyle: text("visual_style").notNull(),
   aspectRatio: text("aspect_ratio").notNull(),
+  brandKit: jsonb("brand_kit").$type<StudioBrandKit>().notNull().default(defaultBrandKit),
   characters: jsonb("characters").$type<StudioCharacter[]>().notNull().default([]),
   musicUrl: text("music_url"),
   musicVolume: integer("music_volume").notNull().default(20),

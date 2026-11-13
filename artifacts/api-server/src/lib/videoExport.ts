@@ -156,6 +156,29 @@ function escapeFilterPath(path: string): string {
   return path.replaceAll("\\", "\\\\").replaceAll(":", "\\:");
 }
 
+type ExportBrandKit = {
+  primaryColor: string;
+  accentColor: string;
+  fontFamily: "sans" | "serif" | "mono";
+  watermarkText: string;
+  watermarkPosition: "top-left" | "top-right" | "bottom-left" | "bottom-right";
+};
+
+function assColor(hex: string): string {
+  const match = /^#([0-9a-f]{6})$/i.exec(hex);
+  if (!match) return "&H00FFFFFF";
+  const [, rgb] = match;
+  return `&H00${rgb.slice(4, 6)}${rgb.slice(2, 4)}${rgb.slice(0, 2)}`;
+}
+
+function drawtextColor(hex: string): string {
+  return /^#[0-9a-f]{6}$/i.test(hex) ? hex : "#FFFFFF";
+}
+
+function escapeDrawtext(value: string): string {
+  return value.replaceAll("\\", "\\\\").replaceAll(":", "\\:").replaceAll("'", "\\'").replaceAll("%", "\\%");
+}
+
 export async function renderMp4(
   userId: string,
   projectId: string,
@@ -172,6 +195,7 @@ export async function renderMp4(
   subtitleStyle: "classic" | "outline" | "pill" = "classic",
   soundEffectsUrl: string | null = null,
   soundEffectsVolume = 35,
+  brandKit?: ExportBrandKit,
 ): Promise<string> {
   if (!scenes.length) throw new Error("Add scenes before exporting.");
   if (scenes.some((scene) => !scene.assetUrl || !["image", "video"].includes(scene.assetType ?? ""))) {
@@ -257,16 +281,29 @@ export async function renderMp4(
         voicePath = join(workDir, `voice-${index}.${voice.contentType.includes("wav") ? "wav" : "mp3"}`);
         await writeFile(voicePath, voice.bytes);
       }
+      const fontName = brandKit?.fontFamily === "serif" ? "DejaVu Serif" : brandKit?.fontFamily === "mono" ? "DejaVu Sans Mono" : "DejaVu Sans";
+      const subtitlePrimary = assColor(brandKit?.primaryColor ?? "#FFFFFF");
+      const subtitleAccent = assColor(brandKit?.accentColor ?? "#101010");
       const subtitleStyles = {
-        classic: "FontName=DejaVu Sans,FontSize=22,PrimaryColour=&H00FFFFFF,OutlineColour=&H00101010,Outline=2,Shadow=1,Alignment=2,MarginV=36",
-        outline: "FontName=DejaVu Sans,FontSize=25,Bold=1,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,Outline=3,Shadow=1,Alignment=2,MarginV=42",
-        pill: "FontName=DejaVu Sans,FontSize=22,PrimaryColour=&H00FFFFFF,BorderStyle=3,BackColour=&H99000000,Outline=0,Shadow=0,Alignment=2,MarginV=40",
+        classic: `FontName=${fontName},FontSize=22,PrimaryColour=${subtitlePrimary},OutlineColour=${subtitleAccent},Outline=2,Shadow=1,Alignment=2,MarginV=36`,
+        outline: `FontName=${fontName},FontSize=25,Bold=1,PrimaryColour=${subtitlePrimary},OutlineColour=${subtitleAccent},Outline=3,Shadow=1,Alignment=2,MarginV=42`,
+        pill: `FontName=${fontName},FontSize=22,PrimaryColour=${subtitlePrimary},BorderStyle=3,BackColour=${subtitleAccent},Outline=0,Shadow=0,Alignment=2,MarginV=40`,
       } as const;
       const selectedSubtitleStyle = subtitleStyles[subtitleStyle] ?? subtitleStyles.classic;
       const subtitleFilter = includeSubtitles && caption
         ? `,subtitles=filename=${escapeFilterPath(subtitlePath)}:force_style='${selectedSubtitleStyle}'`
         : "";
-      const videoFilter = `${ffmpegFilter(width, height, fps, !isVideo)},setpts=PTS/${playbackSpeed}${subtitleFilter}`;
+      const watermark = brandKit?.watermarkText.trim();
+      const watermarkPosition = {
+        "top-left": "x=36:y=36",
+        "top-right": "x=w-tw-36:y=36",
+        "bottom-left": "x=36:y=h-th-36",
+        "bottom-right": "x=w-tw-36:y=h-th-36",
+      }[brandKit?.watermarkPosition ?? "bottom-right"];
+      const watermarkFilter = watermark
+        ? `,drawtext=text='${escapeDrawtext(watermark)}':fontcolor=${drawtextColor(brandKit?.accentColor ?? "#FFFFFF")}@0.86:fontsize=22:font='${fontName}':${watermarkPosition}`
+        : "";
+      const videoFilter = `${ffmpegFilter(width, height, fps, !isVideo)},setpts=PTS/${playbackSpeed}${subtitleFilter}${watermarkFilter}`;
       const audioInput = voicePath
         ? ["-i", voicePath]
         : ["-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000"];

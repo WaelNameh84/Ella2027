@@ -76,6 +76,7 @@ import {
   type ProviderStatus,
 } from "../lib/providerRegistry";
 import { renderMp4 } from "../lib/videoExport";
+import { readGeneratedAsset } from "../lib/studioAssets";
 import { searchMediaCatalog } from "../lib/mediaCatalog";
 import { isZeroSpendMode, ZERO_SPEND_ERROR } from "../lib/spendingGuard";
 
@@ -224,6 +225,7 @@ function projectDto(project: typeof projectsTable.$inferSelect, sceneCount: numb
     audience: project.audience,
     visualStyle: project.visualStyle,
     aspectRatio: project.aspectRatio,
+    brandKit: project.brandKit,
     characters: project.characters ?? [],
     musicUrl: project.musicUrl,
     musicVolume: project.musicVolume,
@@ -782,6 +784,24 @@ router.post("/projects/:projectId/jobs/export", async (req, res): Promise<void> 
     res.status(409).json({ error: "Add at least one scene before exporting." });
     return;
   }
+  const exportScenes = await scenesForProject(project.id, userId);
+  const seenSortOrders = new Set<number>();
+  const preflightErrors: string[] = [];
+  for (const [index, scene] of exportScenes.entries()) {
+    const label = `Scene ${index + 1}`;
+    const errors: string[] = [];
+    if (seenSortOrders.has(scene.sortOrder)) errors.push(`${label}: scene order is duplicated.`);
+    seenSortOrders.add(scene.sortOrder);
+    if (!scene.assetUrl || !["image", "video"].includes(scene.assetType ?? "")) errors.push(`${label}: attach an image or video.`);
+    if (scene.assetUrl?.startsWith("/api/projects/") && !(await readGeneratedAsset(scene.assetUrl, project.id, scene.id))) errors.push(`${label}: the stored media file is missing; replace the asset.`);
+    if (scene.assetType === "video" && scene.clipEndSeconds !== null && scene.clipEndSeconds <= scene.clipStartSeconds) errors.push(`${label}: video clip end must be after clip start.`);
+    if (!Number.isInteger(scene.durationSeconds) || scene.durationSeconds < 1 || scene.durationSeconds > 600) errors.push(`${label}: duration must be between 1 and 600 seconds.`);
+    preflightErrors.push(...errors);
+  }
+  if (preflightErrors.length) {
+    res.status(409).json({ error: `Preflight failed: ${preflightErrors.join(" ")}` });
+    return;
+  }
   const existingJobs = await db.select().from(studioJobsTable).where(and(
     eq(studioJobsTable.userId, userId),
     eq(studioJobsTable.projectId, project.id),
@@ -1150,6 +1170,7 @@ router.post("/projects/:projectId/export", async (req, res): Promise<void> => {
       parsed.data.subtitleStyle ?? "classic",
       project.soundEffectsUrl,
       project.soundEffectsVolume,
+      project.brandKit,
     );
     const downloadUrl = `/api/projects/${project.id}/export/file`;
     await db.update(projectsTable).set({
@@ -1198,7 +1219,7 @@ router.post("/projects/:projectId/preview", async (req, res): Promise<void> => {
   const previewId = `${project.id}-preview-${randomUUID()}`;
   let previewPath: string | null = null;
   try {
-    previewPath = await renderMp4(userId, project.id, scenes, 480, 24, project.aspectRatio, previewOptions.data.includeSubtitles, project.musicUrl, project.musicVolume, "mp4", "h264", previewId, previewOptions.data.subtitleStyle ?? "classic", project.soundEffectsUrl, project.soundEffectsVolume);
+    previewPath = await renderMp4(userId, project.id, scenes, 480, 24, project.aspectRatio, previewOptions.data.includeSubtitles, project.musicUrl, project.musicVolume, "mp4", "h264", previewId, previewOptions.data.subtitleStyle ?? "classic", project.soundEffectsUrl, project.soundEffectsVolume, project.brandKit);
     const bytes = await readFile(previewPath);
     res.setHeader("Content-Type", "video/mp4");
     res.setHeader("Content-Disposition", `inline; filename="ella-preview.mp4"`);

@@ -426,6 +426,53 @@ router.get("/projects/:projectId/assets/:sceneId/:filename", async (req, res): P
   });
 });
 
+router.post("/projects/:projectId/scenes/:sceneId/assets/upload", async (req, res): Promise<void> => {
+  const { projectId, sceneId } = req.params;
+  const userId = userIdOf(res);
+  if (!/^[a-f0-9-]{36}$/i.test(projectId) || !/^[a-f0-9-]{36}$/i.test(sceneId)) {
+    res.status(400).json({ error: "Invalid target project or scene." });
+    return;
+  }
+  const bytes = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+  if (!bytes.length) {
+    res.status(400).json({ error: "Upload an image file." });
+    return;
+  }
+  if (bytes.length > 20 * 1024 * 1024) {
+    res.status(413).json({ error: "The reference image exceeds the 20 MB limit." });
+    return;
+  }
+  const [scene] = await db.select({ id: scenesTable.id }).from(scenesTable).where(and(
+    eq(scenesTable.id, sceneId),
+    eq(scenesTable.projectId, projectId),
+    eq(scenesTable.userId, userId),
+  )).limit(1);
+  if (!scene) {
+    res.status(404).json({ error: "Target scene not found." });
+    return;
+  }
+  try {
+    const saved = await saveGeneratedAsset(projectId, sceneId, "image", bytes);
+    const [updated] = await db.update(scenesTable).set({
+      assetUrl: saved.url,
+      assetType: "image",
+      updatedAt: new Date(),
+    }).where(and(
+      eq(scenesTable.id, sceneId),
+      eq(scenesTable.projectId, projectId),
+      eq(scenesTable.userId, userId),
+    )).returning({ id: scenesTable.id });
+    if (!updated) {
+      res.status(404).json({ error: "Target scene not found." });
+      return;
+    }
+    res.status(201).json({ assetUrl: saved.url, assetType: "image", contentType: saved.contentType });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not save the reference image.";
+    res.status(400).json({ error: message });
+  }
+});
+
 router.post("/projects/:projectId/scenes/:sceneId/assets/clone", async (req, res): Promise<void> => {
   const { projectId, sceneId } = req.params;
   const userId = userIdOf(res);
