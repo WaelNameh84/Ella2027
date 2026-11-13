@@ -1194,3 +1194,19 @@ body { min-height: 100dvh; }
   .workspace-actions { grid-template-columns: 1fr; }
   .studio-mobile-tabs button { font-size: 10px; padding: 0 6px; }
 }
+
+/* ── Charge approval card ──────────────────────────────────── */
+.charge-approval { display: grid; gap: 9px; padding: 12px; border: 1px solid hsl(38 92% 46% / .32); border-radius: 10px; background: linear-gradient(160deg, hsl(38 92% 46% / .07), hsl(var(--card)) 55%); }
+.charge-approval-head { display: flex; align-items: flex-start; gap: 8px; }
+.charge-approval-icon { display: grid; place-items: center; flex: 0 0 30px; width: 30px; height: 30px; border-radius: 8px; background: hsl(38 92% 46% / .14); color: hsl(32 84% 34%); }
+.charge-approval-head > div { flex: 1; min-width: 0; }
+.charge-approval-head h4 { margin-top: 2px; font-size: 12px; }
+.charge-approval-cost { flex: 0 0 auto; padding: 4px 7px; border-radius: 6px; background: hsl(var(--card)); border: 1px solid hsl(var(--border)); font: 9px var(--app-font-mono); color: hsl(32 84% 30%); }
+.charge-approval-cost.is-free { color: hsl(158 42% 30%); border-color: hsl(158 48% 40% / .3); }
+.charge-approval-rows { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 10px; margin: 0; }
+.charge-approval-rows > div { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding-bottom: 4px; border-bottom: 1px dashed hsl(var(--border)); }
+.charge-approval-rows dt { color: hsl(var(--muted-foreground)); font-size: 8px; }
+.charge-approval-rows dd { margin: 0; overflow: hidden; font-size: 8.5px; font-weight: 600; text-align: end; text-overflow: ellipsis; white-space: nowrap; }
+.charge-approval-gate { display: flex; align-items: center; gap: 6px; padding: 7px 9px; border-radius: 7px; background: hsl(205 72% 48% / .08); color: hsl(205 72% 36%); font-size: 9px; }
+.charge-approval-note { color: hsl(var(--muted-foreground)); font-size: 8px; line-height: 1.5; }
+@media (max-width: 560px) { .charge-approval-rows { grid-template-columns: 1fr; } }

@@ -3,7 +3,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Check, Columns2, Film, ImagePlus, LoaderCircle, RefreshCw, ShieldCheck, X } from 'lucide-react';
 import { getGetProjectQueryKey, useQueueSceneImageGeneration, useQueueSceneVideoGeneration, useUpdateScene } from '@workspace/api-client-react';
 import type { ProviderKey, Scene, SceneAssetVersion } from '@workspace/api-client-react';
-import { defaultVideoModel, estimateCostText } from '@/lib/provider-costs';
+import { defaultVideoModel } from '@/lib/provider-costs';
+import { ChargeApprovalCard, useRequestApproval } from '@/components/charge-approval';
 
 type Lang = 'ar' | 'en';
 
@@ -29,9 +30,9 @@ export function AssetVersionCompare({ projectId, scene, keys, lang, onQueued }: 
   const [regen, setRegen] = useState<Version | null>(null);
   const [providerId, setProviderId] = useState('');
   const [model, setModel] = useState('');
-  const [approved, setApproved] = useState(false);
   const [message, setMessage] = useState('');
 
+  const [approved, setApproved] = useRequestApproval(JSON.stringify({ variant: regen?.id || '', provider: providerId, model }));
   const versions = useMemo<Version[]>(() => {
     const rows: Version[] = (scene.assetHistory || []).map(version => ({ ...version }));
     if (scene.assetUrl && (scene.assetType === 'image' || scene.assetType === 'video')) {
@@ -111,8 +112,7 @@ export function AssetVersionCompare({ projectId, scene, keys, lang, onQueued }: 
         {!ready.length ? <div className="service-purpose-hint is-unavailable"><b>{t('لا يوجد مزوّد جاهز لهذا النوع', 'No provider is ready for this type')}</b><span>{t('أضف مفتاحًا مفعّلًا من إعدادات المزوّدات.', 'Add an enabled key in provider settings.')}</span></div> : <>
           {ready.length > 1 && <label><span className="field-label">{t('المزوّد', 'Provider')}</span><select className="studio-input" value={activeKey?.id || ''} onChange={event => { const selectedKey = ready.find(key => key.id === event.target.value); setProviderId(event.target.value); setModel(regen.type === 'video' ? defaultVideoModel(selectedKey?.provider, scene.assetType === 'image' ? 'image' : 'text') : ''); setApproved(false); }}>{ready.map(key => <option key={key.id} value={key.id}>{key.label} · {key.provider}</option>)}</select></label>}
           <label><span className="field-label">{regen.type === 'image' ? t('نموذج الصورة', 'Image model') : t('نموذج الفيديو', 'Video model')}</span><input className="studio-input" value={model} onChange={event => { setModel(event.target.value); setApproved(false); }} placeholder={activeKey?.provider === 'huggingface' ? 'black-forest-labs/FLUX.1-schnell' : activeKey?.provider === 'fal' ? 'minimax/h3-max/image-to-video' : t('معرّف النموذج لدى مزوّدك', 'Your provider model ID')} /></label>
-          <div className="cost-estimate" role="note"><div><b>{t('تقدير تقريبي قبل الإرسال', 'Preflight cost estimate')}</b><span>{estimateCostText(activeKey?.provider, regen.type, 1, lang)}</span></div><small>{t('السعر النهائي يحدده النموذج والمزوّد. لن يبدأ التوليد قبل موافقتك.', 'Final pricing depends on the model and provider. Generation will not start before your approval.')}</small></div>
-          <label className="checkline charge-consent"><input type="checkbox" checked={approved} onChange={event => setApproved(event.target.checked)} />{t('أوافق على إرسال طلب واحد قد تُحتسب عليه رسوم.', 'I approve one request that may incur a charge.')}</label>
+          <ChargeApprovalCard lang={lang} service={regen.type} provider={activeKey?.provider} providerLabel={activeKey?.label} model={model} scenes={1} approved={approved} onChange={setApproved} />
         </>}
         {(imageJob.isError || videoJob.isError) && <p className="inline-error">{t('تعذر إرسال الطلب. تحقق من المفتاح والنموذج.', 'Could not queue the request. Check the key and model.')}</p>}
         <div className="modal-actions"><button type="button" className="btn btn-quiet" onClick={() => setRegen(null)} disabled={busy}>{t('إلغاء', 'Cancel')}</button><button type="button" className="btn btn-primary" onClick={queue} disabled={!activeKey || !model.trim() || !approved || busy}>{busy ? <LoaderCircle size={15} className="animate-spin" /> : <ShieldCheck size={15} />}{t('إرسال بعد الموافقة', 'Queue after approval')}</button></div>
