@@ -812,6 +812,7 @@ export const QueueSceneImageGenerationBody = zod.object({
   "resolution": zod.union([zod.literal(512),zod.literal(768),zod.literal(1024)]),
   "seed": zod.number().int().min(queueSceneImageGenerationBodySeedMin).max(queueSceneImageGenerationBodySeedMax).nullish(),
   "negativePrompt": zod.string().max(queueSceneImageGenerationBodyNegativePromptMax).nullish(),
+  "acceptAiHordePrivacy": zod.boolean().optional(),
   "approvePotentialCharges": zod.boolean()
 })
 
@@ -1733,5 +1734,4 @@ export const DownloadProjectExportParams = zod.object({
 })
 
 export const DownloadProjectExportResponse = zod.unknown()
-
 

@@ -134,6 +134,10 @@ router.post("/projects/:projectId/scenes/:sceneId/jobs/image", async (req, res):
     res.status(400).json({ error: "Confirm that the image provider may charge before starting generation." });
     return;
   }
+  if (parsed.data.providerKeyId === AI_HORDE_PROVIDER_KEY && parsed.data.acceptAiHordePrivacy !== true) {
+    res.status(400).json({ error: "Confirm that you are comfortable sharing this prompt and generated image with the anonymous AI Horde service before starting generation." });
+    return;
+  }
   if (parsed.data.providerKeyId === AI_HORDE_PROVIDER_KEY && !(parsed.data.model ?? "").trim()) {
     res.status(400).json({ error: "Choose an active AI Horde image model before starting generation." });
     return;

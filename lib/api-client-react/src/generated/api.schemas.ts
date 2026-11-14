@@ -647,6 +647,7 @@ export interface SceneImageGenerationInput {
      * @nullable
      */
   negativePrompt?: string | null;
+  acceptAiHordePrivacy?: boolean;
   approvePotentialCharges: boolean;
 }
 
@@ -1078,4 +1079,3 @@ export const SearchFreeMediaOrientation = {
   portrait: 'portrait',
   square: 'square',
 } as const;
-

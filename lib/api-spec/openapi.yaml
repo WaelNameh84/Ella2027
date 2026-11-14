@@ -1094,6 +1094,7 @@ components:
         seed: { type: ["integer", "null"], minimum: 0, maximum: 2147483647 }
         negativePrompt: { type: ["string", "null"], maxLength: 2000 }
         approvePotentialCharges: { type: boolean }
+        acceptAiHordePrivacy: { type: boolean, description: "Required when providerKeyId selects anonymous AI Horde; confirms the user accepts sharing the prompt and generated image with the public service." }
       required: [model, outputs, resolution, approvePotentialCharges]
     SceneVideoGenerationInput:
       type: object

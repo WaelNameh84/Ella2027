@@ -46,6 +46,7 @@ type JobInput = {
   providerKeyId?: string | null;
   allowRotation?: boolean;
   approvePotentialCharges?: boolean;
+  acceptAiHordePrivacy?: boolean;
   resolution?: number;
   fps?: number;
   includeSubtitles?: boolean;
@@ -641,6 +642,9 @@ async function processImageJob(job: typeof studioJobsTable.$inferSelect): Promis
   const { input, project, scene } = await getJobScene(job);
   if (input.approvePotentialCharges !== true) {
     throw new Error("Explicit confirmation is required before a generation provider can be used.");
+  }
+  if (input.providerKeyId === AI_HORDE_PROVIDER_KEY && input.acceptAiHordePrivacy !== true) {
+    throw new Error("Explicit consent is required before sharing this prompt with anonymous AI Horde.");
   }
   const prompt = scenePrompt(project, scene);
   const outputCount = input.providerKeyId === AI_HORDE_PROVIDER_KEY ? 1 : Math.max(1, Math.min(input.outputs ?? 1, 4));

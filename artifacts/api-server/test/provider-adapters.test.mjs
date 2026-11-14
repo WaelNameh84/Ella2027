@@ -14,6 +14,7 @@ import {
 } from "../src/lib/mediaGeneration.ts";
 import { transcribeAudio } from "../src/lib/transcription.ts";
 import { validateUploadedImage } from "../src/lib/studioAssets.ts";
+import { listAiHordeModels, submitAiHordeImage } from "../src/lib/aiHorde.ts";
 
 function mockFetch(t, implementation) {
   const originalFetch = globalThis.fetch;
@@ -280,4 +281,43 @@ test("manual scene uploads accept JPEG, PNG, and WebP signatures but reject SVG 
   assert.throws(() => validateUploadedImage(Buffer.from("<svg></svg>")), /JPEG, PNG, or WebP/);
   assert.throws(() => validateUploadedImage(Buffer.from("not an image")), /unsupported image format/);
   assert.throws(() => validateUploadedImage(Buffer.alloc(0)), /non-empty image/);
+});
+
+test("AI Horde lists active image models without a personal API key", async (t) => {
+  let captured;
+  mockFetch(t, async (url, init) => {
+    captured = { url: String(url), headers: new Headers(init.headers) };
+    return jsonResponse([
+      { name: "model-a", type: "image", count: 2, eta: 45 },
+      { name: "text-only", type: "text", count: 8, eta: 1 },
+      { name: "offline", type: "image", count: 0, eta: 0 },
+    ]);
+  });
+
+  const models = await listAiHordeModels();
+
+  assert.deepEqual(models, [{ name: "model-a", workers: 2, etaSeconds: 45 }]);
+  assert.match(captured.url, /status\/models\?type=image/);
+  assert.equal(captured.headers.get("client-agent"), "Ella2027:1.0.0");
+  assert.equal(captured.headers.has("apikey"), false);
+  assert.equal(captured.headers.has("authorization"), false);
+});
+
+test("AI Horde image submission uses only the public anonymous identifier and shares one output", async (t) => {
+  let captured;
+  mockFetch(t, async (url, init) => {
+    captured = { url: String(url), headers: new Headers(init.headers), body: JSON.parse(init.body) };
+    return jsonResponse({ id: "9f000000-0000-4000-8000-000000000001" });
+  });
+
+  const requestId = await submitAiHordeImage("cinematic test prompt", "model-a");
+
+  assert.equal(requestId, "9f000000-0000-4000-8000-000000000001");
+  assert.equal(captured.url, "https://aihorde.net/api/v2/generate/async");
+  assert.equal(captured.headers.get("apikey"), "0000000000");
+  assert.equal(captured.headers.has("authorization"), false);
+  assert.equal(captured.body.prompt, "cinematic test prompt");
+  assert.deepEqual(captured.body.models, ["model-a"]);
+  assert.equal(captured.body.params.n, 1);
+  assert.equal(captured.body.shared, true);
 });
