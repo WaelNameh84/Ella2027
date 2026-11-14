@@ -40,7 +40,7 @@ function detectNames(idea: string) {
   latin.forEach(name => names.add(name));
   const arabic = idea.match(/(?:اسمه|اسمها|تدعى|يدعى|تُدعى|يُدعى)\s+([\u0600-\u06FF]{3,})/g) || [];
   arabic.forEach(match => {
-    const name = match.split(/\s+/).pop();
+    const name = String(match).split(/\s+/).pop();
     if (name) names.add(name);
   });
   return [...names].slice(0, 4);
