@@ -287,12 +287,13 @@ function StateError({ retry, lang }: { retry: () => void; lang: Lang }) {
 }
 function MediaSearchError({ error, retry, lang }: { error: unknown; retry: () => void; lang: Lang }) {
   const detail = error instanceof Error ? error.message : '';
-  return <div className="panel media-search-error" role="alert"><div className="media-search-error-icon"><X size={18}/></div><div><h3>{tx(lang,'تعذر البحث في مكتبة الوسائط','Media search failed')}</h3><p>{tx(lang,'تأكد من اتصال الإنترنت وأن المصدر المختار لا يحتاج مفتاح API، ثم أعد المحاولة.','Check your internet connection and make sure the selected source does not require an API key, then retry.')}</p>{detail && <code>{detail}</code>}<button onClick={retry} className="btn btn-quiet" data-testid="button-retry-media">{tx(lang,'إعادة المحاولة','Retry search')}</button></div></div>;
+  return <div className="panel media-search-error" role="alert"><div className="media-search-error-icon"><X size={18}/></div><div><h3>{tx(lang,'تعذر البحث في مكتبة الوسائط','Media search failed')}</h3><p>{tx(lang,'يجرب التطبيق مصدرًا عامًا بديلًا تلقائيًا. إذا استمرت المشكلة، جرّب Wikimedia للصور أو Internet Archive للصوت والفيديو.','The app tries a public fallback automatically. If the issue continues, choose Wikimedia for images or Internet Archive for audio and video.')}</p>{detail && <code>{detail}</code>}<button onClick={retry} className="btn btn-quiet" data-testid="button-retry-media">{tx(lang,'إعادة المحاولة','Retry search')}</button></div></div>;
 }
 
 function MediaPreview({ item, lang }: { item: { url: string; thumbnailUrl?: string | null; title: string; mediaType: string }; lang: Lang }) {
   if (item.mediaType === 'audio') return <div className="media-audio-preview"><Music2 size={24}/><span>{tx(lang,'استمع قبل الاستخدام','Preview audio')}</span><audio controls preload="none" src={item.url} aria-label={tx(lang,`معاينة صوت ${item.title}`,`Preview ${item.title}`)} /></div>;
-  return <MediaPreview item={item} lang={lang}/>;
+  if (item.mediaType === 'video') return <div className="media-image media-video-frame"><video controls preload="none" playsInline poster={item.thumbnailUrl || undefined} src={item.url} aria-label={tx(lang,`معاينة فيديو ${item.title}`,`Preview ${item.title}`)} /><span className="media-type-tag">{tx(lang,'فيديو','Video')}</span></div>;
+  return <a className="media-image" href={item.url} target="_blank" rel="noreferrer" aria-label={tx(lang,`فتح الصورة ${item.title}`,`Open image ${item.title}`)}><img src={item.thumbnailUrl || item.url} alt={item.title} loading="lazy" decoding="async"/><span className="media-type-tag">{tx(lang,'صورة','Image')}</span></a>;
 }
 function Empty({ title, body, action }: { title: string; body: string; action?: ReactNode }) {
   return <div className="panel flex min-h-[220px] flex-col items-center justify-center px-6 py-10 text-center"><div className="mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-secondary text-primary"><Film size={21} /></div><h3 className="font-semibold">{title}</h3><p className="mt-2 max-w-sm text-sm leading-6 text-muted-foreground">{body}</p>{action && <div className="mt-5">{action}</div>}</div>;
