@@ -1610,3 +1610,11 @@ a[href]:active,
 .scene-checklist-items button.is-done small { color: hsl(var(--primary)); }
 .scene-checklist-items button:hover { border-color: hsl(var(--primary) / .48); }
 @media (max-width: 520px) { .scene-checklist-items { grid-template-columns: 1fr; } }
+
+.media-search-context { display: grid; gap: 4px; padding: 11px 13px; margin: 0 0 12px; border: 1px solid hsl(var(--primary) / .25); border-radius: 10px; background: hsl(var(--primary) / .06); }
+.media-search-context span, .media-prompt-replace-note { color: hsl(var(--muted-foreground)); font-size: 10px; }
+.media-search-context strong { color: hsl(var(--foreground)); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.media-prompt-generation { display: grid; gap: 10px; padding: 14px; margin: 0 0 14px; }
+.media-prompt-generation .section-heading { margin: 0; }
+.media-prompt-generation .section-heading h3 { margin-top: 3px; font-size: 14px; }
+.media-prompt-replace-note { margin-top: -3px; }
