@@ -365,6 +365,10 @@ body { min-height: 100dvh; }
 .provider-key-modal { display: flex; min-height: 0; flex-direction: column; overflow: hidden; }
 .provider-key-form { min-height: 0; flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; padding-bottom: max(4px, env(safe-area-inset-bottom)); }
 .provider-key-form .modal-actions { position: sticky; bottom: 0; z-index: 2; margin-inline: -2px; padding: 10px 2px 2px; background: hsl(var(--card)); }
+.generation-modal { display: flex; min-height: 0; flex-direction: column; overflow: hidden; }
+.generation-modal .modal-head { flex: 0 0 auto; }
+.generation-modal > .form-stack { min-height: 0; flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding-bottom: max(4px, env(safe-area-inset-bottom)); }
+.generation-modal > .form-stack > .modal-actions { position: sticky; bottom: 0; z-index: 2; margin-inline: -2px; padding: 10px 2px 2px; background: hsl(var(--card)); }
 .form-two { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 13px; }
 .modal-actions { display: flex; align-items: center; justify-content: flex-end; gap: 9px; margin-top: 8px; }
 .workspace-skeleton { display: grid; gap: 15px; }
@@ -1222,6 +1226,7 @@ body { min-height: 100dvh; }
   .studio-status { padding: 11px 12px; }
   .studio-status-foot { gap: 8px; }
   .modal { width: calc(100vw - 16px); max-width: none; max-height: calc(100dvh - 24px); overflow: auto; border-radius: 14px; }
+  .generation-modal { max-height: calc(100dvh - 16px); }
   .modal-backdrop { padding: 8px; align-items: flex-end; }
   .modal-actions { position: sticky; bottom: 0; padding-top: 10px; background: hsl(var(--card)); }
   .export-settings, .studio-export-tools .export-settings { grid-template-columns: 1fr; }
