@@ -362,6 +362,9 @@ body { min-height: 100dvh; }
 .modal-head h2 { font-size: 21px; letter-spacing: -.03em; }
 .modal-head p { margin-top: 5px; color: hsl(var(--muted-foreground)); font-size: 12px; }
 .form-stack { display: grid; gap: 15px; }
+.provider-key-modal { display: flex; min-height: 0; flex-direction: column; overflow: hidden; }
+.provider-key-form { min-height: 0; flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; padding-bottom: max(4px, env(safe-area-inset-bottom)); }
+.provider-key-form .modal-actions { position: sticky; bottom: 0; z-index: 2; margin-inline: -2px; padding: 10px 2px 2px; background: hsl(var(--card)); }
 .form-two { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 13px; }
 .modal-actions { display: flex; align-items: center; justify-content: flex-end; gap: 9px; margin-top: 8px; }
 .workspace-skeleton { display: grid; gap: 15px; }
