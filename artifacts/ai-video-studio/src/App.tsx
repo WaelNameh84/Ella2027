@@ -913,7 +913,7 @@ function Projects({ homePage = false }: { homePage?: boolean }) {
       setBackupImporting(false);
     }
   };
-  const startStory = (projectId: string, sceneCount: number, sceneDurationSeconds: number, sceneStyle: string, story?: string) => generate.mutate({ projectId, data: { providerKeyId: null, allowRotation: false, approvePotentialCharges: true, sceneCount, sceneDurationSeconds, sceneStyle, ...(story ? { story } : {}) } }, {
+  const startStory = (projectId: string, sceneCount: number, sceneDurationSeconds: number, sceneStyle: string, story?: string) => generate.mutate({ projectId, data: { providerKeyId: null, allowRotation: true, approvePotentialCharges: true, sceneCount, sceneDurationSeconds, sceneStyle, ...(story ? { story } : {}) } }, {
     onSuccess: () => {
       afterChange();
       setOpen(false);
