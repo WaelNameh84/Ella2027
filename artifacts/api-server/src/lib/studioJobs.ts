@@ -532,8 +532,9 @@ async function assignedCharacterReferenceImages(
   scene: typeof scenesTable.$inferSelect,
   userId: string,
 ): Promise<Buffer[]> {
+  const sceneCharacterIds = Array.isArray(scene.characterIds) ? scene.characterIds : [];
   const assigned = (project.characters ?? [])
-    .filter((character) => scene.characterIds.includes(character.id) && Boolean(character.referenceImageUrl?.trim()))
+    .filter((character) => sceneCharacterIds.includes(character.id) && Boolean(character.referenceImageUrl?.trim()))
     .slice(0, 4);
   const references: Buffer[] = [];
   for (const character of assigned) {
@@ -566,8 +567,9 @@ async function assignedCharacterReferenceImages(
 }
 
 function scenePrompt(project: typeof projectsTable.$inferSelect, scene: typeof scenesTable.$inferSelect) {
+  const sceneCharacterIds = Array.isArray(scene.characterIds) ? scene.characterIds : [];
   const characterBible = (project.characters ?? [])
-    .filter((character) => scene.characterIds.includes(character.id))
+    .filter((character) => sceneCharacterIds.includes(character.id))
     .map((character) =>
       `${character.name}: ${character.description}. Clothing: ${character.costume}.`,
     );

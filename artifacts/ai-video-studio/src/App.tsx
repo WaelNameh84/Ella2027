@@ -1430,7 +1430,7 @@ function SceneTemplatePicker({lang,onApply}:{lang:Lang;onApply:(template:SceneTe
 }
 function SceneFields({ projectId, scene, characters, lang, onSave, pending }: { projectId: string; scene: Scene; characters:CharacterProfile[]; lang: Lang; onSave: (field: keyof Scene, value: string | number | string[] | null) => Promise<void>; pending: boolean }) {
   const [form,setForm] = useState({title:scene.title,description:scene.description,imagePrompt:scene.imagePrompt,narration:scene.narration,subtitleText:scene.subtitleText,subtitleStartSeconds:scene.subtitleStartSeconds,subtitleEndSeconds:scene.subtitleEndSeconds,durationSeconds:scene.durationSeconds,shotType:scene.shotType,cameraMovement:scene.cameraMovement,location:scene.location,lighting:scene.lighting,clipStartSeconds:scene.clipStartSeconds,clipEndSeconds:scene.clipEndSeconds,playbackSpeed:scene.playbackSpeed,transition:scene.transition,voiceUrl:scene.voiceUrl||'',voiceVolume:scene.voiceVolume});
-  const [characterIds,setCharacterIds]=useState(scene.characterIds);
+  const [characterIds,setCharacterIds]=useState(scene.characterIds ?? []);
   const [saveState,setSaveState]=useState<'saved'|'saving'|'error'>('saved');
   const [trimError,setTrimError]=useState(false);
   const [subtitleRangeError,setSubtitleRangeError]=useState(false);
@@ -1449,7 +1449,7 @@ function SceneFields({ projectId, scene, characters, lang, onSave, pending }: { 
   useEffect(()=>{saveHandler.current=onSave},[onSave]);
   useEffect(()=>{
     setForm({title:scene.title,description:scene.description,imagePrompt:scene.imagePrompt,narration:scene.narration,subtitleText:scene.subtitleText,subtitleStartSeconds:scene.subtitleStartSeconds,subtitleEndSeconds:scene.subtitleEndSeconds,durationSeconds:scene.durationSeconds,shotType:scene.shotType,cameraMovement:scene.cameraMovement,location:scene.location,lighting:scene.lighting,clipStartSeconds:scene.clipStartSeconds,clipEndSeconds:scene.clipEndSeconds,playbackSpeed:scene.playbackSpeed,transition:scene.transition,voiceUrl:scene.voiceUrl||'',voiceVolume:scene.voiceVolume});
-    setCharacterIds(scene.characterIds);
+    setCharacterIds(scene.characterIds ?? []);
     setSaveState('saved');
      setTrimError(false);
      setSubtitleRangeError(false);
@@ -1596,7 +1596,8 @@ function GenerationPanel({projectId,scene,keys,lang,onQueued,freeMode,services,c
   const readyKeys=generationKeys.filter(key=>key.enabled&&key.serviceType===service&&providerSupports(key.provider,service||'')&&providerKeyIsUsable(key.provider,key.status,key.cooldownUntil)).sort((a,b)=>Number(b.provider==='ai-horde')-Number(a.provider==='ai-horde')||Number(b.provider==='piper-local')-Number(a.provider==='piper-local'));
   const activeKey=readyKeys.find(key=>key.id===providerId)||readyKeys[0];
   const aiHordeSelected=action==='image'&&activeKey?.provider==='ai-horde';
-  const assignedReferenceCharacters=characters.filter(character=>scene.characterIds.includes(character.id)&&Boolean(character.referenceImageUrl?.trim()));
+  const sceneCharacterIds=Array.isArray(scene.characterIds)?scene.characterIds:[];
+  const assignedReferenceCharacters=characters.filter(character=>sceneCharacterIds.includes(character.id)&&Boolean(character.referenceImageUrl?.trim()));
   const supportsSeed=action==='image'&&(activeKey?.provider==='stability'||activeKey?.provider==='huggingface');
   const supportsNegative=supportsSeed;
   const supportsResolution=action==='image'&&!aiHordeSelected&&activeKey?.provider!=='replicate';
