@@ -44,6 +44,7 @@ const copy = {
     dragHint:
       "اسحب مقاطع الصورة لتغيير ترتيب المشاهد؛ اختر أي مقطع لتحرير مساره.",
     preview: "معاينة المونتاج",
+    zoom: "تكبير الخط الزمني",
     seconds: "ث",
     playhead: "موضع المعاينة",
     selected: "تحرير المسار المحدد",
@@ -89,6 +90,7 @@ const copy = {
     dragHint:
       "Drag picture clips to reorder scenes; select any clip to edit its track.",
     preview: "Preview edit",
+    zoom: "Timeline zoom",
     seconds: "s",
     playhead: "Preview position",
     selected: "Edit selected track",
@@ -577,10 +579,12 @@ export function FilmTimeline({
 }: FilmTimelineProps) {
   const [draggedScene, setDraggedScene] = useState<string | null>(null);
   const [selectedTrack, setSelectedTrack] = useState<TrackName>("visual");
+  const [zoom, setZoom] = useState(1);
   const text = copy[lang];
+  const sceneWidth = (scene: Scene) => Math.max(84, Math.round(clipWidth(scene) * zoom));
   const totalWidth = Math.max(
     84,
-    scenes.reduce((sum, scene) => sum + clipWidth(scene), 0) +
+    scenes.reduce((sum, scene) => sum + sceneWidth(scene), 0) +
       Math.max(0, scenes.length - 1) * 6,
   );
   const totalDuration = scenes.reduce(
@@ -608,7 +612,7 @@ export function FilmTimeline({
     : 0;
 
   const trackClip = (scene: Scene, track: TrackName, index: number) => {
-    const width = clipWidth(scene);
+    const width = sceneWidth(scene);
     const selected = scene.id === selectedId && track === selectedTrack;
     const common = {
       key: `${track}-${scene.id}`,
@@ -721,6 +725,8 @@ export function FilmTimeline({
           <b>{text.title}</b>
           <small>{text.dragHint}</small>
         </div>
+        <div className="timeline-heading-actions">
+        <label className="timeline-zoom"><span>{text.zoom}</span><input type="range" min="0.5" max="3" step="0.25" value={zoom} onChange={(event) => setZoom(Number(event.target.value))} aria-label={text.zoom}/><output>{zoom.toFixed(2)}×</output></label>
         <button
           className="btn btn-quiet"
           type="button"
@@ -734,6 +740,7 @@ export function FilmTimeline({
           )}
           {text.preview}
         </button>
+        </div>
       </div>
       <div className="film-timeline-scroll">
         <div
@@ -772,7 +779,7 @@ export function FilmTimeline({
               <div
                 className="film-timeline-segment"
                 key={`visual-segment-${scene.id}`}
-                style={{ width: `${clipWidth(scene)}px` }}
+                style={{ width: `${sceneWidth(scene)}px` }}
               >
                 {trackClip(scene, "visual", index)}
               </div>
@@ -784,7 +791,7 @@ export function FilmTimeline({
               <div
                 className="film-timeline-segment"
                 key={`voice-segment-${scene.id}`}
-                style={{ width: `${clipWidth(scene)}px` }}
+                style={{ width: `${sceneWidth(scene)}px` }}
               >
                 {trackClip(scene, "voice", index)}
               </div>
@@ -796,7 +803,7 @@ export function FilmTimeline({
               <div
                 className="film-timeline-segment"
                 key={`subtitle-segment-${scene.id}`}
-                style={{ width: `${clipWidth(scene)}px` }}
+                style={{ width: `${sceneWidth(scene)}px` }}
               >
                 {trackClip(scene, "subtitles", index)}
               </div>

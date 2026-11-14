@@ -1,4 +1,5 @@
 import { lookup } from "node:dns/promises";
+import { spawn } from "node:child_process";
 import { isIP } from "node:net";
 
 export class ProviderCallError extends Error {
@@ -27,7 +28,7 @@ function privateAddress(address: string): boolean {
     || a >= 224;
 }
 
-async function downloadPublicHttps(urlText: string, maximumBytes: number): Promise<Buffer> {
+export async function downloadPublicHttps(urlText: string, maximumBytes: number): Promise<Buffer> {
   const url = new URL(urlText);
   if (url.protocol !== "https:" || url.username || url.password
     || url.hostname === "localhost" || url.hostname.endsWith(".local")) {
@@ -219,12 +220,55 @@ function firstOutput(output: unknown): string {
   return candidate;
 }
 
+export async function convertImageToWebp(bytes: Buffer): Promise<Buffer> {
+  if (!bytes.length || bytes.byteLength > 25 * 1024 * 1024) {
+    throw new Error("Character reference images must be non-empty and smaller than 25 MB.");
+  }
+  return new Promise((resolvePromise, reject) => {
+    const child = spawn("ffmpeg", ["-hide_banner", "-loglevel", "error", "-nostdin", "-i", "pipe:0", "-frames:v", "1", "-c:v", "libwebp", "-quality", "82", "-f", "webp", "pipe:1"], { stdio: ["pipe", "pipe", "pipe"] });
+    const chunks: Buffer[] = [];
+    let total = 0;
+    let settled = false;
+    const finishError = (error: Error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      child.kill("SIGKILL");
+      reject(error);
+    };
+    const timeout = setTimeout(() => finishError(new Error("Could not convert a character reference image to WebP.")), 20_000);
+    child.stdout.on("data", (chunk: Buffer) => {
+      total += chunk.length;
+      if (total > 4 * 1024 * 1024) {
+        finishError(new Error("The converted character reference image is too large."));
+        return;
+      }
+      chunks.push(chunk);
+    });
+    child.once("error", () => finishError(new Error("Image conversion is unavailable on this server.")));
+    child.once("close", (code) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      const result = Buffer.concat(chunks);
+      if (code !== 0 || result.length < 12 || result.toString("ascii", 0, 4) !== "RIFF" || result.toString("ascii", 8, 12) !== "WEBP") {
+        reject(new Error("The character reference could not be converted to WebP."));
+        return;
+      }
+      resolvePromise(result);
+    });
+    child.stdin.on("error", () => undefined);
+    child.stdin.end(bytes);
+  });
+}
+
 export async function generateStill(
   provider: string,
   key: string,
   prompt: string,
   model: string,
   resolution: 512 | 768 | 1024,
+  options: { seed?: number | null; negativePrompt?: string | null } = {},
 ): Promise<Buffer> {
   if (provider === "openai" || provider === "openai-audio") {
     const response = await providerResponse("https://api.openai.com/v1/images/generations", key, {
@@ -247,6 +291,8 @@ export async function generateStill(
     form.append("prompt", prompt);
     form.append("output_format", "png");
     form.append("aspect_ratio", resolution === 512 ? "1:1" : "16:9");
+    if (options.negativePrompt?.trim()) form.append("negative_prompt", options.negativePrompt.trim());
+    if (typeof options.seed === "number") form.append("seed", String(options.seed));
     const response = await fetch("https://api.stability.ai/v2beta/stable-image/generate/core", {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, Accept: "image/*" },
@@ -293,7 +339,15 @@ export async function generateStill(
           "Content-Type": "application/json",
           Accept: "image/*",
         },
-        body: JSON.stringify({ inputs: prompt, parameters: { width: resolution, height: resolution } }),
+        body: JSON.stringify({
+          inputs: prompt,
+          parameters: {
+            width: resolution,
+            height: resolution,
+            ...(options.negativePrompt?.trim() ? { negative_prompt: options.negativePrompt.trim() } : {}),
+            ...(typeof options.seed === "number" ? { seed: options.seed } : {}),
+          },
+        }),
         signal: AbortSignal.timeout(120_000),
         redirect: "error",
       },

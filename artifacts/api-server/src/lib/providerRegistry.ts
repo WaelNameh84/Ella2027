@@ -368,6 +368,9 @@ export async function generateWithProvider(
     "Content-Type": "application/json",
     ...(isColabT5 ? {} : { Authorization: `Bearer ${key}` }),
   };
+  // Cohere's compatibility endpoint rejects values above 4096.
+  // Without this cap the provider can appear to have a bad key after HTTP 400.
+  const maxOutputTokens = provider === "cohere" ? 4096 : 5000;
   let body: unknown;
   let chatUrl = isColabT5 ? `${colabBaseUrl}/v1/chat/completions` : definition.chatUrl;
   if (definition.chatMode === "gemini") {
@@ -404,7 +407,7 @@ export async function generateWithProvider(
     body = {
       model: definition.chatModel,
       temperature: 0.7,
-      max_tokens: 5000,
+      max_tokens: maxOutputTokens,
       messages: [{ role: "user", content: prompt }],
     };
   } else if (definition.chatMode === "anthropic") {
@@ -420,7 +423,7 @@ export async function generateWithProvider(
     body = {
       model: definition.chatModel,
       temperature: 0.7,
-      max_tokens: 5000,
+      max_tokens: maxOutputTokens,
       messages: [{ role: "user", content: prompt }],
     };
   }

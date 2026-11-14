@@ -146,6 +146,36 @@ export interface AdminProviderKey {
   createdAt: string;
 }
 
+export type StudioBrandKitFontFamily = typeof StudioBrandKitFontFamily[keyof typeof StudioBrandKitFontFamily];
+
+
+export const StudioBrandKitFontFamily = {
+  sans: 'sans',
+  serif: 'serif',
+  mono: 'mono',
+} as const;
+
+export type StudioBrandKitWatermarkPosition = typeof StudioBrandKitWatermarkPosition[keyof typeof StudioBrandKitWatermarkPosition];
+
+
+export const StudioBrandKitWatermarkPosition = {
+  'top-left': 'top-left',
+  'top-right': 'top-right',
+  'bottom-left': 'bottom-left',
+  'bottom-right': 'bottom-right',
+} as const;
+
+export interface StudioBrandKit {
+  /** @pattern ^#[0-9a-fA-F]{6}$ */
+  primaryColor: string;
+  /** @pattern ^#[0-9a-fA-F]{6}$ */
+  accentColor: string;
+  fontFamily: StudioBrandKitFontFamily;
+  /** @maxLength 160 */
+  watermarkText: string;
+  watermarkPosition: StudioBrandKitWatermarkPosition;
+}
+
 export interface CharacterProfile {
   /**
      * @minLength 1
@@ -179,31 +209,6 @@ export const ProjectStatus = {
   failed: 'failed',
 } as const;
 
-export type StudioBrandKitFontFamily = typeof StudioBrandKitFontFamily[keyof typeof StudioBrandKitFontFamily];
-
-export const StudioBrandKitFontFamily = {
-  sans: 'sans',
-  serif: 'serif',
-  mono: 'mono',
-} as const;
-
-export type StudioBrandKitWatermarkPosition = typeof StudioBrandKitWatermarkPosition[keyof typeof StudioBrandKitWatermarkPosition];
-
-export const StudioBrandKitWatermarkPosition = {
-  'top-left': 'top-left',
-  'top-right': 'top-right',
-  'bottom-left': 'bottom-left',
-  'bottom-right': 'bottom-right',
-} as const;
-
-export interface StudioBrandKit {
-  primaryColor: string;
-  accentColor: string;
-  fontFamily: StudioBrandKitFontFamily;
-  watermarkText: string;
-  watermarkPosition: StudioBrandKitWatermarkPosition;
-}
-
 export interface Project {
   id: string;
   title: string;
@@ -225,7 +230,10 @@ export interface Project {
   musicVolume: number;
   /** @nullable */
   soundEffectsUrl: string | null;
-  /** @minimum 0 @maximum 100 */
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
   soundEffectsVolume: number;
   status: ProjectStatus;
   progress: number;
@@ -365,7 +373,10 @@ export interface ProjectInput {
   musicVolume?: number;
   /** @nullable */
   soundEffectsUrl?: string | null;
-  /** @minimum 0 @maximum 100 */
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
   soundEffectsVolume?: number;
 }
 
@@ -411,7 +422,10 @@ export interface ProjectUpdate {
   musicVolume?: number;
   /** @nullable */
   soundEffectsUrl?: string | null;
-  /** @minimum 0 @maximum 100 */
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
   soundEffectsVolume?: number;
 }
 
@@ -591,6 +605,11 @@ export interface ScriptGenerationInput {
      * @maxLength 200
      */
   sceneStyle?: string;
+  /**
+     * @minLength 1
+     * @maxLength 30000
+     */
+  story?: string;
 }
 
 export type SceneImageGenerationInputOutputs = typeof SceneImageGenerationInputOutputs[keyof typeof SceneImageGenerationInputOutputs];
@@ -622,6 +641,18 @@ export interface SceneImageGenerationInput {
   model: string;
   outputs: SceneImageGenerationInputOutputs;
   resolution: SceneImageGenerationInputResolution;
+  /**
+     * @minimum 0
+     * @maximum 2147483647
+     * @nullable
+     */
+  seed?: number | null;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  negativePrompt?: string | null;
+  acceptAiHordePrivacy?: boolean;
   approvePotentialCharges: boolean;
 }
 
@@ -684,6 +715,8 @@ export const StudioJobStatus = {
 export interface StudioJob {
   id: string;
   projectId: string;
+  /** @nullable */
+  sceneId: string | null;
   jobType: StudioJobJobType;
   status: StudioJobStatus;
   stage: string;
@@ -1051,4 +1084,3 @@ export const SearchFreeMediaOrientation = {
   portrait: 'portrait',
   square: 'square',
 } as const;
-

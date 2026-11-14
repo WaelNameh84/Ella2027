@@ -95,7 +95,7 @@ export async function listAiHordeModels(): Promise<AiHordeModel[]> {
   return models;
 }
 
-export async function submitAiHordeImage(prompt: string, model: string): Promise<string> {
+export async function submitAiHordeImage(prompt: string, model: string, referenceImages: Buffer[] = []): Promise<string> {
   const response = await fetch(`${AI_HORDE_BASE_URL}/generate/async`, {
     method: "POST",
     headers: {
@@ -106,6 +106,7 @@ export async function submitAiHordeImage(prompt: string, model: string): Promise
     body: JSON.stringify({
       prompt,
       params: { width: 512, height: 512, steps: 20, n: 1 },
+      ...(referenceImages.length ? { extra_source_images: referenceImages.slice(0, 4).map((image) => ({ image: image.toString("base64"), strength: 0.65 })) } : {}),
       models: [model],
       nsfw: false,
       censor_nsfw: true,

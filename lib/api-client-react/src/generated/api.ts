@@ -2872,7 +2872,7 @@ export const getTestProviderKeyUrl = (keyId: string,) => {
 }
 
 /**
- * @summary Test one provider key with a minimal request
+ * @summary Test provider authentication using a read-only endpoint when documented; never trigger generation
  */
 export const testProviderKey = async (keyId: string, options?: Parameters<typeof customFetch>[1]): Promise<ProviderTestResult> => {
 
@@ -2924,7 +2924,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type TestProviderKeyMutationVariables = {keyId: string}
 
     /**
- * @summary Test one provider key with a minimal request
+ * @summary Test provider authentication using a read-only endpoint when documented; never trigger generation
  */
 export const useTestProviderKey = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof testProviderKey>>, TError,TestProviderKeyMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}

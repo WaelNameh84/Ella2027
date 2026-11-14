@@ -72,6 +72,13 @@ function openverseUrl(kind: MediaKind, term: string, page: number): URL {
 
 async function searchOpenverse(term: string, kind: MediaKind, page: number) {
   const { response, text, payload } = await jsonRequest(openverseUrl(kind, term, page));
+  if (!response.ok && (response.status === 401 || response.status === 403)) {
+    // Openverse may reject anonymous requests. Keep no-key search usable by
+    // switching to Wikimedia for images and Internet Archive for audio/video.
+    return kind === "image"
+      ? searchWikimedia(term, kind, page)
+      : searchArchive(term, kind, page);
+  }
   if (!response.ok) throw new Error(`Openverse search failed (HTTP ${response.status}).`);
   const rows = Array.isArray(payload.results) ? payload.results as Array<Record<string, unknown>> : [];
   const results = rows.flatMap((item, index) => cleanResult({

@@ -54,6 +54,24 @@ export async function saveGeneratedAsset(
   };
 }
 
+export function validateUploadedImage(bytes: Buffer): { extension: string; contentType: string } {
+  if (!bytes.length) throw new Error("Choose a non-empty image smaller than 8 MB.");
+  const detected = imageFileType(bytes);
+  if (!["png", "jpg", "webp"].includes(detected.extension)) {
+    throw new Error('Upload a JPEG, PNG, or WebP image.');
+  }
+  return detected;
+}
+
+export async function saveUploadedImageAsset(
+  projectId: string,
+  sceneId: string,
+  bytes: Buffer,
+): Promise<{ id: string; url: string; contentType: string }> {
+  validateUploadedImage(bytes);
+  return saveGeneratedAsset(projectId, sceneId, 'image', bytes);
+}
+
 function filenameFromAssetUrl(
   assetUrl: string,
   projectId: string,
