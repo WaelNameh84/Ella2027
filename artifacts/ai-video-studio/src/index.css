@@ -1418,3 +1418,82 @@ a[href]:active,
   .app-update-banner .btn { min-height: 38px; padding: 6px 8px; }
 }
 @media (prefers-reduced-motion: reduce) { .app-update-banner { animation: none; } }
+
+/* ── Always-on cinematic edge light across every app card ───── */
+@property --all-card-orbit-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+.panel:not(.generation-modal):not(.idea-entry-card),
+[class~="project-card"], [class~="media-card"], [class~="storyboard-card"],
+[class~="asset-version-card"], [class~="character-card"], [class~="job-card"],
+[class~="stat-card"], [class~="tool-card"], [class~="workflow-mode-card"],
+[class~="launch-card"], [class~="home-template-card"] {
+  position: relative;
+  isolation: isolate;
+  border-color: hsl(var(--accent) / .22);
+  box-shadow: var(--shadow-sm), 0 0 18px hsl(var(--accent) / .07), inset 0 1px hsl(var(--foreground) / .035);
+}
+.panel:not(.generation-modal):not(.idea-entry-card)::before,
+[class~="project-card"]::before, [class~="media-card"]::before, [class~="storyboard-card"]::before,
+[class~="asset-version-card"]::before, [class~="character-card"]::before, [class~="job-card"]::before,
+[class~="stat-card"]::before, [class~="tool-card"]::before, [class~="workflow-mode-card"]::before,
+[class~="launch-card"]::before, [class~="home-template-card"]::before {
+  content: '';
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  padding: 1.4px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: conic-gradient(from var(--all-card-orbit-angle), transparent 0deg, transparent 205deg, hsl(var(--accent) / .16) 236deg, hsl(var(--accent) / .86) 270deg, hsl(var(--primary) / .95) 296deg, hsl(var(--accent) / .82) 321deg, transparent 354deg, transparent 360deg);
+  filter: drop-shadow(0 0 3px hsl(var(--accent) / .48));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: all-card-edge-orbit 11s linear infinite;
+}
+@keyframes all-card-edge-orbit { to { --all-card-orbit-angle: 360deg; } }
+@media (hover: hover) and (pointer: fine) {
+  .panel:not(.generation-modal):not(.idea-entry-card):hover,
+  [class~="project-card"]:hover, [class~="media-card"]:hover, [class~="storyboard-card"]:hover,
+  [class~="asset-version-card"]:hover, [class~="character-card"]:hover, [class~="job-card"]:hover,
+  [class~="stat-card"]:hover, [class~="tool-card"]:hover, [class~="workflow-mode-card"]:hover,
+  [class~="launch-card"]:hover, [class~="home-template-card"]:hover {
+    border-color: hsl(var(--accent) / .48);
+    box-shadow: var(--shadow), 0 0 28px hsl(var(--accent) / .14), inset 0 1px hsl(var(--foreground) / .05);
+  }
+}
+.panel:not(.generation-modal):not(.idea-entry-card):has(button:active),
+.panel:not(.generation-modal):not(.idea-entry-card):has(a:active),
+[class~="project-card"]:has(button:active), [class~="project-card"]:has(a:active),
+[class~="media-card"]:has(button:active), [class~="media-card"]:has(a:active),
+[class~="storyboard-card"]:has(button:active), [class~="storyboard-card"]:has(a:active),
+[class~="asset-version-card"]:has(button:active), [class~="asset-version-card"]:has(a:active),
+[class~="character-card"]:has(button:active), [class~="character-card"]:has(a:active),
+[class~="job-card"]:has(button:active), [class~="job-card"]:has(a:active),
+[class~="workflow-mode-card"]:active, [class~="launch-card"]:active,
+[class~="home-template-card"]:active {
+  transform: translateY(2px) scale(.985);
+  border-color: hsl(var(--accent) / .68);
+  box-shadow: 0 3px 12px hsl(var(--accent) / .18);
+  transition-duration: 85ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  .panel:not(.generation-modal):not(.idea-entry-card)::before,
+  [class~="project-card"]::before, [class~="media-card"]::before, [class~="storyboard-card"]::before,
+  [class~="asset-version-card"]::before, [class~="character-card"]::before, [class~="job-card"]::before,
+  [class~="stat-card"]::before, [class~="tool-card"]::before, [class~="workflow-mode-card"]::before,
+  [class~="launch-card"]::before, [class~="home-template-card"]::before { animation: none; }
+  .panel:not(.generation-modal):not(.idea-entry-card):has(button:active),
+  .panel:not(.generation-modal):not(.idea-entry-card):has(a:active),
+  [class~="project-card"]:has(button:active), [class~="project-card"]:has(a:active),
+  [class~="media-card"]:has(button:active), [class~="media-card"]:has(a:active),
+  [class~="storyboard-card"]:has(button:active), [class~="storyboard-card"]:has(a:active),
+  [class~="asset-version-card"]:has(button:active), [class~="asset-version-card"]:has(a:active),
+  [class~="character-card"]:has(button:active), [class~="character-card"]:has(a:active),
+  [class~="job-card"]:has(button:active), [class~="job-card"]:has(a:active),
+  [class~="workflow-mode-card"]:active, [class~="launch-card"]:active, [class~="home-template-card"]:active { transform: none; }
+}
