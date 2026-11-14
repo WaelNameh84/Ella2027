@@ -1022,6 +1022,7 @@ body { min-height: 100dvh; }
 .studio-progress-track span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, hsl(var(--primary)), hsl(174 44% 42%)); transition: width .3s ease; }
 .studio-grid { display: grid; grid-template-columns: 248px minmax(0, 1fr) 360px; align-items: start; gap: 14px; }
 .studio-center { display: grid; gap: 14px; min-width: 0; }
+.mobile-video-cta { display: none; }
 .studio-rail { position: sticky; top: 92px; padding: 14px; }
 .studio-rail-head { margin-bottom: 10px; }
 .studio-rail-head h3 { margin-top: 3px; font-size: 15px; }
@@ -1083,6 +1084,7 @@ body { min-height: 100dvh; }
 }
 @media (max-width: 767px) {
   .studio-grid { gap: 10px; }
+  .mobile-video-cta { display: flex; width: 100%; justify-content: center; }
   .studio-rail-step { min-width: 112px; }
   .studio-tools { padding: 12px; }
   .studio-tools-head h3 { font-size: 13px; }
