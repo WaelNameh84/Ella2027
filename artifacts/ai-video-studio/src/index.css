@@ -1497,3 +1497,67 @@ a[href]:active,
   [class~="job-card"]:has(button:active), [class~="job-card"]:has(a:active),
   [class~="workflow-mode-card"]:active, [class~="launch-card"]:active, [class~="home-template-card"]:active { transform: none; }
 }
+
+/* Small tiles inside the overview's large dashboard panels */
+@property --overview-mini-orbit-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+.dashboard-journey-steps > div,
+.dashboard-operations .operations-grid > .operation-metric,
+.production-dashboard-summary > div {
+  position: relative;
+  isolation: isolate;
+  padding: .72rem .8rem;
+  border: 1px solid hsl(var(--accent) / .28);
+  border-radius: .78rem;
+  background: linear-gradient(145deg, hsl(var(--card) / .88), hsl(var(--accent) / .085));
+  box-shadow: 0 0 17px hsl(var(--accent) / .08), inset 0 1px hsl(var(--foreground) / .04);
+  transition: border-color .22s ease, box-shadow .22s ease, transform .12s ease;
+}
+.dashboard-journey-steps > div { border-inline-start: 2px solid hsl(var(--primary) / .52); }
+.dashboard-journey-steps > div::before,
+.dashboard-operations .operations-grid > .operation-metric::before,
+.production-dashboard-summary > div::before {
+  content: '';
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  padding: 1.25px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: conic-gradient(from var(--overview-mini-orbit-angle), transparent 0deg, transparent 215deg, hsl(var(--accent) / .18) 246deg, hsl(var(--accent) / .9) 278deg, white 289deg, hsl(var(--primary) / .92) 304deg, transparent 333deg, transparent 360deg);
+  filter: drop-shadow(0 0 4px hsl(var(--accent) / .68));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: overview-mini-edge-orbit 8s linear infinite;
+}
+@keyframes overview-mini-edge-orbit { to { --overview-mini-orbit-angle: 360deg; } }
+@media (hover: hover) and (pointer: fine) {
+  .dashboard-journey-steps > div:hover,
+  .dashboard-operations .operations-grid > .operation-metric:hover,
+  .production-dashboard-summary > div:hover {
+    border-color: hsl(var(--accent) / .68);
+    box-shadow: 0 0 24px hsl(var(--accent) / .18), inset 0 1px hsl(var(--foreground) / .06);
+  }
+}
+
+/* Hot white-gold highlight that travels around the film-idea card edge */
+.idea-entry-card {
+  border-color: hsl(var(--accent) / .46);
+  box-shadow: var(--shadow), 0 0 30px hsl(var(--accent) / .13), inset 0 1px hsl(var(--foreground) / .05);
+}
+.idea-entry-card::before {
+  padding: 2.2px;
+  background: conic-gradient(from var(--idea-edge-angle), transparent 0deg, transparent 258deg, hsl(var(--accent) / .16) 274deg, hsl(var(--accent) / .82) 286deg, white 294deg, hsl(var(--accent)) 301deg, hsl(var(--primary) / .92) 311deg, hsl(var(--accent) / .5) 321deg, transparent 337deg, transparent 360deg);
+  filter: drop-shadow(0 0 4px white) drop-shadow(0 0 13px hsl(var(--accent) / .9));
+  animation-duration: 5.4s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-journey-steps > div::before,
+  .dashboard-operations .operations-grid > .operation-metric::before,
+  .production-dashboard-summary > div::before { animation: none; }
+}
