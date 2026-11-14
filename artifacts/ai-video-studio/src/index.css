@@ -1593,3 +1593,19 @@ a[href]:active,
   .media-search .media-type { flex: initial; }
   .media-search .btn { grid-column: 1 / -1; }
 }
+
+/* Local production checklist inside the scene inspector */
+.scene-checklist { display: grid; gap: 10px; padding: 13px; border-color: hsl(var(--primary) / .28); }
+.scene-checklist-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.scene-checklist-heading > div { display: grid; gap: 3px; }
+.scene-checklist-heading b { font-size: 12px; }
+.scene-checklist-count { padding: 4px 8px; border: 1px solid hsl(var(--accent) / .3); border-radius: 999px; color: hsl(var(--accent)); font: 10px var(--app-font-mono); }
+.scene-checklist-items { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.scene-checklist-items button { display: flex; align-items: center; gap: 7px; min-width: 0; padding: 8px; border: 1px solid hsl(var(--border)); border-radius: 8px; background: hsl(var(--background) / .5); color: hsl(var(--foreground)); text-align: start; font-size: 10px; cursor: pointer; }
+.scene-checklist-items button > span:first-child { display: grid; place-items: center; flex: 0 0 18px; width: 18px; height: 18px; border: 1px solid hsl(var(--border)); border-radius: 50%; color: hsl(var(--primary)); }
+.scene-check-empty { width: 5px; height: 5px; border-radius: 50%; background: hsl(var(--muted-foreground) / .6); }
+.scene-checklist-items button.is-done > span:first-child { border-color: hsl(var(--primary) / .45); background: hsl(var(--primary) / .12); }
+.scene-checklist-items button small { margin-inline-start: auto; color: hsl(var(--muted-foreground)); font-size: 9px; white-space: nowrap; }
+.scene-checklist-items button.is-done small { color: hsl(var(--primary)); }
+.scene-checklist-items button:hover { border-color: hsl(var(--primary) / .48); }
+@media (max-width: 520px) { .scene-checklist-items { grid-template-columns: 1fr; } }
