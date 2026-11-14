@@ -1356,3 +1356,33 @@ a[href]:active,
   button:not(:disabled):active, a[href]:active, [role="button"]:active { transform: none; }
   .storyboard-card:has(button:active), .media-card:has(button:active), .launch-card:active, .home-template-card:active, .production-blocker:active { transform: none; }
 }
+
+/* Moving, restrained halo around the project name + idea entry card */
+@property --idea-edge-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+.idea-entry-card {
+  position: relative;
+  isolation: isolate;
+  border-color: hsl(var(--accent) / .23);
+  box-shadow: var(--shadow), 0 0 20px hsl(var(--accent) / .035), inset 0 1px hsl(var(--foreground) / .03);
+}
+.idea-entry-card::before {
+  content: '';
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  padding: 1.25px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: conic-gradient(from var(--idea-edge-angle), transparent 0deg, transparent 263deg, hsl(var(--accent) / .08) 280deg, hsl(var(--accent) / .72) 300deg, hsl(var(--primary) / .52) 317deg, transparent 338deg, transparent 360deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: idea-edge-orbit 8s linear infinite;
+}
+@keyframes idea-edge-orbit { to { --idea-edge-angle: 360deg; } }
+@media (prefers-reduced-motion: reduce) { .idea-entry-card::before { animation: none; } }
