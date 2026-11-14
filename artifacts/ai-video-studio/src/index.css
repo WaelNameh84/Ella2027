@@ -1386,3 +1386,35 @@ a[href]:active,
 }
 @keyframes idea-edge-orbit { to { --idea-edge-angle: 360deg; } }
 @media (prefers-reduced-motion: reduce) { .idea-entry-card::before { animation: none; } }
+
+/* A safe, explicit refresh prompt when a newer Render build is detected */
+.app-update-banner {
+  position: fixed;
+  z-index: 120;
+  inset-inline: max(12px, env(safe-area-inset-left)) max(12px, env(safe-area-inset-right));
+  inset-block-start: max(12px, env(safe-area-inset-top));
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: min(620px, calc(100% - 24px));
+  margin-inline: auto;
+  padding: 11px 13px;
+  border: 1px solid hsl(var(--primary) / .38);
+  border-radius: 13px;
+  background: hsl(var(--card) / .97);
+  color: hsl(var(--foreground));
+  box-shadow: 0 12px 42px hsl(0 0% 0% / .3), 0 0 24px hsl(var(--primary) / .09);
+  backdrop-filter: blur(14px);
+  animation: page-in .22s ease both;
+}
+.app-update-banner > span { display: grid; gap: 3px; flex: 1; min-width: 0; }
+.app-update-banner b { font-size: 12px; }
+.app-update-banner small { color: hsl(var(--muted-foreground)); font-size: 10px; line-height: 1.45; }
+.app-update-banner .btn { min-height: 36px; padding: 7px 11px; font-size: 10px; }
+.app-update-dismiss { display: grid; place-items: center; width: 30px; height: 30px; flex: 0 0 auto; border: 0; border-radius: 8px; background: transparent; color: hsl(var(--muted-foreground)); font-size: 20px; cursor: pointer; }
+.app-update-dismiss:hover { background: hsl(var(--muted)); color: hsl(var(--foreground)); }
+@media (max-width: 480px) {
+  .app-update-banner { gap: 7px; padding: 9px; }
+  .app-update-banner .btn { min-height: 38px; padding: 6px 8px; }
+}
+@media (prefers-reduced-motion: reduce) { .app-update-banner { animation: none; } }

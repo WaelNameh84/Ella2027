@@ -71,9 +71,13 @@ app.use((req, res, next) => {
     return;
   }
 
-  res.sendFile(path.join(frontendDistPath, "index.html"), (error) => {
-    if (error) next(error);
-  });
+  res.sendFile(
+    path.join(frontendDistPath, "index.html"),
+    { headers: { "Cache-Control": "no-cache, must-revalidate" } },
+    (error) => {
+      if (error) next(error);
+    },
+  );
 });
 
 export default app;

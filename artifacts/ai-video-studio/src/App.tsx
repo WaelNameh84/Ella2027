@@ -2079,12 +2079,61 @@ function ClerkCacheInvalidator() {
   useEffect(()=>addListener(({user})=>{const id=user?.id??null;if(previous.current!==undefined&&previous.current!==id)qc.clear();previous.current=id}),[addListener,qc]);
   return null;
 }
+function AppUpdateNotice() {
+  const { lang } = useApp();
+  const [updateAvailable, setUpdateAvailable] = useState(false);
+  useEffect(() => {
+    if (import.meta.env.DEV) return;
+    let lastCheckedAt = 0;
+    let stopped = false;
+    const currentAssetSignature = () => {
+      const script = document.querySelector<HTMLScriptElement>('script[type="module"][src]')?.getAttribute('src') || '';
+      const style = document.querySelector<HTMLLinkElement>('link[rel="stylesheet"][href]')?.getAttribute('href') || '';
+      return `${script}|${style}`;
+    };
+    const currentSignature = currentAssetSignature();
+    const checkForUpdate = async () => {
+      if (stopped || document.visibilityState !== 'visible' || Date.now() - lastCheckedAt < 30_000) return;
+      lastCheckedAt = Date.now();
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.set('__ella_build_check', String(lastCheckedAt));
+        const response = await fetch(url.toString(), { cache: 'no-store', headers: { Accept: 'text/html' } });
+        if (!response.ok) return;
+        const html = await response.text();
+        const parsed = new DOMParser().parseFromString(html, 'text/html');
+        const script = parsed.querySelector<HTMLScriptElement>('script[type="module"][src]')?.getAttribute('src') || '';
+        const style = parsed.querySelector<HTMLLinkElement>('link[rel="stylesheet"][href]')?.getAttribute('href') || '';
+        if (!stopped && script && `${script}|${style}` !== currentSignature) setUpdateAvailable(true);
+      } catch {
+        // Updates are checked again on the next resume; a temporary network failure is non-blocking.
+      }
+    };
+    void checkForUpdate();
+    const handleVisible = () => { if (document.visibilityState === 'visible') void checkForUpdate(); };
+    const interval = window.setInterval(handleVisible, 120_000);
+    window.addEventListener('focus', handleVisible);
+    document.addEventListener('visibilitychange', handleVisible);
+    return () => {
+      stopped = true;
+      window.clearInterval(interval);
+      window.removeEventListener('focus', handleVisible);
+      document.removeEventListener('visibilitychange', handleVisible);
+    };
+  }, []);
+  if (!updateAvailable) return null;
+  return <aside className="app-update-banner" role="status" aria-live="polite">
+    <span><b>{tx(lang, 'تحديث جديد جاهز', 'A new update is ready')}</b><small>{tx(lang, 'حدّث التطبيق لرؤية آخر نسخة. لن نعيد تحميله قبل ضغطك.', 'Refresh to get the latest version. The app will not reload until you choose.')}</small></span>
+    <button type="button" className="btn btn-primary" onClick={() => window.location.reload()}>{tx(lang, 'تحديث الآن', 'Update now')}</button>
+    <button type="button" className="app-update-dismiss" aria-label={tx(lang, 'إغلاق', 'Dismiss')} onClick={() => setUpdateAvailable(false)}>×</button>
+  </aside>;
+}
 function Router() {
   const [location,setLocation]=useLocation();
   return <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl} appearance={appearance} signInUrl={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`}
     localization={{signIn:{start:{title:'مرحبًا بعودتك',subtitle:'سجّل الدخول إلى مساحة إنتاجك'}},signUp:{start:{title:'ابدأ مساحة إنتاجك',subtitle:'أنشئ حسابك وابدأ بتحويل أفكارك إلى مشاهد'}}}}
     routerPush={to=>setLocation(stripBase(to))} routerReplace={to=>setLocation(stripBase(to),{replace:true})}>
-    <QueryClientProvider client={queryClient}><ThemeLanguageProvider><ClerkCacheInvalidator/>
+    <QueryClientProvider client={queryClient}><ThemeLanguageProvider><ClerkCacheInvalidator/><AppUpdateNotice/>
       <Switch>
         <Route path="/" component={HomeRedirect}/>
         <Route path="/sign-in/*?" component={SignInPage}/>
