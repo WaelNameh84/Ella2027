@@ -1959,9 +1959,9 @@ function ProvidersPage() {
     lang={lang}/>;
   useEffect(()=>{if(settingsQ.data)setPrefs(settingsQ.data)},[settingsQ.data]);
   return <AppFrame title={tx(lang,'مزوّدو الخدمة','Provider settings')} crumb="CREDENTIALS & ROTATION">
-    <div className="page-toolbar"><div><span className="eyebrow">{tx(lang,'المفاتيح والاعتمادية','KEYS & RELIABILITY')}</span><h2>{tx(lang,'أدواتك، تحت سيطرتك.', 'Your tools, on your terms.')}</h2><p>{tx(lang,'المفاتيح لا تظهر مجددًا بعد حفظها؛ تُرسل للخادم مباشرة ولا تُخزّن في المتصفح. كل مفتاح يظهر تحت نوع الخدمة المخصص له.', 'Keys are never shown again after saving. They are sent directly to the server and never stored in browser storage. Each key appears under its assigned service.')}</p></div><button className="btn btn-primary" onClick={()=>openAdd('text')} data-testid="button-add-provider"><Plus size={16}/>{tx(lang,'إضافة مفتاح','Add a key')}</button></div>
+    <div className="page-toolbar"><div><span className="eyebrow">{tx(lang,'المفاتيح والاعتمادية','KEYS & RELIABILITY')}</span><h2>{tx(lang,'أدواتك، تحت سيطرتك.', 'Your tools, on your terms.')}</h2><p>{tx(lang,'المفاتيح المحفوظة لا تظهر مجددًا وتُرسل للخادم مباشرة. خدمات AI Horde وPiper لا تُسجّل كمفاتيح API؛ ستجدهما مدمجتين تحت قسمي الصور والصوت.', 'Saved keys are never shown again and are sent directly to the server. AI Horde and Piper do not create API-key records; find them as built-in services under Image and Voice.')}</p></div><button className="btn btn-primary" onClick={()=>openAdd('text')} data-testid="button-add-provider"><Plus size={16}/>{tx(lang,'إضافة مفتاح','Add a key')}</button></div>
     <div className="resource-notice panel"><ShieldCheck size={18}/><p>{tx(lang,'أضفنا NVIDIA NIM وCohere للكتابة بمستويات تجريبية مجانية وحدود استخدام. توليد الفيديو ليس مجانياً عبر واجهات API المستضافة؛ مزوّدا fal.ai وReplicate قد يحاسبان حسب النموذج، ويظل كل طلب فيديو خلف موافقتك الصريحة.', 'NVIDIA NIM and Cohere are available for script writing with free prototype/trial limits. Hosted video-generation APIs are not free: fal.ai and Replicate may charge by model, and every video request remains behind your explicit approval.')}</p></div>
-    <div className={`resource-notice panel ${prefs?.freeMode !== false ? 'is-unavailable' : ''}`} role="status"><ShieldCheck size={18}/><p>{prefs?.freeMode !== false ? tx(lang,'المزوّدات الخارجية متوقفة حاليًا. يمكنك تشغيلها من المفتاح أدناه عند إضافة مفاتيحك؛ وسيظل كل طلب محتمل الرسوم بحاجة إلى موافقتك.','External providers are currently off. You can enable them using the control below after adding keys; each request that may incur charges still needs your approval.') : tx(lang,'المزوّدات الخارجية مسموحة. قد يستهلك استخدامها رصيدًا أو يسبب رسومًا، لكن التطبيق سيطلب موافقتك قبل كل مهمة مولّدة.','External providers are enabled. They may use credits or incur charges, but the app asks before every generation job.')}</p></div>
+    <div className={`resource-notice panel ${prefs?.freeMode !== false ? 'is-unavailable' : ''}`} role="status"><ShieldCheck size={18}/><p>{prefs?.freeMode !== false ? tx(lang,'المزوّدات المدفوعة متوقفة؛ تبقى AI Horde للصور وPiper للصوت متاحتين بلا مفتاح شخصي. لتشغيل مزوّد مدفوع، فعّله أدناه بعد إضافة مفتاحه. وستظل موافقتك مطلوبة قبل كل طلب قد يكلّف.','Paid external providers are off; built-in AI Horde images and Piper narration remain available without a personal key. Add and enable a paid provider below only if you choose, and approve every potentially chargeable request.') : tx(lang,'المزوّدات الخارجية مسموحة. قد يستهلك استخدامها رصيدًا أو يسبب رسومًا، لكن التطبيق سيطلب موافقتك قبل كل مهمة مولّدة.','External providers are enabled. They may use credits or incur charges, but the app asks before every generation job.')}</p></div>
     {keys.isError&&<StateError lang={lang} retry={()=>keys.refetch()} />}
     <div className="provider-category-list grid gap-3">
       {serviceSections.map(section=>{
@@ -1969,7 +1969,7 @@ function ProvidersPage() {
         return <section className="panel provider-list" key={section.value} data-testid={`provider-section-${section.value}`}>
           <div className="section-heading"><div><span className="eyebrow">{tx(lang,'قسم المفاتيح','KEY CATEGORY')}</span><h3>{section.label}</h3></div><div className="flex items-center gap-3"><span className="result-count">{sectionKeys.length} {tx(lang,'مفاتيح','keys')}</span><button className="btn btn-quiet" onClick={()=>openAdd(section.value,true)}><Plus size={15}/>{tx(lang,'إضافة لهذا القسم','Add to section')}</button></div></div>
           {keys.isLoading?<div className="provider-rows">{[1,2].map(n=><SkeletonBlock key={n} className="h-20"/>)}</div>
-            :sectionKeys.length?<div className="provider-rows">{sectionKeys.map(renderProviderRow)}</div>
+            :sectionKeys.length||section.value==='image'||section.value==='voice'?<div className="provider-rows">{sectionKeys.map(renderProviderRow)}{section.value==='image'&&<BuiltInProviderRow kind="image" lang={lang}/ >}{section.value==='voice'&&<BuiltInProviderRow kind="voice" lang={lang}/>}</div>
             :<p className="provider-purpose-description">{tx(lang,'لا توجد مفاتيح في هذا القسم بعد.','No keys in this section yet.')}</p>}
         </section>;
       })}
@@ -1989,6 +1989,19 @@ function ProvidersPage() {
     {dialog && <ProviderForm initial={editing} initialService={initialService} restrictToSection={!editing&&restrictToSection} onClose={()=>setDialog(false)} pending={create.isPending||update.isPending} onSave={data=>{if(editing){const {apiKey,...safe}=data;update.mutate({keyId:editing.id,data:{...safe,...(apiKey?{apiKey}:{})}},{onSuccess:()=>{invalidate();setDialog(false)}})}else create.mutate({data},{onSuccess:()=>{invalidate();setDialog(false)}})}} />}
   </AppFrame>;
 }
+function BuiltInProviderRow({kind,lang}:{kind:'image'|'voice';lang:Lang}) {
+  const isImage=kind==='image';
+  const name=isImage?tx(lang,'AI Horde — صور مجهولة','AI Horde — anonymous images'):tx(lang,'Piper — صوت عربي محلي','Piper — local Arabic voice');
+  const service=isImage?tx(lang,'توليد الصور','Image generation'):tx(lang,'التعليق الصوتي','Voice narration');
+  const details=isImage?tx(lang,'لا يحتاج مفتاح API. اختره من نافذة توليد الصورة في المشهد. الطلبات المجهولة منخفضة الأولوية وقد تنتظر؛ ويُشارك الوصف والصورة مع LAION بعد موافقتك في نافذة التوليد.','No API key required. Select it in a scene’s image-generation dialog. Anonymous requests have low priority and may wait; the prompt and image are shared with LAION after your consent in the dialog.'):tx(lang,'صوت عربي أردني محلي بلا مفتاح API. أول استخدام يجهّز محرك Piper وينزّل نموذجًا صوتيًا (نحو 61 MB) إلى الخادم؛ يحتاج Python 3 واتصال HTTPS ومساحة كافية.','Local Jordanian Arabic voice with no API key. First use prepares Piper and downloads a voice model (about 61 MB) to the server; Python 3, outbound HTTPS, and sufficient disk space are required.');
+  return <article className="provider-row builtin-provider-row" data-testid={`builtin-provider-${kind}`}>
+    <div className="provider-avatar">{isImage?<ImagePlus size={17}/>:<AudioLines size={17}/>}</div>
+    <div className="provider-ident"><b>{name}</b><span>{isImage?'ai-horde':'piper-local'}</span><span className="provider-purpose">{service}</span><small className="provider-purpose-description">{details}</small></div>
+    <span className="key-status valid">{tx(lang,'بلا مفتاح','No key required')}</span>
+    <div className="provider-actions"><Link className="btn btn-quiet" href="/projects">{tx(lang,'فتح المشاريع','Open projects')}<ArrowLeft size={14}/></Link></div>
+  </article>;
+}
+
 function ProviderRow({item,onEdit,onToggle,onPriority,onTest,onDelete,testing,freeMode,lang}:{item:ProviderKey;onEdit:()=>void;onToggle:(v:boolean)=>void;onPriority:(v:number)=>void;onTest:()=>void;onDelete:()=>void;testing:boolean;freeMode:boolean;lang:Lang}) {
   const officialUrl=providerOfficialUrls[item.provider];
   const testedAt=item.lastTestAt?new Date(item.lastTestAt).toLocaleString(lang==='ar'?'ar':'en') : tx(lang,'لم يُختبر بعد','Not tested yet');

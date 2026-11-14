@@ -636,6 +636,9 @@ body { min-height: 100dvh; }
 .provider-list, .rotation-panel { padding: 19px; margin-bottom: 16px; }
 .provider-rows { display: grid; }
 .provider-row { display: grid; grid-template-columns: 36px minmax(110px,1fr) auto 90px 44px auto; align-items: center; gap: 12px; padding: 13px 0; border-top: 1px solid hsl(var(--border)); }
+.provider-row.builtin-provider-row { grid-template-columns: 36px minmax(110px,1fr) auto auto; }
+.builtin-provider-row .provider-ident { align-self: start; }
+.builtin-provider-row .provider-purpose-description { line-height: 1.55; }
 .provider-avatar { display: grid; place-items: center; width: 35px; height: 35px; border-radius: 10px; background: hsl(var(--secondary)); color: hsl(var(--primary)); font: 11px var(--app-font-mono); }
 .provider-ident { display: grid; gap: 3px; }
 .provider-ident b { font-size: 12px; }
