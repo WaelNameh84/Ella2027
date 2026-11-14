@@ -63,6 +63,7 @@ type JobInput = {
   sceneCount?: number;
   sceneDurationSeconds?: number;
   sceneStyle?: string;
+  story?: string;
 };
 
 function parseGeneratedJson(text: string): ScriptResult {
@@ -374,7 +375,7 @@ async function processScriptJob(job: typeof studioJobsTable.$inferSelect): Promi
     const prompt = [
       "Analyze the premise and create a production-ready film script, character bible, and storyboard. Return only valid JSON with this shape:",
       '{"characters":[{"id":"character-1","name":"...","description":"fixed visual identity","costume":"fixed costume","voiceDescription":"..."}],"scenes":[{"title":"...","description":"...","imagePrompt":"...","narration":"...","durationSeconds":8,"shotType":"wide","cameraMovement":"slow push-in","location":"...","lighting":"...","characterIds":["character-1"]}]}',
-      `Concept: ${project.idea}`,
+      `Concept: ${input.story?.trim() || project.idea}`,
       `Video type: ${project.videoType}`,
       `Language: ${project.language}`,
       `Audience: ${project.audience}`,
@@ -384,7 +385,9 @@ async function processScriptJob(job: typeof studioJobsTable.$inferSelect): Promi
       `Scene direction: ${input.sceneStyle ?? (project.visualStyle || "Cinematic")}`,
       `Target duration: ${project.durationSeconds} seconds`,
       `Return exactly ${input.sceneCount ?? 6} scenes. Set durationSeconds to exactly ${input.sceneDurationSeconds ?? 8} for every scene.`,
-      "Use 1 to 24 scenes. Create 1 to 8 recurring character profiles, and refer to them by their stable IDs. Keep each character's face, age, hair, body, costume, palette, and environment consistent across every scene. Make each image prompt include only the relevant character profile details, shot size, camera movement, lens feel, location, lighting, and composition. Write narration in the selected language and keep scene durations close to the target total.",
+      input.story?.trim()
+        ? "Treat the Concept as a complete source story. Preserve the main events, order, tone, characters, relationships, and ending. Divide it into the exact requested number of scenes without changing the plot. Enrich each scene with detailed action, setting, character continuity, cinematic direction, and dialogue. Put complete speaker-labeled dialogue plus any narrator voiceover in the narration field, and include suitable sound-effect suggestions in the scene description. Return the fixed character bible so the same characters remain consistent across all scenes."
+        : "Use 1 to 24 scenes. Create 1 to 8 recurring character profiles, and refer to them by their stable IDs. Keep each character's face, age, hair, body, costume, palette, and environment consistent across every scene. Make each image prompt include only the relevant character profile details, shot size, camera movement, lens feel, location, lighting, and composition. Write narration in the selected language and keep scene durations close to the target total.",
     ].join("\n");
 
     let lastError = "All configured providers failed.";

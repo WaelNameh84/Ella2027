@@ -605,6 +605,11 @@ export interface ScriptGenerationInput {
      * @maxLength 200
      */
   sceneStyle?: string;
+  /**
+     * @minLength 1
+     * @maxLength 30000
+     */
+  story?: string;
 }
 
 export type SceneImageGenerationInputOutputs = typeof SceneImageGenerationInputOutputs[keyof typeof SceneImageGenerationInputOutputs];

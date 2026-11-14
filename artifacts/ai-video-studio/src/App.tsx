@@ -604,7 +604,7 @@ function ManualSceneImagePicker({sceneNumber,file,disabled,lang,onChange,onError
     {file&&<button type="button" className="btn btn-quiet manual-scene-image-remove" disabled={disabled} onClick={()=>{onChange(null);onError('');}}><Trash2 size={14}/>{tx(lang,'إزالة الصورة','Remove image')}</button>}
   </div>;
 }
-function ProjectForm({ onClose, initial, initialMode = 'auto', initialTemplateId = '', onSave, pending, freeMode = true, textProviderReady = false, checkingProvider = false, generationError = false, projectCreated = false, onOpenCreated, inline = false }: { onClose: () => void; initial?: Partial<ProjectInput>; initialTemplateId?: string; onSave: (data: ProjectInput, approvePotentialCharges?: boolean, templateId?: string, mode?: 'auto' | 'manual', sceneCount?: number, sceneDurationSeconds?: number, allowExternalProviders?: boolean, manualScenes?: ManualSceneDraft[]) => void | Promise<void>; pending: boolean; freeMode?: boolean; textProviderReady?: boolean; checkingProvider?: boolean; generationError?: boolean; projectCreated?: boolean; onOpenCreated?: () => void; initialMode?: 'auto' | 'manual'; inline?: boolean }) {
+function ProjectForm({ onClose, initial, initialMode = 'auto', initialTemplateId = '', onSave, pending, freeMode = true, textProviderReady = false, checkingProvider = false, generationError = false, projectCreated = false, onOpenCreated, inline = false }: { onClose: () => void; initial?: Partial<ProjectInput>; initialTemplateId?: string; onSave: (data: ProjectInput, approvePotentialCharges?: boolean, templateId?: string, mode?: 'auto' | 'manual', sceneCount?: number, sceneDurationSeconds?: number, allowExternalProviders?: boolean, manualScenes?: ManualSceneDraft[], manualFullStory?: string, splitManualStory?: boolean) => void | Promise<void>; pending: boolean; freeMode?: boolean; textProviderReady?: boolean; checkingProvider?: boolean; generationError?: boolean; projectCreated?: boolean; onOpenCreated?: () => void; initialMode?: 'auto' | 'manual'; inline?: boolean }) {
   const { lang } = useApp();
   const initialPreset = projectTemplates.find(item => item.id === initialTemplateId);
   const [form, setForm] = useState<ProjectInput>(() => ({ ...blankProject, language: lang, ...initial, ...(initialPreset ? { videoType: initialPreset.videoType, aspectRatio: initialPreset.aspectRatio, visualStyle: initialPreset.visualStyle, audience: lang === 'ar' ? 'الجمهور العام' : initialPreset.audience } : {}) }));
@@ -616,6 +616,8 @@ function ProjectForm({ onClose, initial, initialMode = 'auto', initialTemplateId
   const [sceneCount, setSceneCount] = useState(5);
   const [sceneDurationSeconds, setSceneDurationSeconds] = useState(() => initialPreset ? Math.max(1, Math.round(initialPreset.durationSeconds / 5)) : 8);
   const [manualScenes, setManualScenes] = useState<ManualSceneDraft[]>(() => Array.from({ length: 5 }, (_, index) => blankManualScene(index, lang)));
+  const [manualFullStory, setManualFullStory] = useState('');
+  const [splitManualStory, setSplitManualStory] = useState(false);
   const [allowExternalProviders, setAllowExternalProviders] = useState(!freeMode);
   const [submitError, setSubmitError] = useState('');
   const [plan, setPlan] = useState<FilmPlan | null>(null);
@@ -641,8 +643,8 @@ function ProjectForm({ onClose, initial, initialMode = 'auto', initialTemplateId
   const quickSceneDuration = Math.max(1, Math.floor(Math.max(5, form.durationSeconds) / quickSceneCount));
   const quickPlannedDuration = quickSceneCount * quickSceneDuration;
   const makePlan = () => buildFilmPlan({ idea: form.idea, videoType: form.videoType, sceneCount: experienceMode === 'quick' ? quickSceneCount : sceneCount, sceneDurationSeconds: experienceMode === 'quick' ? quickSceneDuration : sceneDurationSeconds, visualStyle: form.visualStyle || selectedTemplate?.visualStyle, lang, providerReady: Boolean(allowExternalProviders && textProviderReady) });
-  const submit = async (planConfirmed = false) => {
-    const idea = form.idea.trim();
+  const submit = async (planConfirmed = false, splitStory = splitManualStory) => {
+    const idea = (splitStory && manualFullStory.trim() ? manualFullStory.trim().slice(0, 12000) : form.idea.trim());
     const firstLine = idea.split(/\r?\n/, 1)[0]?.trim() || idea;
     const firstSentence = firstLine.split(/[.!؟?]/, 1)[0]?.trim() || firstLine;
     const title = firstSentence.length > 72 ? `${firstSentence.slice(0, 71).trimEnd()}…` : firstSentence;
@@ -667,7 +669,7 @@ function ProjectForm({ onClose, initial, initialMode = 'auto', initialTemplateId
     }
     try {
       const useTextProvider = !editing && mode === 'auto' && !selectedTemplate && allowExternalProviders && textProviderReady;
-      await onSave(payload, useTextProvider && approvePotentialCharges, !editing ? selectedTemplate?.id : undefined, mode, effectiveSceneCount, effectiveSceneDuration, !editing && mode === 'auto' ? allowExternalProviders : undefined, mode === 'manual' ? manualScenes : undefined);
+      await onSave(payload, useTextProvider && approvePotentialCharges || splitStory && approvePotentialCharges, !editing ? selectedTemplate?.id : undefined, mode, effectiveSceneCount, effectiveSceneDuration, !editing && (mode === 'auto' || splitStory) ? allowExternalProviders : undefined, mode === 'manual' ? manualScenes : undefined, splitStory ? manualFullStory.trim() : undefined, splitStory);
       setSubmitError('');
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : tx(lang, 'تعذر حفظ إعدادات المشروع.', 'Could not save project settings.'));
@@ -687,8 +689,9 @@ function ProjectForm({ onClose, initial, initialMode = 'auto', initialTemplateId
   const minSceneDuration = Math.ceil(5 / sceneCount);
   const maxSceneDuration = Math.floor(3600 / sceneCount);
   const manualScenesReady = manualScenes.length === sceneCount && manualScenes.every(scene => Boolean(scene.description.trim()));
+  const manualStoryReady = manualFullStory.trim().length >= 20 && allowExternalProviders && textProviderReady && approvePotentialCharges;
   const retryingStory = projectCreated && mode === 'auto' && useTextProvider && generationError;
-  const canSubmit = editing || (retryingStory && approvePotentialCharges) || (!projectCreated && Boolean((experienceMode === 'quick' || mode === 'auto' ? form.idea.trim() : form.title.trim())) && (experienceMode === 'quick' || mode !== 'manual' || manualScenesReady) && (!useTextProvider || approvePotentialCharges));
+  const canSubmit = editing || (retryingStory && approvePotentialCharges) || (!projectCreated && Boolean((experienceMode === 'quick' || mode === 'auto' ? form.idea.trim() : form.title.trim())) && (experienceMode === 'quick' || mode !== 'manual' || manualScenesReady || manualStoryReady) && (!useTextProvider || approvePotentialCharges));
   const submitLabel = editing ? tx(lang,'حفظ التعديلات','Save changes') : pending ? projectCreated ? tx(lang,'جارٍ إنشاء السيناريو…','Creating story…') : tx(lang,'جارٍ إنشاء المشروع…','Creating project…') : experienceMode === 'quick' ? generationError ? tx(lang,'إعادة المحاولة','Retry') : tx(lang,'تحليل الفكرة','Analyze idea') : mode === 'manual' ? tx(lang,'أنشئ المشروع والمشاهد','Create project and scenes') : useTextProvider ? generationError ? tx(lang,'إعادة محاولة التأليف','Retry story generation') : tx(lang,'اكتب القصة','Write the story') : tx(lang,'أنشئ المشاهد تلقائيًا','Create scenes automatically');
   const submitButton = <button type="submit" disabled={pending || !canSubmit} className="btn btn-primary" data-testid="button-create-project">{pending ? <LoaderCircle className="animate-spin" size={16}/> : editing ? <Check size={16}/> : <WandSparkles size={16}/ >}{submitLabel}</button>;
   return <Modal inline={inline} className="idea-entry-card" onClose={onClose} title={editing ? tx(lang,'تعديل تفاصيل المشروع','Edit project details') : tx(lang, 'فكرتك إلى قصة', 'Turn your idea into a story')} subtitle={editing ? tx(lang, 'عدّل تفاصيل المشروع ومشاهده.', 'Update the project details.') : tx(lang, 'اكتب فكرة قصيرة، ثم اختر المسار السريع أو تحكم بالمشاهد في الوضع الاحترافي.', 'Describe your idea, then choose the quick path or control each scene in Professional mode.')}>
@@ -726,6 +729,16 @@ function ProjectForm({ onClose, initial, initialMode = 'auto', initialTemplateId
           <div className="form-two"><label><span className="field-label">{tx(lang,'عدد المشاهد','Number of scenes')}</span><input type="number" min="1" max="24" step="1" className="studio-input" value={sceneCount} onChange={e => { const next = Math.max(1, Math.min(24, Number(e.target.value) || 1)); setSceneCount(next); setSceneDurationSeconds(value => Math.min(Math.floor(3600 / next), Math.max(Math.ceil(5 / next), value))); }} data-testid="input-manual-scene-count" /></label><label><span className="field-label">{tx(lang,'مدة كل مشهد بالثواني','Seconds per scene')}</span><input type="number" min={minSceneDuration} max={maxSceneDuration} step="1" className="studio-input" value={sceneDurationSeconds} onChange={e => setSceneDurationSeconds(Math.max(minSceneDuration, Math.min(maxSceneDuration, Number(e.target.value) || minSceneDuration)))} data-testid="input-manual-scene-duration" /></label></div>
           <div className="form-two"><label><span className="field-label">{tx(lang,'نسبة أبعاد الفيديو','Video aspect ratio')}</span><select className="studio-input" value={form.aspectRatio} onChange={e => update('aspectRatio', e.target.value)}><option>16:9</option><option>9:16</option><option>1:1</option><option>4:5</option></select></label><div className="service-purpose-hint"><b>{tx(lang,'المدة الإجمالية','Total duration')}</b><span>{tx(lang,`${sceneCount * sceneDurationSeconds} ثانية محفوظة مع المشروع`,`${sceneCount * sceneDurationSeconds} seconds saved with the project`)}</span></div></div>
           <label><span className="field-label">{tx(lang,'ملخص القصة (اختياري)','Story summary (optional)')}</span><textarea maxLength={12000} rows={3} className="studio-input resize-y" value={form.idea} onChange={e => update('idea', e.target.value)} placeholder={tx(lang,'أضف ملخصًا يساعدك أثناء كتابة المشاهد…','Add an optional summary to guide your scene writing…')} data-testid="input-manual-story-summary" /></label>
+          <section className="manual-story-split-panel panel" aria-label={tx(lang, 'تقسيم القصة الكاملة إلى مشاهد', 'Split complete story into scenes')}>
+            <div className="section-heading"><div><span className="eyebrow">AI STORY SPLITTER</span><h3>{tx(lang, 'تقسيم القصة الكاملة إلى مشاهد تلقائياً', 'Split a complete story into scenes')}</h3></div><span className="small-mono">{sceneCount} {tx(lang, 'مشاهد', 'scenes')}</span></div>
+            <p className="generation-note">{tx(lang, 'اكتب الفيلم كاملًا هنا. سيُرسل طلبًا واحدًا إلى مزوّد النص الحالي، ويحافظ على الأحداث والشخصيات ثم يملأ نفس مشاهد التوليد اليدوي.','Write the complete film here. One request goes to the current text provider, preserving events and characters while filling the same manual-generation scenes.')}</p>
+            <textarea maxLength={30000} rows={7} className="studio-input resize-y" value={manualFullStory} disabled={projectCreated || pending} onChange={e => { setManualFullStory(e.target.value); setSplitManualStory(false); }} placeholder={tx(lang,'من البداية إلى النهاية: الأحداث، الشخصيات، الحوار، والنهاية…','From beginning to end: events, characters, dialogue, and ending…')} data-testid="input-manual-full-story" />
+            <label className="rotation-row"><span><b>{tx(lang,'السماح بمزوّد كتابة لتقسيم القصة','Allow a writing provider to split the story')}</b><small>{tx(lang,'لا يُرسل النص قبل موافقتك. يُستخدم نفس المزوّد الحالي ولا يُرسل طلبًا لكل مشهد.','The story is not sent before approval. The current provider is used once; no request is sent per scene.')}</small></span><input type="checkbox" checked={allowExternalProviders} disabled={pending || projectCreated} onChange={e => setAllowExternalProviders(e.target.checked)} /></label>
+            {allowExternalProviders && !checkingProvider && !textProviderReady && <div className="service-purpose-hint is-unavailable"><b>{tx(lang,'لا يوجد مزوّد كتابة جاهز','No writing provider is ready')}</b><span>{tx(lang,'أضف أو فعّل مفتاح مزوّد النص من الإعدادات أولًا.','Add or enable a text provider key in Settings first.')}</span><Link href="/settings/providers" className="text-link">{tx(lang,'إعداد المزوّدات','Set up providers')}<ArrowLeft size={14}/></Link></div>}
+            {allowExternalProviders && textProviderReady && <label className="checkline charge-consent"><input type="checkbox" checked={approvePotentialCharges} disabled={projectCreated} onChange={e => setApprovePotentialCharges(e.target.checked)} />{tx(lang,'أوافق على إرسال القصة إلى مزوّد النص الحالي؛ قد تُحتسب رسوم حسب خطتي.','I approve sending the story to the current text provider; charges may apply according to my plan.')}</label>}
+            <button type="button" className="btn btn-primary" disabled={pending || projectCreated || !manualStoryReady} onClick={() => { setSplitManualStory(true); void submit(false, true); }} data-testid="button-split-manual-story"><WandSparkles size={16}/>{tx(lang,'تقسيم القصة إلى مشاهد','Split story into scenes')}</button>
+            {manualFullStory.trim().length > 0 && manualFullStory.trim().length < 20 && <p className="inline-error">{tx(lang,'أدخل قصة أطول قليلاً حتى يمكن تقسيمها بشكل مفيد.','Enter a longer story so it can be split meaningfully.')}</p>}
+          </section>
           <section className="manual-scene-drafts" aria-label={tx(lang, 'مسودات المشاهد اليدوية', 'Manual scene drafts')}>
             <div className="section-heading"><div><span className="eyebrow">SCENE DRAFTS</span><h3>{tx(lang, 'اكتب المشاهد قبل الإنشاء', 'Write scenes before creating')}</h3></div><span className="small-mono">{sceneCount} {tx(lang, 'مشاهد', 'scenes')}</span></div>
             <p className="generation-note">{tx(lang, 'هذه الحقول تُحفظ مباشرة في المشاهد ولا تُرسل إلى أي مزوّد كتابة. يمكنك تعديل كل التفاصيل لاحقًا من المحرر.', 'These fields are saved directly into the scenes and are never sent to a writing provider. You can edit every detail later in the workspace.')}</p>
@@ -900,7 +913,7 @@ function Projects({ homePage = false }: { homePage?: boolean }) {
       setBackupImporting(false);
     }
   };
-  const startStory = (projectId: string, sceneCount: number, sceneDurationSeconds: number, sceneStyle: string) => generate.mutate({ projectId, data: { providerKeyId: null, allowRotation: false, approvePotentialCharges: true, sceneCount, sceneDurationSeconds, sceneStyle } }, {
+  const startStory = (projectId: string, sceneCount: number, sceneDurationSeconds: number, sceneStyle: string, story?: string) => generate.mutate({ projectId, data: { providerKeyId: null, allowRotation: false, approvePotentialCharges: true, sceneCount, sceneDurationSeconds, sceneStyle, ...(story ? { story } : {}) } }, {
     onSuccess: () => {
       afterChange();
       setOpen(false);
@@ -918,7 +931,7 @@ function Projects({ homePage = false }: { homePage?: boolean }) {
     const result = await response.json().catch(() => ({})) as { error?: string };
     if (!response.ok) throw new Error(result.error || tx(lang, 'تعذر رفع صورة المشهد.', 'Could not upload the scene image.'));
   };
-  const saveProjectAndWriteStory = async (data: ProjectInput, approvePotentialCharges = false, templateId?: string, mode: 'auto' | 'manual' = 'auto', sceneCount = 5, sceneDurationSeconds = 8, allowExternalProviders?: boolean, manualScenes?: ManualSceneDraft[]) => {
+  const saveProjectAndWriteStory = async (data: ProjectInput, approvePotentialCharges = false, templateId?: string, mode: 'auto' | 'manual' = 'auto', sceneCount = 5, sceneDurationSeconds = 8, allowExternalProviders?: boolean, manualScenes?: ManualSceneDraft[], manualFullStory?: string, splitManualStory = false) => {
     if (createdProjectId) {
       if (!approvePotentialCharges || allowExternalProviders !== true) throw new Error(tx(lang, 'أكّد السماح بالمزوّدات والموافقة على الرسوم المحتملة قبل إعادة المحاولة.', 'Confirm external providers and possible charges before retrying.'));
       startStory(createdProjectId, sceneCount, sceneDurationSeconds, data.visualStyle || 'Cinematic');
@@ -934,6 +947,12 @@ function Projects({ homePage = false }: { homePage?: boolean }) {
     const project = await create.mutateAsync({ data });
     afterChange();
     if (mode === 'manual') {
+      if (splitManualStory && manualFullStory?.trim()) {
+        if (!allowExternalProviders || !approvePotentialCharges || !textProviderReady) throw new Error(tx(lang, 'فعّل مزوّد الكتابة ووافق على الطلب قبل تقسيم القصة.', 'Enable a writing provider and approve the request before splitting the story.'));
+        setCreatedProjectId(project.id);
+        startStory(project.id, sceneCount, sceneDurationSeconds, data.visualStyle || 'Cinematic', manualFullStory.trim());
+        return;
+      }
       setCreatedProjectId(project.id);
       setProjectSaveError(false);
       setSavingManualScenes(true);

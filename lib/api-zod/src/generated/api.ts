@@ -953,7 +953,8 @@ export const GenerateProjectScriptBody = zod.object({
   "approvePotentialCharges": zod.boolean(),
   "sceneCount": zod.number().int().min(1).max(generateProjectScriptBodySceneCountMax).default(generateProjectScriptBodySceneCountDefault),
   "sceneDurationSeconds": zod.number().int().min(1).max(generateProjectScriptBodySceneDurationSecondsMax).default(generateProjectScriptBodySceneDurationSecondsDefault),
-  "sceneStyle": zod.string().min(1).max(generateProjectScriptBodySceneStyleMax).default(generateProjectScriptBodySceneStyleDefault)
+  "sceneStyle": zod.string().min(1).max(generateProjectScriptBodySceneStyleMax).default(generateProjectScriptBodySceneStyleDefault),
+  "story": zod.string().min(1).max(30000).optional()
 })
 
 export const generateProjectScriptResponseOneBrandKitPrimaryColorRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
@@ -1093,7 +1094,8 @@ export const QueueProjectScriptBody = zod.object({
   "approvePotentialCharges": zod.boolean(),
   "sceneCount": zod.number().int().min(1).max(queueProjectScriptBodySceneCountMax).default(queueProjectScriptBodySceneCountDefault),
   "sceneDurationSeconds": zod.number().int().min(1).max(queueProjectScriptBodySceneDurationSecondsMax).default(queueProjectScriptBodySceneDurationSecondsDefault),
-  "sceneStyle": zod.string().min(1).max(queueProjectScriptBodySceneStyleMax).default(queueProjectScriptBodySceneStyleDefault)
+  "sceneStyle": zod.string().min(1).max(queueProjectScriptBodySceneStyleMax).default(queueProjectScriptBodySceneStyleDefault),
+  "story": zod.string().min(1).max(30000).optional()
 })
 
 export const queueProjectScriptResponseProgressMin = 0;
@@ -1734,4 +1736,3 @@ export const DownloadProjectExportParams = zod.object({
 })
 
 export const DownloadProjectExportResponse = zod.unknown()
-
