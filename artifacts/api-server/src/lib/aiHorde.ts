@@ -77,8 +77,11 @@ export async function listAiHordeModels(): Promise<AiHordeModel[]> {
     headers: clientHeaders(),
     signal: AbortSignal.timeout(12_000),
   });
-  if (!response.ok) throw await hordeError(response);
-  const data: unknown = await response.json();
+  // The anonymous status endpoint can return a valid model array with HTTP
+  // 403 on some Horde edges. Use the payload when it is valid; only surface
+  // an error when the response contains no usable JSON data.
+  const data: unknown = await response.clone().json().catch(() => null);
+  if (!response.ok && !Array.isArray(data)) throw await hordeError(response);
   if (!Array.isArray(data)) throw new Error("AI Horde returned an invalid active-model list.");
   const models = data
     .filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object"))
