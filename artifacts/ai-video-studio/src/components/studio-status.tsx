@@ -39,8 +39,8 @@ export function StudioStatusBoard({ lang, stages, scenes, jobs, readyProviders, 
   const assetVersions = scenes.reduce((sum, scene) => sum + (scene.assetHistory?.length || 0), 0);
   const recoverable = [
     failedJobs.length ? { ar: `${failedJobs.length} مهمة فاشلة قابلة لإعادة المحاولة`, en: `${failedJobs.length} failed job(s) can be retried`, action: onOpenJobs, labelAr: 'فتح المهام', labelEn: 'Open jobs' } : null,
-    missingAssets.length ? { ar: `${missingAssets.length} مشهد بلا صورة أو فيديو`, en: `${missingAssets.length} scene(s) without an image or video`, action: () => onSelectScene(missingAssets[0].id), labelAr: 'اختيار المشهد', labelEn: 'Select scene' } : null,
-    missingVoices.length ? { ar: `${missingVoices.length} مشهد بتعليق بلا صوت`, en: `${missingVoices.length} narrated scene(s) without voice`, action: () => onSelectScene(missingVoices[0].id), labelAr: 'اختيار المشهد', labelEn: 'Select scene' } : null,
+    missingAssets.length ? { ar: `${missingAssets.length} مشهد بلا صورة أو فيديو`, en: `${missingAssets.length} scene(s) without an image or video`, action: () => { onSelectScene(missingAssets[0].id); onStage('images'); }, labelAr: 'فتح أدوات الصورة', labelEn: 'Open image tools' } : null,
+    missingVoices.length ? { ar: `${missingVoices.length} مشهد بتعليق بلا صوت`, en: `${missingVoices.length} narrated scene(s) without voice`, action: () => { onSelectScene(missingVoices[0].id); onStage('voice'); }, labelAr: 'فتح أدوات الصوت', labelEn: 'Open voice tools' } : null,
   ].filter(Boolean) as { ar: string; en: string; action: () => void; labelAr: string; labelEn: string }[];
   const savedLabel = saving
     ? t('جارٍ حفظ التغييرات…', 'Saving changes…')
