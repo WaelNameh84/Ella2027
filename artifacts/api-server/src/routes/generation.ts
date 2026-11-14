@@ -193,14 +193,20 @@ router.post("/projects/:projectId/scenes/:sceneId/jobs/video", async (req, res):
     return;
   }
   if (parsed.data.mode === "image") {
-    const [scene] = await db.select({ assetUrl: scenesTable.assetUrl, assetType: scenesTable.assetType })
+    const [scene] = await db.select({ id: scenesTable.id, projectId: scenesTable.projectId, assetUrl: scenesTable.assetUrl, assetType: scenesTable.assetType })
       .from(scenesTable).where(and(
         eq(scenesTable.id, params.data.sceneId),
         eq(scenesTable.projectId, params.data.projectId),
         eq(scenesTable.userId, userId),
       )).limit(1);
-    if (!scene?.assetUrl || scene.assetType !== "image") {
-      res.status(409).json({ error: "Attach an image to this scene before choosing image-to-video." });
+    const localAssetType = scene?.assetUrl && scene.id && scene.projectId
+      ? generatedAssetContentType(scene.assetUrl)
+      : null;
+    const localImageExists = Boolean(scene?.assetUrl && scene.id && scene.projectId && localAssetType?.startsWith("image/") && await readGeneratedAsset(scene.assetUrl, scene.projectId, scene.id));
+    const remoteImageUrl = Boolean(scene?.assetUrl && /^https:\/\/\S+\.(?:png|jpe?g|webp)(?:\?[^\s]*)?$/i.test(scene.assetUrl));
+    const hasImage = Boolean(scene?.assetUrl && (scene.assetType === "image" || localImageExists || remoteImageUrl));
+    if (!hasImage) {
+      res.status(409).json({ error: "The selected scene has no usable image. Generate or attach an image to this scene first, then choose image-to-video." });
       return;
     }
   }
