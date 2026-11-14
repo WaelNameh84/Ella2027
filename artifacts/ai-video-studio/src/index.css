@@ -1295,3 +1295,64 @@ body { min-height: 100dvh; }
   .home-template-grid { grid-template-columns: 1fr 1fr; }
   .home-hero-actions .btn { flex: 1 1 auto; justify-content: center; }
 }
+
+/* ── Ambient card lighting + tactile mobile-style press ─────── */
+.panel {
+  background: linear-gradient(145deg, hsl(var(--card)), hsl(var(--card) / .97) 68%, hsl(var(--primary) / .025));
+  box-shadow: var(--shadow-sm), inset 0 1px hsl(var(--foreground) / .025);
+  transition: border-color .22s ease, box-shadow .22s ease, background-color .22s ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .panel:hover {
+    border-color: hsl(var(--primary) / .23);
+    box-shadow: var(--shadow-sm), 0 0 22px hsl(var(--primary) / .045), inset 0 1px hsl(var(--foreground) / .035);
+  }
+}
+button:not(:disabled):active,
+a[href]:active,
+[role="button"]:active {
+  transform: translateY(2px) scale(.975);
+  filter: brightness(1.05);
+  transition-duration: 80ms;
+}
+.storyboard-card:has(button:active),
+.media-card:has(button:active),
+.launch-card:active,
+.home-template-card:active,
+.production-blocker:active {
+  transform: translateY(1px) scale(.985);
+  border-color: hsl(var(--primary) / .55);
+  box-shadow: 0 2px 8px hsl(var(--primary) / .12);
+}
+@property --generation-edge-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+.generation-modal {
+  position: relative;
+  isolation: isolate;
+  border-color: hsl(var(--primary) / .28);
+  box-shadow: var(--shadow), 0 0 30px hsl(var(--primary) / .09), inset 0 1px hsl(var(--foreground) / .045);
+}
+.generation-modal::before {
+  content: '';
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  padding: 1.5px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: conic-gradient(from var(--generation-edge-angle), transparent 0deg, transparent 255deg, hsl(var(--primary) / .18) 277deg, hsl(var(--accent)) 301deg, hsl(var(--primary) / .72) 319deg, transparent 343deg, transparent 360deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: generation-edge-orbit 5.5s linear infinite;
+}
+@keyframes generation-edge-orbit { to { --generation-edge-angle: 360deg; } }
+@media (prefers-reduced-motion: reduce) {
+  .generation-modal::before { animation: none; }
+  button:not(:disabled):active, a[href]:active, [role="button"]:active { transform: none; }
+  .storyboard-card:has(button:active), .media-card:has(button:active), .launch-card:active, .home-template-card:active, .production-blocker:active { transform: none; }
+}
