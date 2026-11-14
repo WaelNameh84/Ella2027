@@ -18,8 +18,8 @@ import {
   type ProviderStatus,
 } from "./providerRegistry";
 import { renderMp4 } from "./videoExport";
-import { generateNarration, generateStill, generateVideo, isProviderCallError } from "./mediaGeneration";
-import { readGeneratedAsset, saveGeneratedAsset } from "./studioAssets";
+import { convertImageToWebp, downloadPublicHttps, generateNarration, generateStill, generateVideo, isProviderCallError } from "./mediaGeneration";
+import { readGeneratedAsset, saveGeneratedAsset, validateUploadedImage } from "./studioAssets";
 import { isZeroSpendMode, ZERO_SPEND_ERROR } from "./spendingGuard";
 import { createTestImage, createTestWav } from "./freeTestProvider";
 import { generatePiperNarration, PIPER_LOCAL_PROVIDER_KEY } from "./piperTts";
@@ -527,6 +527,44 @@ async function processScriptJob(job: typeof studioJobsTable.$inferSelect): Promi
   });
 }
 
+async function assignedCharacterReferenceImages(
+  project: typeof projectsTable.$inferSelect,
+  scene: typeof scenesTable.$inferSelect,
+  userId: string,
+): Promise<Buffer[]> {
+  const assigned = (project.characters ?? [])
+    .filter((character) => scene.characterIds.includes(character.id) && Boolean(character.referenceImageUrl?.trim()))
+    .slice(0, 4);
+  const references: Buffer[] = [];
+  for (const character of assigned) {
+    const url = character.referenceImageUrl!.trim();
+    let bytes: Buffer | null = null;
+    const local = /^\/api\/projects\/([a-f0-9-]{36})\/assets\/([a-f0-9-]{36})\/([a-f0-9-]{36}\.(?:png|jpe?g|webp))$/i.exec(url);
+    if (local) {
+      const [, sourceProjectId, sourceSceneId] = local;
+      const [ownedScene] = await db.select({ id: scenesTable.id }).from(scenesTable).where(and(
+        eq(scenesTable.id, sourceSceneId),
+        eq(scenesTable.projectId, sourceProjectId),
+        eq(scenesTable.userId, userId),
+      )).limit(1);
+      if (!ownedScene) throw new Error(`The reference image for ${character.name} is not an image owned by this account.`);
+      bytes = await readGeneratedAsset(url, sourceProjectId, sourceSceneId);
+    } else if (/^https:\/\//i.test(url)) {
+      bytes = await downloadPublicHttps(url, 8 * 1024 * 1024);
+    } else {
+      throw new Error(`The reference image for ${character.name} must be an HTTPS image or a saved image from this project.`);
+    }
+    if (!bytes) throw new Error(`The reference image for ${character.name} is unavailable. Replace it or remove the reference before generating.`);
+    try {
+      validateUploadedImage(bytes);
+    } catch {
+      throw new Error(`The reference image for ${character.name} must be a JPEG, PNG, or WebP image.`);
+    }
+    references.push(await convertImageToWebp(bytes));
+  }
+  return references;
+}
+
 function scenePrompt(project: typeof projectsTable.$inferSelect, scene: typeof scenesTable.$inferSelect) {
   const characterBible = (project.characters ?? [])
     .filter((character) => scene.characterIds.includes(character.id))
@@ -647,6 +685,9 @@ async function processImageJob(job: typeof studioJobsTable.$inferSelect): Promis
     throw new Error("Explicit consent is required before sharing this prompt with anonymous AI Horde.");
   }
   const prompt = scenePrompt(project, scene);
+  const characterReferences = input.providerKeyId === AI_HORDE_PROVIDER_KEY
+    ? await assignedCharacterReferenceImages(project, scene, job.userId)
+    : [];
   const outputCount = input.providerKeyId === AI_HORDE_PROVIDER_KEY ? 1 : Math.max(1, Math.min(input.outputs ?? 1, 4));
   const outputAssets = assetResult(job);
   while (outputAssets.length < outputCount) {
@@ -670,7 +711,7 @@ async function processImageJob(job: typeof studioJobsTable.$inferSelect): Promis
         savedResult.aiHordeModel = requestedModel;
         await updateJob(job.id, { result: savedResult, stage: "provider_request", progress: 8, message: "Sending one anonymous image request to AI Horde." });
         job.result = savedResult;
-        requestId = await submitAiHordeImage(prompt, requestedModel);
+        requestId = await submitAiHordeImage(prompt, requestedModel, characterReferences);
         savedResult.aiHordeSubmitState = "submitted";
         savedResult.aiHordeRequestId = requestId;
         await updateJob(job.id, { result: savedResult, stage: "provider_request", progress: 10, message: "AI Horde accepted the anonymous request; waiting for an eligible worker." });

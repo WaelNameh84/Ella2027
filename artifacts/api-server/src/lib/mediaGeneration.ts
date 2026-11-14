@@ -1,4 +1,5 @@
 import { lookup } from "node:dns/promises";
+import { spawn } from "node:child_process";
 import { isIP } from "node:net";
 
 export class ProviderCallError extends Error {
@@ -27,7 +28,7 @@ function privateAddress(address: string): boolean {
     || a >= 224;
 }
 
-async function downloadPublicHttps(urlText: string, maximumBytes: number): Promise<Buffer> {
+export async function downloadPublicHttps(urlText: string, maximumBytes: number): Promise<Buffer> {
   const url = new URL(urlText);
   if (url.protocol !== "https:" || url.username || url.password
     || url.hostname === "localhost" || url.hostname.endsWith(".local")) {
@@ -217,6 +218,48 @@ function firstOutput(output: unknown): string {
     throw new Error("The model completed without returning a downloadable media URL.");
   }
   return candidate;
+}
+
+export async function convertImageToWebp(bytes: Buffer): Promise<Buffer> {
+  if (!bytes.length || bytes.byteLength > 25 * 1024 * 1024) {
+    throw new Error("Character reference images must be non-empty and smaller than 25 MB.");
+  }
+  return new Promise((resolvePromise, reject) => {
+    const child = spawn("ffmpeg", ["-hide_banner", "-loglevel", "error", "-nostdin", "-i", "pipe:0", "-frames:v", "1", "-c:v", "libwebp", "-quality", "82", "-f", "webp", "pipe:1"], { stdio: ["pipe", "pipe", "pipe"] });
+    const chunks: Buffer[] = [];
+    let total = 0;
+    let settled = false;
+    const finishError = (error: Error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      child.kill("SIGKILL");
+      reject(error);
+    };
+    const timeout = setTimeout(() => finishError(new Error("Could not convert a character reference image to WebP.")), 20_000);
+    child.stdout.on("data", (chunk: Buffer) => {
+      total += chunk.length;
+      if (total > 4 * 1024 * 1024) {
+        finishError(new Error("The converted character reference image is too large."));
+        return;
+      }
+      chunks.push(chunk);
+    });
+    child.once("error", () => finishError(new Error("Image conversion is unavailable on this server.")));
+    child.once("close", (code) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      const result = Buffer.concat(chunks);
+      if (code !== 0 || result.length < 12 || result.toString("ascii", 0, 4) !== "RIFF" || result.toString("ascii", 8, 12) !== "WEBP") {
+        reject(new Error("The character reference could not be converted to WebP."));
+        return;
+      }
+      resolvePromise(result);
+    });
+    child.stdin.on("error", () => undefined);
+    child.stdin.end(bytes);
+  });
 }
 
 export async function generateStill(

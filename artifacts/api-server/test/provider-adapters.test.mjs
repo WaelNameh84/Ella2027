@@ -303,6 +303,20 @@ test("AI Horde lists active image models without a personal API key", async (t) 
   assert.equal(captured.headers.has("authorization"), false);
 });
 
+test("AI Horde image submission attaches WebP character references as extra source images", async (t) => {
+  let captured;
+  mockFetch(t, async (_url, init) => {
+    captured = JSON.parse(init.body);
+    return jsonResponse({ id: "9f000000-0000-4000-8000-000000000002" });
+  });
+  const reference = Buffer.from("RIFF0000WEBP-character-reference");
+
+  await submitAiHordeImage("same character across scenes", "model-a", [reference]);
+
+  assert.deepEqual(captured.extra_source_images, [{ image: reference.toString("base64"), strength: 0.65 }]);
+  assert.equal(captured.shared, true);
+});
+
 test("AI Horde image submission uses only the public anonymous identifier and shares one output", async (t) => {
   let captured;
   mockFetch(t, async (url, init) => {
