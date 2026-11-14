@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq } from "drizzle-orm";
+import { and, asc, count, desc, eq, isNotNull } from "drizzle-orm";
 import { Router, type IRouter, type Response } from "express";
 import { resolve } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -1083,6 +1083,26 @@ router.get("/media/search", async (req, res): Promise<void> => {
     const message = error instanceof Error ? error.message : "Media search failed.";
     res.status(message.includes("Add an enabled") || message.includes("No usable") ? 409 : 502).json({ error: message });
   }
+});
+
+router.get("/media/library", async (req, res): Promise<void> => {
+  const userId = userIdOf(res);
+  const projectId = typeof req.query.projectId === "string" && /^[a-f0-9-]{36}$/i.test(req.query.projectId) ? req.query.projectId : undefined;
+  const requestedType = typeof req.query.type === "string" ? req.query.type : "all";
+  const [projects, scenes] = await Promise.all([
+    db.select({ id: projectsTable.id, title: projectsTable.title }).from(projectsTable).where(eq(projectsTable.userId, userId)),
+    db.select({ id: scenesTable.id, projectId: scenesTable.projectId, title: scenesTable.title, assetUrl: scenesTable.assetUrl, assetType: scenesTable.assetType, voiceUrl: scenesTable.voiceUrl, createdAt: scenesTable.createdAt }).from(scenesTable).where(and(eq(scenesTable.userId, userId), isNotNull(scenesTable.assetUrl))),
+  ]);
+  const projectTitles = new Map(projects.map(project => [project.id, project.title]));
+  const assets = scenes.flatMap(scene => {
+    if (projectId && scene.projectId !== projectId) return [];
+    const items = scene.assetUrl && ["image", "video"].includes(scene.assetType ?? "") && (requestedType === "all" || requestedType === scene.assetType)
+      ? [{ id: `${scene.id}:asset`, sceneId: scene.id, projectId: scene.projectId, projectTitle: projectTitles.get(scene.projectId) ?? "", title: scene.title, url: scene.assetUrl, thumbnailUrl: scene.assetType === "image" ? scene.assetUrl : null, mediaType: scene.assetType, source: "project", createdAt: scene.createdAt }]
+      : [];
+    if (scene.voiceUrl && (requestedType === "all" || requestedType === "audio")) items.push({ id: `${scene.id}:voice`, sceneId: scene.id, projectId: scene.projectId, projectTitle: projectTitles.get(scene.projectId) ?? "", title: `${scene.title} · voice`, url: scene.voiceUrl, thumbnailUrl: null, mediaType: "audio", source: "project", createdAt: scene.createdAt });
+    return items;
+  });
+  res.json({ assets });
 });
 
 router.get("/media/favorites", async (_req, res): Promise<void> => {

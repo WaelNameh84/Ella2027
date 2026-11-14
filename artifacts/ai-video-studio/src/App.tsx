@@ -68,6 +68,7 @@ const appearance = {
 };
 
 type Lang = 'ar' | 'en';
+type LibraryAsset = { id: string; sceneId: string; projectId: string; projectTitle: string; title: string; url: string; thumbnailUrl: string | null; mediaType: 'image' | 'video' | 'audio'; source: string; createdAt: string };
 type AppCtx = { lang: Lang; setLang: (v: Lang) => void; dark: boolean; setDark: (v: boolean) => void };
 const Context = createContext<AppCtx>({ lang: 'ar', setLang: () => {}, dark: false, setDark: () => {} });
 const useApp = () => useContext(Context);
@@ -1591,6 +1592,8 @@ function MediaPage() {
   const { lang } = useApp();
   const qc=useQueryClient();
   const initial = new URLSearchParams(window.location.search);
+  const projectId = initial.get('projectId') || '';
+  const sceneId = initial.get('sceneId') || '';
   const [term,setTerm] = useState('');
   const [search,setSearch] = useState('');
   const [type,setType] = useState<'image'|'video'|'audio'>('image');
@@ -1598,11 +1601,27 @@ function MediaPage() {
   const [orientation,setOrientation] = useState<'landscape'|'portrait'|'square'|''>('');
   const [page,setPage] = useState(1);
   const [added,setAdded] = useState<string | null>(null);
-  const projectId = initial.get('projectId') || '';
-  const sceneId = initial.get('sceneId') || '';
+  const [libraryType,setLibraryType] = useState<'all'|'image'|'video'|'audio'>('all');
+  const [libraryProject,setLibraryProject] = useState(projectId);
+  const [libraryAssets,setLibraryAssets] = useState<LibraryAsset[]>([]);
+  const [libraryLoading,setLibraryLoading] = useState(true);
+  const [libraryError,setLibraryError] = useState(false);
+  const [libraryRefresh,setLibraryRefresh] = useState(0);
   const params = {q:search,mediaType:type,source,orientation:orientation||undefined,page};
   const q = useSearchFreeMedia(params,{query:{enabled:search.length>0,queryKey:getSearchFreeMediaQueryKey(params)}});
   const updateScene=useUpdateScene();
+  const projectsQuery=useListProjects();
+  useEffect(() => {
+    let cancelled = false;
+    setLibraryLoading(true); setLibraryError(false);
+    const query = new URLSearchParams({ type: libraryType });
+    if (libraryProject) query.set('projectId', libraryProject);
+    fetch(`${basePath}/api/media/library?${query.toString()}`, { credentials: 'include' }).then(async response => {
+      if (!response.ok) throw new Error('library');
+      return response.json() as Promise<{ assets: LibraryAsset[] }>;
+    }).then(body => { if (!cancelled) setLibraryAssets(body.assets); }).catch(() => { if (!cancelled) setLibraryError(true); }).finally(() => { if (!cancelled) setLibraryLoading(false); });
+    return () => { cancelled = true; };
+  }, [libraryProject, libraryType, libraryRefresh]);
   const favorites=useListFavoriteMedia();
   const createFavorite=useCreateFavoriteMedia(),deleteFavorite=useDeleteFavoriteMedia();
   const refreshFavorites=()=>qc.invalidateQueries({queryKey:getListFavoriteMediaQueryKey()});
@@ -1620,7 +1639,15 @@ function MediaPage() {
     if(!projectId||!sceneId){setAdded(tx(lang,'افتح مشهدًا من المشروع لإضافة الوسائط.','Open a project scene to attach media.'));return}
     updateScene.mutate({projectId,sceneId,data:{assetUrl:item.url,assetType:item.mediaType}},{onSuccess:()=>{qc.invalidateQueries({queryKey:getGetProjectQueryKey(projectId)});setAdded(tx(lang,`تم ربط «${item.title}» بالمشهد.`,`“${item.title}” is attached to the scene.`))},onError:()=>setAdded(tx(lang,'تعذرت إضافة الوسيط. حاول مجددًا.','Could not attach this media. Try again.'))});
   }
+  function attachLibraryAsset(item: LibraryAsset) {
+    if (!projectId || !sceneId) { setAdded(tx(lang, 'افتح مشهدًا من المشروع لربط الأصل.', 'Open a project scene to attach this asset.')); return; }
+    updateScene.mutate({ projectId, sceneId, data: { assetUrl: item.url, assetType: item.mediaType } }, { onSuccess: () => { qc.invalidateQueries({queryKey:getGetProjectQueryKey(projectId)}); setAdded(tx(lang, `تم ربط «${item.title}» بالمشهد.`, `“${item.title}” is attached to the scene.`)); }, onError: () => setAdded(tx(lang, 'تعذر ربط الأصل بالمشهد.', 'Could not attach the asset.')) });
+  }
+  function detachLibraryAsset(item: LibraryAsset) {
+    updateScene.mutate({ projectId: item.projectId, sceneId: item.sceneId, data: { assetUrl: null, assetType: null } }, { onSuccess: () => { setLibraryAssets(current => current.filter(asset => asset.id !== item.id)); if (projectId) qc.invalidateQueries({queryKey:getGetProjectQueryKey(projectId)}); setAdded(tx(lang, 'تم فصل الأصل عن المشهد دون حذف الملف من التخزين.', 'The asset was detached without deleting the stored file.')); }, onError: () => setAdded(tx(lang, 'تعذر فصل الأصل.', 'Could not detach the asset.')) });
+  }
   return <AppFrame title={tx(lang,'مكتبة الوسائط','Media library')} crumb="OPENVERSE SEARCH"><div className="page-toolbar"><div><span className="eyebrow">{tx(lang,'بحث مفتوح الترخيص','OPEN-LICENSED SEARCH')}</span><h2>{tx(lang,'لقطة مناسبة تغيّر كل شيء.', 'The right frame changes everything.')}</h2><p>{tx(lang,'ابحث في نتائج Openverse مع إظهار المصدر والترخيص لكل ملف.', 'Search Openverse and review the source and license for every result.')}</p></div></div>
+    <section className="section-block project-media-library panel"><div className="section-heading"><div><span className="eyebrow">{tx(lang,'الأصول المحفوظة','SAVED PROJECT ASSETS')}</span><h3>{tx(lang,'مكتبة إنتاجك','Your production library')}</h3></div><span className="result-count">{libraryAssets.length}</span></div><div className="media-library-controls"><select className="studio-input" aria-label={tx(lang,'فلترة المشروع','Filter by project')} value={libraryProject} onChange={e=>setLibraryProject(e.target.value)}><option value="">{tx(lang,'كل المشاريع','All projects')}</option>{projectsQuery.data?.map(project=><option key={project.id} value={project.id}>{project.title}</option>)}</select><select className="studio-input" aria-label={tx(lang,'فلترة النوع','Filter by type')} value={libraryType} onChange={e=>setLibraryType(e.target.value as typeof libraryType)}><option value="all">{tx(lang,'كل الأنواع','All types')}</option><option value="image">{tx(lang,'صور','Images')}</option><option value="video">{tx(lang,'فيديو','Video')}</option><option value="audio">{tx(lang,'صوت','Audio')}</option></select></div>{libraryLoading?<div className="media-results">{[1,2].map(n=><SkeletonBlock key={n} className="h-48"/>)}</div>:libraryError?<StateError lang={lang} retry={()=>setLibraryRefresh(value=>value+1)}/>:libraryAssets.length?<div className="media-results">{libraryAssets.map(item=><article className="media-card panel" key={item.id}><div className="media-image">{item.mediaType==='image'&&<img src={item.url} alt={item.title}/>} {item.mediaType==='video'&&<video src={item.url} controls preload="metadata"/>} {item.mediaType==='audio'&&<div className="media-placeholder"><Mic size={28}/><audio src={item.url} controls/></div>}<span className="media-type-tag">{item.mediaType}</span></div><div className="media-card-content"><h3>{item.title}</h3><p className="media-creator">{item.projectTitle}</p><div className="license-line"><span>{tx(lang,'مشهد محفوظ','Saved scene')}</span><span>{new Date(item.createdAt).toLocaleDateString(lang==='ar'?'ar':'en')}</span></div><div className="media-card-actions"><button className="btn btn-quiet" onClick={()=>attachLibraryAsset(item)} disabled={updateScene.isPending||!projectId||!sceneId}><Plus size={15}/>{tx(lang,'ربط بالمشهد','Attach')}</button><button className="btn btn-quiet text-destructive" onClick={()=>detachLibraryAsset(item)} disabled={updateScene.isPending}>{tx(lang,'فصل','Detach')}</button></div></div></article>)}</div>:<Empty title={tx(lang,'لا توجد أصول محفوظة','No saved assets')} body={tx(lang,'ارفع أو ولّد أصلًا داخل مشهد ليظهر هنا في مكتبة إنتاجك.','Upload or generate an asset inside a scene to see it in your production library.')}/>}</section>
     <form className="media-search panel" onSubmit={e=>{e.preventDefault();setSearch(term.trim());setPage(1);setAdded(null);}}><div className="searchbox"><Search size={18}/><input value={term} onChange={e=>setTerm(e.target.value)} placeholder={tx(lang,'ابحث عن مشهد، مكان، أو إحساس...','Search a scene, place, or feeling...')} data-testid="input-media-query" /></div><select aria-label={tx(lang,'نوع الوسائط','Media type')} className="studio-input media-type" value={type} onChange={e=>setType(e.target.value as typeof type)}><option value="image">{tx(lang,'صور','Images')}</option><option value="video">{tx(lang,'فيديو','Video')}</option><option value="audio">{tx(lang,'صوت','Audio')}</option></select><select aria-label={tx(lang,'المصدر','Source')} className="studio-input media-type" value={source} onChange={e=>setSource(e.target.value as typeof source)}><option value="openverse">Openverse</option><option value="wikimedia">Wikimedia</option><option value="archive">Internet Archive</option><option value="pexels">Pexels</option><option value="pixabay">Pixabay</option><option value="unsplash">Unsplash</option></select><select aria-label={tx(lang,'الاتجاه','Orientation')} className="studio-input media-type" value={orientation} onChange={e=>setOrientation(e.target.value as typeof orientation)}><option value="">{tx(lang,'كل الاتجاهات','Any orientation')}</option><option value="landscape">{tx(lang,'أفقي','Landscape')}</option><option value="portrait">{tx(lang,'عمودي','Portrait')}</option><option value="square">{tx(lang,'مربع','Square')}</option></select><button className="btn btn-primary" disabled={!term.trim()} data-testid="button-search-media"><Search size={16}/>{tx(lang,'بحث','Search')}</button></form>
     {added && <div className="media-notice"><Check size={16}/>{added}<button onClick={()=>setAdded(null)} className="btn btn-ghost !p-1"><X size={15}/></button></div>}
      {q.isLoading ? <div className="media-results">{[1,2,3,4].map(n=><SkeletonBlock key={n} className="h-64"/>)}</div> : q.isError ? <StateError lang={lang} retry={()=>q.refetch()} /> : q.data ? q.data.results.length ? <><div className="results-label"><span>{q.data.total} {tx(lang,'نتيجة','results')} · {q.data.source}</span><span>{tx(lang,'تحقق من الترخيص قبل الاستخدام','Review license before use')}</span></div><div className="media-results">{q.data.results.map(item=><article className="media-card panel" key={item.id}><a className="media-image" href={item.url} target="_blank" rel="noreferrer">{item.thumbnailUrl ? <img src={item.thumbnailUrl} alt={item.title}/> : <div className="media-placeholder"><ImagePlus size={28}/><span>{item.mediaType}</span></div>}<span className="media-type-tag">{item.mediaType}</span></a><div className="media-card-content"><h3>{item.title}</h3>{item.creator && <p className="media-creator">{tx(lang,'بواسطة','by')} {item.creator}</p>}<div className="license-line"><span>{item.source}</span><a href={item.licenseUrl || item.url} target="_blank" rel="noreferrer">{item.license}</a></div><div className="media-card-actions"><button className="btn btn-quiet" onClick={()=>add(item)} disabled={updateScene.isPending||!projectId||!sceneId} data-testid={`button-add-media-${item.id}`}><Plus size={15}/>{tx(lang,'إضافة للمشهد','Attach')}</button><button className={`btn btn-quiet favorite-button ${favoriteFor(item)?'is-favorite':''}`} onClick={()=>toggleFavorite(item)} disabled={createFavorite.isPending||deleteFavorite.isPending} aria-label={favoriteFor(item)?tx(lang,'إزالة من المفضلة','Remove favorite'):tx(lang,'حفظ في المفضلة','Save favorite')} title={favoriteFor(item)?tx(lang,'إزالة من المفضلة','Remove favorite'):tx(lang,'حفظ في المفضلة','Save favorite')}><Heart size={16} fill={favoriteFor(item)?'currentColor':'none'}/></button></div></div></article>)}</div><div className="pager"><button className="btn btn-quiet" disabled={page<=1} onClick={()=>setPage(p=>Math.max(1,p-1))}><ArrowRight size={15}/>{tx(lang,'السابق','Previous')}</button><span>{tx(lang,`صفحة ${page}`,`Page ${page}`)}</span><button className="btn btn-quiet" onClick={()=>setPage(p=>p+1)}>{tx(lang,'التالي','Next')}<ArrowLeft size={15}/></button></div></> : <Empty title={tx(lang,'لم نعثر على نتائج','No results found')} body={tx(lang,'جرّب عبارة بحث مختلفة أو بدّل نوع الوسائط.','Try a different phrase or switch the media type.')} /> : <Empty title={tx(lang,'ابحث عن الوسيط التالي','Find your next asset')} body={tx(lang,'ابحث في المصدر المحدد، ثم راجع الترخيص قبل الاستخدام.','Search the selected source, then review its license before use.')} />}
