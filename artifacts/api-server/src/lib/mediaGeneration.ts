@@ -56,6 +56,58 @@ export async function downloadPublicHttps(urlText: string, maximumBytes: number)
   return bytes;
 }
 
+export async function validateGeneratedMp4(bytes: Buffer): Promise<void> {
+  if (!bytes.length || bytes.byteLength > 250 * 1024 * 1024) {
+    throw new Error("The video provider returned an empty or oversized MP4 file.");
+  }
+  await new Promise<void>((resolvePromise, rejectPromise) => {
+    const child = spawn("ffprobe", [
+      "-hide_banner", "-v", "error", "-select_streams", "v:0",
+      "-show_entries", "stream=codec_type",
+      "-show_entries", "format=format_name,duration",
+      "-of", "json", "-i", "pipe:0",
+    ], { stdio: ["pipe", "pipe", "pipe"] });
+    const output: Buffer[] = [];
+    let settled = false;
+    const finish = (error?: Error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      child.kill("SIGKILL");
+      if (error) rejectPromise(error);
+      else resolvePromise();
+    };
+    const timeout = setTimeout(() => finish(new Error("The generated MP4 could not be validated in time.")), 20_000);
+    child.stdout.on("data", (chunk: Buffer) => output.push(chunk));
+    child.once("error", () => finish(new Error("Video validation is unavailable on this server.")));
+    child.once("close", (code) => {
+      if (settled) return;
+      if (code !== 0) {
+        finish(new Error("The provider returned a video that ffprobe could not read as MP4."));
+        return;
+      }
+      try {
+        const parsed = JSON.parse(Buffer.concat(output).toString("utf8")) as {
+          streams?: Array<{ codec_type?: string }>;
+          format?: { format_name?: string; duration?: string };
+        };
+        const stream = parsed.streams?.[0];
+        const formats = parsed.format?.format_name?.split(",") ?? [];
+        const duration = Number(parsed.format?.duration ?? 0);
+        if (stream?.codec_type !== "video" || !formats.some((format) => ["mov", "mp4", "m4v"].includes(format)) || !Number.isFinite(duration) || duration <= 0) {
+          finish(new Error("The provider returned a video without a valid MP4 video stream."));
+          return;
+        }
+        finish();
+      } catch {
+        finish(new Error("The provider returned an unreadable video file."));
+      }
+    });
+    child.stdin.on("error", () => undefined);
+    child.stdin.end(bytes);
+  });
+}
+
 async function providerResponse(url: string, key: string, body: unknown): Promise<Response> {
   return fetch(url, {
     method: "POST",
@@ -219,7 +271,7 @@ async function agnesVideoPrediction(
   referenceImage: string | undefined,
   durationSeconds: number,
   aspectRatio: string,
-  maxWaitMs = 10 * 60_000,
+  maxWaitMs = 15 * 60_000,
 ): Promise<string> {
   const portrait = aspectRatio === "9:16" || aspectRatio === "3:4";
   const width = portrait ? 768 : 1152;
@@ -227,7 +279,7 @@ async function agnesVideoPrediction(
   const frameRate = 24;
   const numFrames = Math.max(24, Math.min(121, Math.round(Math.max(1, durationSeconds) * frameRate)));
   const body: Record<string, unknown> = {
-    model: model || "agnes-video-v2.0",
+    model: model || "agnes-video-2.5",
     prompt,
     width,
     height,
@@ -455,13 +507,15 @@ export async function generateVideo(
   if (provider === "agnes") {
     const videoUrl = await agnesVideoPrediction(
       key,
-      model || "agnes-video-v2.0",
+      model || "agnes-video-2.5",
       prompt,
       referenceImage,
       durationSeconds,
       aspectRatio,
     );
-    return downloadPublicHttps(videoUrl, 250 * 1024 * 1024);
+    const bytes = await downloadPublicHttps(videoUrl, 250 * 1024 * 1024);
+    await validateGeneratedMp4(bytes);
+    return bytes;
   }
   if (provider === "fal") {
     const input: Record<string, unknown> = {
@@ -479,7 +533,9 @@ export async function generateVideo(
     if (typeof video?.url !== "string" || !video.url.startsWith("https://")) {
       throw new Error("fal.ai completed without returning a downloadable video URL.");
     }
-    return downloadPublicHttps(video.url, 250 * 1024 * 1024);
+    const bytes = await downloadPublicHttps(video.url, 250 * 1024 * 1024);
+    await validateGeneratedMp4(bytes);
+    return bytes;
   }
 
   if (provider !== "replicate") {
@@ -491,7 +547,9 @@ export async function generateVideo(
   };
   if (referenceImage) input.first_frame_image = referenceImage;
   const output = await replicatePrediction(key, model || "minimax/video-01", input);
-  return downloadPublicHttps(firstOutput(output), 250 * 1024 * 1024);
+  const bytes = await downloadPublicHttps(firstOutput(output), 250 * 1024 * 1024);
+  await validateGeneratedMp4(bytes);
+  return bytes;
 }
 
 export async function generateNarration(

@@ -40,7 +40,7 @@ function userIdOf(res: Response): string {
 
 function supportedProvider(provider: string, jobType: JobKind): boolean {
   if (jobType === "image") return ["openai", "stability", "replicate", "huggingface", "ai-horde"].includes(provider);
-  if (jobType === "video") return ["replicate", "fal"].includes(provider);
+  if (jobType === "video") return ["replicate", "fal", "agnes"].includes(provider);
   return ["elevenlabs", "openai", "openai-audio"].includes(provider);
 }
 

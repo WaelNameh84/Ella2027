@@ -796,7 +796,7 @@ async function processVideoJob(job: typeof studioJobsTable.$inferSelect): Promis
       const model = provider === "fal"
         ? (segments >= 3 ? requestedModel : falDefault)
         : provider === "agnes"
-          ? (requestedModel || "agnes-video-v2.0")
+          ? (requestedModel || "agnes-video-2.5")
           : (segments === 2 ? requestedModel : "minimax/video-01");
       return generateVideo(
         provider,
