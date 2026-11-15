@@ -212,6 +212,78 @@ async function replicatePrediction(
   return prediction.output;
 }
 
+async function agnesVideoPrediction(
+  key: string,
+  model: string,
+  prompt: string,
+  referenceImage: string | undefined,
+  durationSeconds: number,
+  aspectRatio: string,
+  maxWaitMs = 10 * 60_000,
+): Promise<string> {
+  const portrait = aspectRatio === "9:16" || aspectRatio === "3:4";
+  const width = portrait ? 768 : 1152;
+  const height = portrait ? 1152 : 768;
+  const frameRate = 24;
+  const numFrames = Math.max(24, Math.min(121, Math.round(Math.max(1, durationSeconds) * frameRate)));
+  const body: Record<string, unknown> = {
+    model: model || "agnes-video-v2.0",
+    prompt,
+    width,
+    height,
+    num_frames: numFrames,
+    frame_rate: frameRate,
+  };
+  // Agnes accepts an image URL for image-to-video. Data URLs from local assets
+  // are intentionally not sent because the remote API requires an accessible URL.
+  if (referenceImage && !referenceImage.startsWith("https://")) {
+    throw new Error("Agnes AI image-to-video requires a public HTTPS image URL; use text-to-video for a local scene image.");
+  }
+  if (referenceImage?.startsWith("https://")) body.image_url = referenceImage;
+  const response = await fetch("https://apihub.agnes-ai.com/v1/videos", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(90_000),
+    redirect: "error",
+  });
+  const submission = await readJson(response);
+  const videoId = typeof submission.video_id === "string"
+    ? submission.video_id
+    : typeof submission.id === "string" ? submission.id : "";
+  if (!videoId || !/^[a-zA-Z0-9._:-]+$/.test(videoId)) {
+    throw new Error("Agnes AI did not return a valid video_id.");
+  }
+  const deadline = Date.now() + maxWaitMs;
+  while (Date.now() < deadline) {
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 5_000));
+    const poll = await fetch(`https://apihub.agnes-ai.com/agnesapi?video_id=${encodeURIComponent(videoId)}`, {
+      headers: { Authorization: `Bearer ${key}` },
+      signal: AbortSignal.timeout(60_000),
+      redirect: "error",
+    });
+    const result = await readJson(poll);
+    const status = typeof result.status === "string" ? result.status.toLowerCase() : "";
+    if (["failed", "error", "cancelled", "canceled"].includes(status)) {
+      const detail = typeof result.error === "string" ? result.error : "Agnes AI failed to generate this video.";
+      throw new Error(detail);
+    }
+    if (["succeeded", "success", "completed", "done"].includes(status)) {
+      const candidate = result.video_url
+        ?? result.url
+        ?? (result.video && typeof result.video === "object" ? (result.video as { url?: unknown }).url : undefined);
+      if (typeof candidate !== "string" || !candidate.startsWith("https://")) {
+        throw new Error("Agnes AI completed without returning a downloadable video URL.");
+      }
+      return candidate;
+    }
+  }
+  throw new Error("Agnes AI is still processing this video. Check the job before submitting it again.");
+}
+
 function firstOutput(output: unknown): string {
   const candidate = Array.isArray(output) ? output[0] : output;
   if (typeof candidate !== "string" || !candidate.startsWith("https://")) {
@@ -380,6 +452,17 @@ export async function generateVideo(
   durationSeconds = 5,
   aspectRatio = "16:9",
 ): Promise<Buffer> {
+  if (provider === "agnes") {
+    const videoUrl = await agnesVideoPrediction(
+      key,
+      model || "agnes-video-v2.0",
+      prompt,
+      referenceImage,
+      durationSeconds,
+      aspectRatio,
+    );
+    return downloadPublicHttps(videoUrl, 250 * 1024 * 1024);
+  }
   if (provider === "fal") {
     const input: Record<string, unknown> = {
       prompt,
@@ -400,7 +483,7 @@ export async function generateVideo(
   }
 
   if (provider !== "replicate") {
-    throw new Error("Video generation is currently connected through Replicate and fal.ai.");
+    throw new Error("Video generation is currently connected through Agnes AI, Replicate, and fal.ai.");
   }
   const input: Record<string, unknown> = {
     prompt,

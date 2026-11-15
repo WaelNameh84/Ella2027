@@ -160,9 +160,6 @@ export const providerDefinitions: Record<string, ProviderDefinition> = {
     label: "Agnes AI",
     officialUrl: "https://platform.agnes-ai.com/settings/apiKeys",
     testUrl: () => "https://apihub.agnes-ai.com/v1/models",
-    chatUrl: "https://apihub.agnes-ai.com/v1/chat/completions",
-    chatModel: "agnes-2.5-flash",
-    chatMode: "openai",
   },
   stability: {
     label: "Stability AI",

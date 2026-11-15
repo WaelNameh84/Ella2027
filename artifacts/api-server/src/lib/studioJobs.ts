@@ -138,7 +138,7 @@ function safeJobError(error: unknown): string {
 
 function supportsJob(provider: string, jobType: JobKind): boolean {
   if (jobType === "image") return ["openai", "stability", "replicate", "huggingface"].includes(provider);
-  if (jobType === "video") return ["replicate", "fal"].includes(provider);
+  if (jobType === "video") return ["replicate", "fal", "agnes"].includes(provider);
   if (jobType === "voice") return ["elevenlabs", "openai", "openai-audio", "google-tts", "azure-speech", "piper-local"].includes(provider);
   return false;
 }
@@ -795,7 +795,9 @@ async function processVideoJob(job: typeof studioJobsTable.$inferSelect): Promis
       const segments = requestedModel.split("/").filter(Boolean).length;
       const model = provider === "fal"
         ? (segments >= 3 ? requestedModel : falDefault)
-        : (segments === 2 ? requestedModel : "minimax/video-01");
+        : provider === "agnes"
+          ? (requestedModel || "agnes-video-v2.0")
+          : (segments === 2 ? requestedModel : "minimax/video-01");
       return generateVideo(
         provider,
         key,

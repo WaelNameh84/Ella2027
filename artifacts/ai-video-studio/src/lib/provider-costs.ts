@@ -25,6 +25,7 @@ export function estimateCostText(provider: string | undefined, service: CostServ
 
 export function defaultVideoModel(provider: string | undefined, mode: 'text' | 'image') {
   if (provider === 'fal') return mode === 'image' ? 'minimax/h3-max/image-to-video' : 'minimax/h3-max/text-to-video';
+  if (provider === 'agnes') return 'agnes-video-v2.0';
   if (provider === 'replicate') return 'minimax/video-01';
   return '';
 }
