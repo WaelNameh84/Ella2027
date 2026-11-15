@@ -81,6 +81,14 @@ export const providerDefinitions: Record<string, ProviderDefinition> = {
     chatModel: "openai/gpt-4o-mini",
     chatMode: "openai",
   },
+  "llama-free": {
+    label: "Llama عبر OpenRouter (مجاني)",
+    officialUrl: "https://openrouter.ai/keys",
+    testUrl: () => "https://openrouter.ai/api/v1/models",
+    chatUrl: "https://openrouter.ai/api/v1/chat/completions",
+    chatModel: "meta-llama/llama-3.3-70b-instruct:free",
+    chatMode: "openai",
+  },
   huggingface: {
     label: "Hugging Face",
     officialUrl: "https://huggingface.co/settings/tokens",
@@ -238,7 +246,7 @@ export const providerCatalog = [
 ];
 
 const providersRequiringSuccessfulTest = new Set([
-  "huggingface", "colab-t5", "cloudflare", "stability", "groq", "assemblyai", "deepgram", "agnes",
+  "huggingface", "colab-t5", "cloudflare", "stability", "groq", "llama-free", "assemblyai", "deepgram", "agnes",
 ]);
 export function providerRequiresSuccessfulTest(provider: string): boolean {
   return providersRequiringSuccessfulTest.has(provider);
