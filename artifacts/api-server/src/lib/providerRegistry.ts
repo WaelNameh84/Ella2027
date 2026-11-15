@@ -156,6 +156,14 @@ export const providerDefinitions: Record<string, ProviderDefinition> = {
     chatModel: "deepseek-chat",
     chatMode: "openai",
   },
+  agnes: {
+    label: "Agnes AI",
+    officialUrl: "https://platform.agnes-ai.com/settings/apiKeys",
+    testUrl: () => "https://apihub.agnes-ai.com/v1/models",
+    chatUrl: "https://apihub.agnes-ai.com/v1/chat/completions",
+    chatModel: "agnes-2.5-flash",
+    chatMode: "openai",
+  },
   stability: {
     label: "Stability AI",
     officialUrl: "https://platform.stability.ai/dashboard/api-keys",
@@ -233,7 +241,7 @@ export const providerCatalog = [
 ];
 
 const providersRequiringSuccessfulTest = new Set([
-  "huggingface", "colab-t5", "cloudflare", "stability", "groq", "assemblyai", "deepgram",
+  "huggingface", "colab-t5", "cloudflare", "stability", "groq", "assemblyai", "deepgram", "agnes",
 ]);
 export function providerRequiresSuccessfulTest(provider: string): boolean {
   return providersRequiringSuccessfulTest.has(provider);
