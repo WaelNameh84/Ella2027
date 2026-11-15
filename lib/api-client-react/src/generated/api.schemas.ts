@@ -652,8 +652,9 @@ export interface SceneImageGenerationInput {
      * @nullable
      */
   negativePrompt?: string | null;
-  acceptAiHordePrivacy?: boolean;
   approvePotentialCharges: boolean;
+  /** Required when providerKeyId selects anonymous AI Horde; confirms the user accepts sharing the prompt and generated image with the public service. */
+  acceptAiHordePrivacy?: boolean;
 }
 
 export type SceneVideoGenerationInputMode = typeof SceneVideoGenerationInputMode[keyof typeof SceneVideoGenerationInputMode];

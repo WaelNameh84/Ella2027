@@ -30,4 +30,6 @@ export interface SceneImageGenerationInput {
      */
   negativePrompt?: string | null;
   approvePotentialCharges: boolean;
+  /** Required when providerKeyId selects anonymous AI Horde; confirms the user accepts sharing the prompt and generated image with the public service. */
+  acceptAiHordePrivacy?: boolean;
 }

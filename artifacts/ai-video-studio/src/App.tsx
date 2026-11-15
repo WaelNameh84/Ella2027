@@ -723,7 +723,7 @@ function ProjectForm({ onClose, initial, initialMode = 'auto', initialTemplateId
       </> : !editing ? <>
         <div className="workflow-mode-grid" role="radiogroup" aria-label={tx(lang,'طريقة إنشاء الفيديو','Video creation mode')}>
           <button type="button" className={`workflow-mode-card ${mode === 'auto' ? 'is-selected' : ''}`} onClick={() => setMode('auto')} role="radio" aria-checked={mode === 'auto'}>
-            <WandSparkles size={19}/><strong>{tx(lang,'تلقائي','Automatic')}</strong><span>{tx(lang,'أدخل الفكرة ونوع الفيديو وعدد المشاهد ومدتها؛ ينشئ Storyboard تلقائيًا. توليد الفيديو يحتاج مفتاح مزوّد وموافقة منفصلة.','Enter the idea, format, scene count, and timing; it creates a storyboard automatically. Video generation needs a provider key and separate approval.')}</span>
+            <WandSparkles size={19}/><strong>{tx(lang,'تلقائي','Automatic')}</strong><span>{tx(lang,'أدخل فكرتك؛ ينشئ السيناريو والمشاهد والفيديو والصوت والتصدير تلقائيًا.','Enter your idea; the script, scenes, video, voice, and final export are handled automatically.')}</span>
           </button>
           <button type="button" className={`workflow-mode-card ${mode === 'manual' ? 'is-selected' : ''}`} onClick={() => setMode('manual')} role="radio" aria-checked={mode === 'manual'}>
             <Settings2 size={19}/><strong>{tx(lang,'يدوي','Manual')}</strong><span>{tx(lang,'أنشئ المشروع ثم أضف النصوص والوسائط وعدّل كل مشهد بنفسك.','Create the project, then add text, media, and edit every scene yourself.')}</span>
@@ -824,6 +824,7 @@ function Projects({ homePage = false }: { homePage?: boolean }) {
   const [sort, setSort] = useState<'updated' | 'name' | 'status'>('updated');
   const [createdProjectId, setCreatedProjectId] = useState<string | null>(null);
   const [projectSaveError, setProjectSaveError] = useState(false);
+  const [autoFilmRunning, setAutoFilmRunning] = useState(false);
   const [savingManualScenes, setSavingManualScenes] = useState(false);
   const [backupExportingId, setBackupExportingId] = useState<string | null>(null);
   const [backupImporting, setBackupImporting] = useState(false);
@@ -928,6 +929,60 @@ function Projects({ homePage = false }: { homePage?: boolean }) {
       setLocation(`/projects/${projectId}`);
     },
   });
+  const runAutoFilm = async (projectId: string, sceneCount: number, sceneDurationSeconds: number, sceneStyle: string, useScriptProvider: boolean) => {
+    setAutoFilmRunning(true);
+    const keys = keysQuery.data || [];
+    const videoKey = keys.find(key => key.enabled && key.serviceType === 'video' && providerSupports(key.provider, 'video') && providerKeyIsUsable(key.provider, key.status));
+    if (!videoKey) throw new Error(tx(lang, 'لا يوجد مزوّد فيديو حقيقي مفعّل. أضف مفتاح Replicate أو fal.ai قبل إنشاء الفيلم تلقائيًا.', 'No connected video provider is enabled. Add a Replicate or fal.ai key before automatic film creation.'));
+    const voiceKey = keys.find(key => key.enabled && key.serviceType === 'voice' && providerSupports(key.provider, 'voice') && providerKeyIsUsable(key.provider, key.status));
+    const waitFor = async (predicate: (jobs: any[]) => boolean, label: string) => {
+      const deadline = Date.now() + 30 * 60 * 1000;
+      while (Date.now() < deadline) {
+        const response = await fetch(`${basePath}/api/jobs?projectId=${encodeURIComponent(projectId)}`, { credentials: 'include' });
+        if (!response.ok) throw new Error(`${label}: ${response.status}`);
+        const jobs = await response.json() as any[];
+        const active = jobs.find(job => job.status === 'failed' && ['script','video','voice','export'].includes(job.jobType));
+        if (active) throw new Error(active.error || `${label} failed.`);
+        if (predicate(jobs)) return jobs;
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      }
+      throw new Error(`${label} timed out.`);
+    };
+    if (useScriptProvider) {
+      const scriptResponse = await fetch(`${basePath}/api/projects/${projectId}/jobs/script`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ providerKeyId: null, allowRotation: true, approvePotentialCharges: true, sceneCount, sceneDurationSeconds, sceneStyle }) });
+      if (!scriptResponse.ok) throw new Error((await scriptResponse.json().catch(() => null))?.error || 'Could not start the script stage.');
+      await waitFor(jobs => jobs.some(job => job.jobType === 'script' && job.status === 'completed'), tx(lang, 'تأليف السيناريو', 'Script generation'));
+    }
+    const projectResponse = await fetch(`${basePath}/api/projects/${projectId}`, { credentials: 'include' });
+    if (!projectResponse.ok) throw new Error('Could not load generated scenes.');
+    const project = await projectResponse.json() as ProjectDetail;
+    const scenes = project.scenes || [];
+    if (!scenes.length) throw new Error('No scenes were created.');
+    const videoModel = defaultVideoModel(videoKey.provider, 'text');
+    if (!videoModel) throw new Error(tx(lang, 'لا يوجد نموذج فيديو افتراضي لهذا المزوّد.', 'No default video model is configured for this provider.'));
+    for (const scene of scenes) {
+      const response = await fetch(`${basePath}/api/projects/${projectId}/scenes/${scene.id}/jobs/video`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ providerKeyId: videoKey.id, model: videoModel, mode: 'text', approvePotentialCharges: true }) });
+      if (!response.ok && response.status !== 409) throw new Error((await response.json().catch(() => null))?.error || `Could not queue video for ${scene.title}.`);
+    }
+    await waitFor(jobs => { const videos = jobs.filter(job => job.jobType === 'video'); return videos.length >= scenes.length && videos.every(job => job.status === 'completed'); }, tx(lang, 'توليد مقاطع الفيديو', 'Video generation'));
+    if (voiceKey) {
+      const voiceId = defaultVoiceId(voiceKey.provider);
+      for (const scene of scenes.filter(item => item.narration.trim())) {
+        const response = await fetch(`${basePath}/api/projects/${projectId}/scenes/${scene.id}/jobs/voice`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ providerKeyId: voiceKey.id, voiceId, approvePotentialCharges: true }) });
+        if (!response.ok && response.status !== 409) throw new Error((await response.json().catch(() => null))?.error || `Could not queue voice for ${scene.title}.`);
+      }
+      const voiceScenes = scenes.filter(item => item.narration.trim());
+      if (voiceScenes.length) await waitFor(jobs => { const voices = jobs.filter(job => job.jobType === 'voice'); return voices.length >= voiceScenes.length && voices.every(job => job.status === 'completed'); }, tx(lang, 'التعليق الصوتي', 'Voice generation'));
+    }
+    const exportResponse = await fetch(`${basePath}/api/projects/${projectId}/jobs/export`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ resolution: 1080, fps: 30, includeSubtitles: true, format: 'mp4', codec: 'h264', subtitleStyle: 'classic' }) });
+    if (!exportResponse.ok) throw new Error((await exportResponse.json().catch(() => null))?.error || 'Could not start final export.');
+    await waitFor(jobs => jobs.some(job => job.jobType === 'export' && job.status === 'completed'), tx(lang, 'تصدير الفيلم النهائي', 'Final film export'));
+    afterChange();
+    setAutoFilmRunning(false);
+    setOpen(false);
+    setCreatedProjectId(null);
+    setLocation(`/projects/${projectId}`);
+  };
   const uploadManualSceneImage = async (projectId: string, sceneId: string, file: File) => {
     const response = await fetch(`${basePath}/api/projects/${projectId}/scenes/${sceneId}/assets/upload`, {
       method: 'POST',
@@ -1000,15 +1055,32 @@ function Projects({ homePage = false }: { homePage?: boolean }) {
     const useTextProvider = !templateId && allowExternalProviders === true && textProviderReady && approvePotentialCharges;
     if (useTextProvider) {
       setCreatedProjectId(project.id);
-      startStory(project.id, sceneCount, sceneDurationSeconds, data.visualStyle || 'Cinematic');
+      void runAutoFilm(project.id, sceneCount, sceneDurationSeconds, data.visualStyle || 'Cinematic', true).catch(error => {
+        setAutoFilmRunning(false);
+        setCreatedProjectId(null);
+        setOpen(false);
+        setLocation(`/projects/${project.id}`);
+        window.alert(error instanceof Error ? error.message : tx(lang, 'تعذر إنشاء الفيلم تلقائيًا.', 'Automatic film creation failed.'));
+      });
       return;
     }
     const seeds = buildFreeTemplateScenes(templateId ?? '', data.idea, lang, data.visualStyle, sceneCount, sceneDurationSeconds);
     try {
       for (const [index, seed] of seeds.entries()) await createScene.mutateAsync({ projectId: project.id, data: { ...seed, sortOrder: index } });
       afterChange();
-      setOpen(false);
-      setLocation(`/projects/${project.id}`);
+      if (allowExternalProviders === true) {
+        setCreatedProjectId(project.id);
+        void runAutoFilm(project.id, sceneCount, sceneDurationSeconds, data.visualStyle || 'Cinematic', false).catch(error => {
+          setAutoFilmRunning(false);
+          setCreatedProjectId(null);
+          setOpen(false);
+          setLocation(`/projects/${project.id}`);
+          window.alert(error instanceof Error ? error.message : tx(lang, 'تعذر إنشاء الفيلم تلقائيًا.', 'Automatic film creation failed.'));
+        });
+      } else {
+        setOpen(false);
+        setLocation(`/projects/${project.id}`);
+      }
     } catch {
       setOpen(false);
       setLocation(`/projects/${project.id}`);
@@ -1016,7 +1088,7 @@ function Projects({ homePage = false }: { homePage?: boolean }) {
   };
   const readyProviderCount = (keysQuery.data ?? []).filter(key => key.enabled && providerSupports(key.provider, key.serviceType) && providerKeyIsUsable(key.provider, key.status, key.cooldownUntil)).length;
   const openCreatedProject = () => { if (createdProjectId) { setOpen(false); setCreatedProjectId(null); setProjectSaveError(false); setLocation(`/projects/${createdProjectId}`); } };
-  const projectForm = (inline = false) => <ProjectForm inline={inline} onClose={() => { setOpen(false); setCreatedProjectId(null); setProjectSaveError(false); }} pending={create.isPending || generate.isPending || createScene.isPending || updateProviderSettings.isPending || savingManualScenes} freeMode={freeMode} textProviderReady={textProviderReady} checkingProvider={keysQuery.isLoading} generationError={projectSaveError || (generate.isError && Boolean(createdProjectId))} projectCreated={Boolean(createdProjectId)} onOpenCreated={createdProjectId ? openCreatedProject : undefined} onSave={saveProjectAndWriteStory} />;
+  const projectForm = (inline = false) => <ProjectForm inline={inline} onClose={() => { setOpen(false); setCreatedProjectId(null); setProjectSaveError(false); }} pending={create.isPending || generate.isPending || createScene.isPending || updateProviderSettings.isPending || savingManualScenes || autoFilmRunning} freeMode={freeMode} textProviderReady={textProviderReady} checkingProvider={keysQuery.isLoading} generationError={projectSaveError || (generate.isError && Boolean(createdProjectId))} projectCreated={Boolean(createdProjectId)} onOpenCreated={createdProjectId ? openCreatedProject : undefined} onSave={saveProjectAndWriteStory} />;
   if (homePage) {
     const recentProjects = [...(q.data ?? [])].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()).slice(0, 4);
     return <AppFrame title={tx(lang, 'استوديو الفيديو', 'Video Studio')}>
@@ -1041,7 +1113,7 @@ function Projects({ homePage = false }: { homePage?: boolean }) {
     {backupProgress&&<p className="save-state mt-2" role="status">{backupProgress}</p>}
     <div className="list-controls"><label className="searchbox"><Search size={17}/><input value={search} onChange={e => setSearch(e.target.value)} placeholder={tx(lang,'ابحث في مشاريعك','Search projects')} data-testid="input-project-search" /></label><label className="project-sort"><span className="field-label">{tx(lang,'ترتيب','Sort')}</span><select className="studio-input" value={sort} onChange={e => setSort(e.target.value as typeof sort)} data-testid="select-project-sort"><option value="updated">{tx(lang,'آخر تعديل','Recently updated')}</option><option value="name">{tx(lang,'الاسم','Name')}</option><option value="status">{tx(lang,'الحالة','Status')}</option></select></label><span className="result-count">{list.length} {tx(lang,'مشروع','projects')}</span></div>
     {q.isLoading ? <div className="project-grid">{[1,2,3].map(n=><SkeletonBlock key={n} className="h-52" />)}</div> : q.isError ? <StateError lang={lang} retry={() => q.refetch()} /> : list.length ? <div className="project-grid">{list.map(p=><ProjectCard key={p.id} project={p} onExport={exportBackup} exporting={backupExportingId===p.id} onDelete={id => { if (window.confirm(tx(lang,'هل تريد حذف المشروع وكل مشاهده؟','Delete this project and all its scenes?'))) remove.mutate({projectId:id},{onSuccess:()=>{afterChange();qc.invalidateQueries({queryKey:getGetProjectQueryKey(id)});}}); }} />)}</div> : <Empty title={search ? tx(lang,'لا توجد مطابقة','No matching projects') : tx(lang,'ابدأ بمشهد أول','Start with a first frame')} body={search ? tx(lang,'جرّب كلمات بحث أخرى.','Try another search term.') : tx(lang,'أنشئ مشروعًا ليصبح لديك مكان لصياغة الفكرة وبناء المشاهد.','Create a project to shape the idea and build your scenes.')} action={!search && <button className="btn btn-primary" onClick={() => setOpen(true)}><Plus size={16}/>{tx(lang,'إنشاء أول مشروع','Create your first project')}</button>} />}
-    {open && <ProjectForm initialTemplateId={newTemplate} initialMode={new URLSearchParams(location.split('?')[1] || '').get('mode') === 'manual' ? 'manual' : 'auto'} onClose={() => { setOpen(false); setNewTemplate(undefined); setCreatedProjectId(null); setProjectSaveError(false); }} pending={create.isPending || generate.isPending || createScene.isPending || updateProviderSettings.isPending || savingManualScenes} freeMode={freeMode} textProviderReady={textProviderReady} checkingProvider={keysQuery.isLoading} generationError={projectSaveError || (generate.isError && Boolean(createdProjectId))} projectCreated={Boolean(createdProjectId)} onOpenCreated={createdProjectId ? openCreatedProject : undefined} onSave={saveProjectAndWriteStory} />}
+    {open && <ProjectForm initialTemplateId={newTemplate} initialMode={new URLSearchParams(location.split('?')[1] || '').get('mode') === 'manual' ? 'manual' : 'auto'} onClose={() => { setOpen(false); setNewTemplate(undefined); setCreatedProjectId(null); setProjectSaveError(false); }} pending={create.isPending || generate.isPending || createScene.isPending || updateProviderSettings.isPending || savingManualScenes || autoFilmRunning} freeMode={freeMode} textProviderReady={textProviderReady} checkingProvider={keysQuery.isLoading} generationError={projectSaveError || (generate.isError && Boolean(createdProjectId))} projectCreated={Boolean(createdProjectId)} onOpenCreated={createdProjectId ? openCreatedProject : undefined} onSave={saveProjectAndWriteStory} />}
   </AppFrame>;
 }
 

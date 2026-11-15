@@ -812,8 +812,8 @@ export const QueueSceneImageGenerationBody = zod.object({
   "resolution": zod.union([zod.literal(512),zod.literal(768),zod.literal(1024)]),
   "seed": zod.number().int().min(queueSceneImageGenerationBodySeedMin).max(queueSceneImageGenerationBodySeedMax).nullish(),
   "negativePrompt": zod.string().max(queueSceneImageGenerationBodyNegativePromptMax).nullish(),
-  "acceptAiHordePrivacy": zod.boolean().optional(),
-  "approvePotentialCharges": zod.boolean()
+  "approvePotentialCharges": zod.boolean(),
+  "acceptAiHordePrivacy": zod.boolean().optional().describe('Required when providerKeyId selects anonymous AI Horde; confirms the user accepts sharing the prompt and generated image with the public service.')
 })
 
 export const queueSceneImageGenerationResponseProgressMin = 0;
@@ -945,6 +945,8 @@ export const generateProjectScriptBodySceneDurationSecondsMax = 600;
 export const generateProjectScriptBodySceneStyleDefault = `Cinematic`;
 export const generateProjectScriptBodySceneStyleMax = 200;
 
+export const generateProjectScriptBodyStoryMax = 30000;
+
 
 
 export const GenerateProjectScriptBody = zod.object({
@@ -954,7 +956,7 @@ export const GenerateProjectScriptBody = zod.object({
   "sceneCount": zod.number().int().min(1).max(generateProjectScriptBodySceneCountMax).default(generateProjectScriptBodySceneCountDefault),
   "sceneDurationSeconds": zod.number().int().min(1).max(generateProjectScriptBodySceneDurationSecondsMax).default(generateProjectScriptBodySceneDurationSecondsDefault),
   "sceneStyle": zod.string().min(1).max(generateProjectScriptBodySceneStyleMax).default(generateProjectScriptBodySceneStyleDefault),
-  "story": zod.string().min(1).max(30000).optional()
+  "story": zod.string().min(1).max(generateProjectScriptBodyStoryMax).optional()
 })
 
 export const generateProjectScriptResponseOneBrandKitPrimaryColorRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
@@ -1086,6 +1088,8 @@ export const queueProjectScriptBodySceneDurationSecondsMax = 600;
 export const queueProjectScriptBodySceneStyleDefault = `Cinematic`;
 export const queueProjectScriptBodySceneStyleMax = 200;
 
+export const queueProjectScriptBodyStoryMax = 30000;
+
 
 
 export const QueueProjectScriptBody = zod.object({
@@ -1095,7 +1099,7 @@ export const QueueProjectScriptBody = zod.object({
   "sceneCount": zod.number().int().min(1).max(queueProjectScriptBodySceneCountMax).default(queueProjectScriptBodySceneCountDefault),
   "sceneDurationSeconds": zod.number().int().min(1).max(queueProjectScriptBodySceneDurationSecondsMax).default(queueProjectScriptBodySceneDurationSecondsDefault),
   "sceneStyle": zod.string().min(1).max(queueProjectScriptBodySceneStyleMax).default(queueProjectScriptBodySceneStyleDefault),
-  "story": zod.string().min(1).max(30000).optional()
+  "story": zod.string().min(1).max(queueProjectScriptBodyStoryMax).optional()
 })
 
 export const queueProjectScriptResponseProgressMin = 0;
