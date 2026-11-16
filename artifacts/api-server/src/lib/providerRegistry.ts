@@ -184,6 +184,12 @@ export const providerDefinitions: Record<string, ProviderDefinition> = {
     testUrl: () => "https://api.fal.ai/v1/models",
     testHeaders: (key) => ({ Authorization: `Key ${key}` }),
   },
+  "magic-hour": {
+    label: "Magic Hour",
+    officialUrl: "https://magichour.ai/developer",
+    testUrl: () => "https://api.magichour.ai/v1/account",
+    testHeaders: (key) => ({ Authorization: `Bearer ${key}` }),
+  },
   elevenlabs: {
     label: "ElevenLabs",
     officialUrl: "https://elevenlabs.io/app/settings/api-keys",
@@ -246,7 +252,7 @@ export const providerCatalog = [
 ];
 
 const providersRequiringSuccessfulTest = new Set([
-  "huggingface", "colab-t5", "cloudflare", "stability", "groq", "llama-free", "assemblyai", "deepgram", "agnes",
+  "huggingface", "colab-t5", "cloudflare", "stability", "groq", "llama-free", "assemblyai", "deepgram", "agnes", "magic-hour",
 ]);
 export function providerRequiresSuccessfulTest(provider: string): boolean {
   return providersRequiringSuccessfulTest.has(provider);
