@@ -336,6 +336,109 @@ async function agnesVideoPrediction(
   throw new Error("Agnes AI is still processing this video. Check the job before submitting it again.");
 }
 
+function magicHourDownloadUrl(value: unknown): string | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = magicHourDownloadUrl(item);
+      if (found) return found;
+    }
+    return undefined;
+  }
+  const record = value as Record<string, unknown>;
+  for (const key of ["url", "download_url", "downloadUrl"]) {
+    if (typeof record[key] === "string" && record[key].startsWith("https://")) return record[key] as string;
+  }
+  for (const item of Object.values(record)) {
+    const found = magicHourDownloadUrl(item);
+    if (found) return found;
+  }
+  return undefined;
+}
+
+function magicHourImageBytes(referenceImage: string): Buffer {
+  const match = /^data:image\/(?:png|jpeg|jpg|webp);base64,([A-Za-z0-9+/=]+)$/.exec(referenceImage);
+  if (!match) throw new Error("Magic Hour image-to-video requires a generated image or a public HTTPS image URL.");
+  const bytes = Buffer.from(match[1], "base64");
+  if (!bytes.length || bytes.byteLength > 25 * 1024 * 1024) throw new Error("The Magic Hour reference image is empty or too large.");
+  return bytes;
+}
+
+async function uploadMagicHourImage(key: string, bytes: Buffer): Promise<string> {
+  const response = await providerResponse("https://api.magichour.ai/v1/files/upload-urls", key, {
+    items: [{ type: "image", extension: "png" }],
+  });
+  const data = await readJson(response);
+  const item = Array.isArray(data.items) ? data.items[0] as Record<string, unknown> | undefined : undefined;
+  const uploadUrl = typeof item?.upload_url === "string" ? item.upload_url : "";
+  const filePath = typeof item?.file_path === "string" ? item.file_path : "";
+  if (!uploadUrl || !filePath) throw new Error("Magic Hour did not return a valid image upload URL.");
+  const parsed = new URL(uploadUrl);
+  if (parsed.protocol !== "https:" || parsed.username || parsed.password || parsed.hostname !== "videos.magichour.ai") {
+    throw new Error("Magic Hour returned an unsafe image upload URL.");
+  }
+  const upload = await fetch(uploadUrl, {
+    method: "PUT",
+    headers: { "Content-Type": "image/png" },
+    body: bytes,
+    signal: AbortSignal.timeout(90_000),
+    redirect: "error",
+  });
+  if (!upload.ok) throw new ProviderCallError(`Magic Hour image upload failed with HTTP ${upload.status}.`, upload.status, (await upload.text()).slice(0, 4000));
+  return filePath;
+}
+
+async function magicHourVideoPrediction(
+  key: string,
+  model: string,
+  prompt: string,
+  referenceImage: string | undefined,
+  durationSeconds: number,
+  aspectRatio: string,
+  maxWaitMs = 20 * 60_000,
+): Promise<string> {
+  const body: Record<string, unknown> = {
+    name: "Ella2027 video",
+    model: model || "ltx-2.5",
+    end_seconds: Math.max(1, Math.min(60, Math.round(durationSeconds))),
+    resolution: "480p",
+    audio: false,
+    style: { prompt },
+  };
+  if (["16:9", "9:16", "1:1"].includes(aspectRatio)) body.aspect_ratio = aspectRatio;
+  let endpoint = "https://api.magichour.ai/v1/text-to-video";
+  if (referenceImage) {
+    const bytes = referenceImage.startsWith("data:image/")
+      ? magicHourImageBytes(referenceImage)
+      : await downloadPublicHttps(referenceImage, 25 * 1024 * 1024);
+    const filePath = await uploadMagicHourImage(key, bytes);
+    endpoint = "https://api.magichour.ai/v1/image-to-video";
+    body.assets = { image_file_path: filePath };
+  }
+  const submission = await readJson(await providerResponse(endpoint, key, body));
+  const projectId = typeof submission.id === "string" ? submission.id : "";
+  if (!projectId || !/^[a-zA-Z0-9._:-]+$/.test(projectId)) throw new Error("Magic Hour did not return a valid video project ID.");
+  const deadline = Date.now() + maxWaitMs;
+  while (Date.now() < deadline) {
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 5_000));
+    const result = await readJson(await fetch(`https://api.magichour.ai/v1/video-projects/${encodeURIComponent(projectId)}`, {
+      headers: { Authorization: `Bearer ${key}`, Accept: "application/json" },
+      signal: AbortSignal.timeout(60_000),
+      redirect: "error",
+    }));
+    const status = typeof result.status === "string" ? result.status.toLowerCase() : "";
+    if (["failed", "error", "canceled", "cancelled"].includes(status)) {
+      throw new Error("Magic Hour could not generate this video. Check the model, prompt, and account credits.");
+    }
+    if (["complete", "completed", "succeeded", "success", "done"].includes(status)) {
+      const videoUrl = magicHourDownloadUrl(result.downloads ?? result);
+      if (!videoUrl) throw new Error("Magic Hour completed without returning a downloadable video URL.");
+      return videoUrl;
+    }
+  }
+  throw new Error("Magic Hour is still processing this video. Check the job before submitting it again.");
+}
+
 function firstOutput(output: unknown): string {
   const candidate = Array.isArray(output) ? output[0] : output;
   if (typeof candidate !== "string" || !candidate.startsWith("https://")) {
@@ -504,6 +607,19 @@ export async function generateVideo(
   durationSeconds = 5,
   aspectRatio = "16:9",
 ): Promise<Buffer> {
+  if (provider === "magic-hour") {
+    const videoUrl = await magicHourVideoPrediction(
+      key,
+      model || "ltx-2.5",
+      prompt,
+      referenceImage,
+      durationSeconds,
+      aspectRatio,
+    );
+    const bytes = await downloadPublicHttps(videoUrl, 250 * 1024 * 1024);
+    await validateGeneratedMp4(bytes);
+    return bytes;
+  }
   if (provider === "agnes") {
     const videoUrl = await agnesVideoPrediction(
       key,
@@ -539,7 +655,7 @@ export async function generateVideo(
   }
 
   if (provider !== "replicate") {
-    throw new Error("Video generation is currently connected through Agnes AI, Replicate, and fal.ai.");
+    throw new Error("Video generation is currently connected through Magic Hour, Agnes AI, Replicate, and fal.ai.");
   }
   const input: Record<string, unknown> = {
     prompt,

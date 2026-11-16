@@ -143,7 +143,7 @@ function providerSupports(provider: string, service: string) {
   if (provider === 'free-test') return ['image', 'voice'].includes(service);
   if (service === 'text') return ['openai','gemini','anthropic','groq','cloudflare','openrouter','llama-free','huggingface','colab-t5','mistral','cerebras','together','sambanova','deepseek','nvidia','cohere'].includes(provider);
   if (service === 'image') return ['openai','stability','replicate','huggingface','ai-horde'].includes(provider);
-  if (service === 'video') return ['replicate','fal','agnes'].includes(provider);
+  if (service === 'video') return ['replicate','fal','agnes','magic-hour'].includes(provider);
   if (service === 'voice') return ['elevenlabs','openai','openai-audio','google-tts','azure-speech','piper-local'].includes(provider);
   if (service === 'transcription') return ['openai','whisper','huggingface','deepgram','assemblyai','google-speech','azure-speech'].includes(provider);
   if (service === 'media') return ['pexels','pixabay','unsplash'].includes(provider);
@@ -215,6 +215,12 @@ function providerServicePurpose(service: string, lang: Lang, provider = '') {
     return {
       label: tx(lang, 'توليد الفيديو عبر Agnes AI', 'Video generation through Agnes AI'),
       description: tx(lang, 'يُنشئ مهمة فيديو غير متزامنة ثم ينتظر اكتمالها عبر Agnes AI.', 'Creates an asynchronous video task and waits for completion through Agnes AI.'),
+    };
+  }
+  if (service === 'video' && provider === 'magic-hour') {
+    return {
+      label: tx(lang, 'توليد الفيديو عبر Magic Hour', 'Video generation through Magic Hour'),
+      description: tx(lang, 'يُنشئ مشروع فيديو غير متزامن عبر Magic Hour ثم ينتظر اكتماله ويحفظ ملف MP4 داخل التطبيق.', 'Creates an asynchronous Magic Hour video project, waits for completion, and saves the MP4 inside the app.'),
     };
   }
   if (service === 'voice' && provider === 'azure-speech') {
@@ -940,7 +946,7 @@ function Projects({ homePage = false }: { homePage?: boolean }) {
     const videoKey = keys.find(key => key.enabled && key.serviceType === 'video' && providerSupports(key.provider, 'video') && providerKeyIsUsable(key.provider, key.status));
     if (!videoKey) {
       const configuredVideo = keys.filter(key => key.enabled && key.serviceType === 'video');
-      const detail = configuredVideo.length ? tx(lang, `المفاتيح موجودة لكن غير جاهزة: ${configuredVideo.map(key => `${key.label} (${key.status})`).join('، ')}. اختبر المفتاح من الإعدادات أولًا.`, `Video keys exist but are not ready: ${configuredVideo.map(key => `${key.label} (${key.status})`).join(', ')}. Test the key in Settings first.`) : tx(lang, 'لا يوجد مفتاح فيديو مفعّل. أضف مفتاح Agnes AI أو Replicate أو fal.ai من الإعدادات.', 'No enabled video key found. Add an Agnes AI, Replicate, or fal.ai key in Settings.');
+      const detail = configuredVideo.length ? tx(lang, `المفاتيح موجودة لكن غير جاهزة: ${configuredVideo.map(key => `${key.label} (${key.status})`).join('، ')}. اختبر المفتاح من الإعدادات أولًا.`, `Video keys exist but are not ready: ${configuredVideo.map(key => `${key.label} (${key.status})`).join(', ')}. Test the key in Settings first.`) : tx(lang, 'لا يوجد مفتاح فيديو مفعّل. أضف مفتاح Magic Hour أو Agnes AI أو Replicate أو fal.ai من الإعدادات.', 'No enabled video key found. Add a Magic Hour, Agnes AI, Replicate, or fal.ai key in Settings.');
       throw new Error(detail);
     }
     const voiceKey = keys.find(key => key.enabled && key.serviceType === 'voice' && providerSupports(key.provider, 'voice') && providerKeyIsUsable(key.provider, key.status));
@@ -1801,7 +1807,7 @@ function BatchVideoGeneration({projectId,scenes,keys,lang,hasActiveJob,onQueued,
     <section className="script-bar panel mt-4" data-testid="batch-video-panel">
       <div className="script-symbol"><Film size={18}/></div>
       <div className="script-copy"><b>{tx(lang,'حوّل المشاهد إلى فيديو','Turn scenes into video')}</b><p>{scenesWithoutVideo.length?tx(lang,'ولّد مقطعًا لكل مشهد ناقص دفعة واحدة، أو اختر كل مشهد وولّده وحده.','Generate clips for all scenes without video, or generate each scene individually.'):tx(lang,'كل المشاهد لديها فيديو بالفعل.','Every scene already has a video.')}</p>
-        {videoKeys.length===0&&scenesWithoutVideo.length>0&&<Link href="/settings/providers" className="text-link" data-testid="link-batch-video-provider-settings">{tx(lang,'أضف مفتاح Agnes AI أو Replicate أو fal.ai لخدمة الفيديو','Add an Agnes AI, Replicate, or fal.ai video key')}<ArrowLeft size={14}/></Link>}
+        {videoKeys.length===0&&scenesWithoutVideo.length>0&&<Link href="/settings/providers" className="text-link" data-testid="link-batch-video-provider-settings">{tx(lang,'أضف مفتاح Magic Hour أو Agnes AI أو Replicate أو fal.ai لخدمة الفيديو','Add a Magic Hour, Agnes AI, Replicate, or fal.ai video key')}<ArrowLeft size={14}/></Link>}
         {hasActiveJob&&<small className="provider-purpose-description">{tx(lang,'انتظر انتهاء المهمة الحالية قبل بدء دفعة فيديو جديدة.','Wait for the current job to finish before starting a video batch.')}</small>}
         {summary&&<p role="status" data-testid="batch-video-result">{summary.failed?tx(lang,`أُرسل ${summary.queued} من ${summary.total} طلبات الفيديو؛ تعذّر إرسال ${summary.failed}.`,`${summary.queued} of ${summary.total} video requests were queued; ${summary.failed} could not be queued.`):tx(lang,`تم إرسال ${summary.queued} طلبات فيديو إلى قائمة المهام.`,`Queued ${summary.queued} video requests.`)} <Link href="/jobs" className="text-link">{tx(lang,'عرض المهام','View jobs')}<ArrowLeft size={13}/></Link></p>}
       </div>
@@ -1810,7 +1816,7 @@ function BatchVideoGeneration({projectId,scenes,keys,lang,hasActiveJob,onQueued,
     {open&&<Modal title={tx(lang,'توليد فيديو للمشاهد','Generate scene videos')} subtitle={tx(lang,`سيتم إرسال ${scenesToQueue.length} طلب فيديو. قد تُحتسب رسوم لكل مشهد.`,`This will send ${scenesToQueue.length} video requests. Each scene may incur a charge.`)} onClose={close}>
       <div className="form-stack">
         {videoKeys.length>1&&<label><span className="field-label">{tx(lang,'مفتاح الفيديو','Video key')}</span><select className="studio-input" value={activeKey?.id||''} onChange={e=>{setProviderId(e.target.value);const selected=videoKeys.find(key=>key.id===e.target.value);setModel(defaultVideoModel(selected?.provider,mode));}} data-testid="select-batch-video-key">{videoKeys.map(key=><option key={key.id} value={key.id}>{key.label} · {key.provider}</option>)}</select></label>}
-        <label><span className="field-label">{tx(lang,'معرّف نموذج الفيديو','Video model endpoint')}</span><input required className="studio-input" value={model} onChange={e=>setModel(e.target.value)} placeholder={activeKey?.provider==='fal'?'minimax/h3-max/text-to-video':activeKey?.provider==='agnes'?'agnes-video-2.5':'minimax/video-01'} data-testid="input-batch-video-model"/></label>
+        <label><span className="field-label">{tx(lang,'معرّف نموذج الفيديو','Video model endpoint')}</span><input required className="studio-input" value={model} onChange={e=>setModel(e.target.value)} placeholder={activeKey?.provider==='fal'?'minimax/h3-max/text-to-video':activeKey?.provider==='agnes'?'agnes-video-2.5':activeKey?.provider==='magic-hour'?'ltx-2.5':'minimax/video-01'} data-testid="input-batch-video-model"/></label>
         <label><span className="field-label">{tx(lang,'طريقة إنشاء الفيديو','Video source')}</span><select className="studio-input" value={mode} onChange={e=>{const nextMode=e.target.value as 'text'|'image';setMode(nextMode);setModel(defaultVideoModel(activeKey?.provider,nextMode));}} data-testid="select-batch-video-mode"><option value="text">{tx(lang,'من وصف المشهد','From each scene prompt')}</option><option value="image" disabled={!allHaveImages}>{tx(lang,'من صورة كل مشهد','From each scene image')}</option></select></label>
         {!allHaveImages&&<p className="generation-note">{tx(lang,'خيار الصورة يحتاج صورة مرفقة بكل مشهد؛ استخدم وصف المشهد إذا لم تتوفر الصور.','Image mode needs an attached image on every scene. Use scene prompts when images are missing.')}</p>}
         {activeKey&&<ChargeApprovalCard lang={lang} service="video" provider={activeKey.provider} providerLabel={activeKey.label} model={model} scenes={scenesToQueue.length} approved={approved} onChange={setApproved}/>}
