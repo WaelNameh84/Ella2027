@@ -93,7 +93,7 @@ function providerKeyIsUsable(provider: string, status: ProviderKey['status'], co
   if (status === 'quota_limited' || status === 'rate_limited') {
     return !cooldownUntil || new Date(cooldownUntil).getTime() <= Date.now();
   }
-  const verifyFirst = ['huggingface','cloudflare','stability','groq','assemblyai','deepgram','google-tts','azure-speech'].includes(provider);
+  const verifyFirst = ['huggingface','cloudflare','stability','groq','llama-free','colab-t5','assemblyai','deepgram','agnes','magic-hour','local-video-worker','google-tts','azure-speech'].includes(provider);
   return verifyFirst ? status === 'valid' : status === 'valid' || status === 'untested';
 }
 
