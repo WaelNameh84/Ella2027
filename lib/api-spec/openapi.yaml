@@ -303,6 +303,43 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/StudioJob"
+  /projects/{projectId}/scenes/{sceneId}/assist:
+    parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: sceneId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: assistWithSceneWriting
+      tags: [projects]
+      summary: Generate a reviewable AI scene-writing suggestion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ManualSceneAssistantInput"
+      responses:
+        "200":
+          description: Reviewable scene suggestion; no scene fields are changed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  suggestion:
+                    $ref: "#/components/schemas/ManualSceneSuggestion"
+                  provider: { type: string }
+                required: [suggestion, provider]
+        "400": { description: Invalid request or missing explicit approval }
+        "403": { description: External AI requests are disabled in zero-spend mode }
+        "404": { description: Project or scene not found }
+        "409": { description: No usable selected text provider }
+        "502": { description: Text provider failed or returned invalid structured output }
   /projects/{projectId}/scenes/{sceneId}/transcriptions:
     post:
       operationId: transcribeSceneAudio
@@ -1074,6 +1111,27 @@ components:
         clipEndSeconds: { type: ["integer", "null"], minimum: 0 }
         playbackSpeed: { type: number, minimum: 0.25, maximum: 4 }
         transition: { type: string, maxLength: 100 }
+    ManualSceneAssistantInput:
+      type: object
+      properties:
+        idea: { type: string, minLength: 1, maxLength: 5000 }
+        task: { type: string, enum: [write_scene, dialogue, visual_prompt, improve_scene] }
+        providerKeyId: { type: string, format: uuid }
+        approvePotentialCharges: { type: boolean }
+      required: [idea, task, approvePotentialCharges]
+    ManualSceneSuggestion:
+      type: object
+      properties:
+        title: { type: string, minLength: 1, maxLength: 160 }
+        description: { type: string, maxLength: 6000 }
+        imagePrompt: { type: string, minLength: 1, maxLength: 6000 }
+        narration: { type: string, maxLength: 6000 }
+        shotType: { type: string, maxLength: 100 }
+        cameraMovement: { type: string, maxLength: 100 }
+        location: { type: string, maxLength: 2000 }
+        lighting: { type: string, maxLength: 2000 }
+        durationSeconds: { type: integer, minimum: 1, maximum: 600 }
+      required: [title, description, imagePrompt, narration, shotType, cameraMovement, location, lighting, durationSeconds]
     ScriptGenerationInput:
       type: object
       properties:
