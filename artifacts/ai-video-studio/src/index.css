@@ -2673,3 +2673,166 @@ a[href]:active,
 @media (prefers-reduced-motion: reduce) {
   .ella-pro-feature::after, .ella-mode-mini::before { transition: none; }
 }
+
+
+/* Ella tactile studio finish: orbiting edge light + physical mobile controls */
+@property --ella-edge-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+:where(
+  .panel,
+  .card,
+  .idea-entry-card,
+  .manual-story-split-panel,
+  .manual-scene-draft,
+  .ai-scene-assistant,
+  .ai-scene-suggestion,
+  .ella-pro-feature,
+  .ella-mode-card,
+  .ella-mode-mini,
+  .project-card,
+  .provider-card,
+  .media-card,
+  .scene-card,
+  .stat-card,
+  .dashboard-card,
+  .studio-card
+) {
+  position: relative;
+  isolation: isolate;
+  --ella-edge-color: rgba(151, 190, 220, .82);
+  box-shadow:
+    0 9px 26px rgba(0, 0, 0, .10),
+    inset 0 1px 0 rgba(255, 255, 255, .075);
+}
+:where(
+  .panel,
+  .card,
+  .idea-entry-card,
+  .manual-story-split-panel,
+  .manual-scene-draft,
+  .ai-scene-assistant,
+  .ai-scene-suggestion,
+  .ella-pro-feature,
+  .ella-mode-card,
+  .ella-mode-mini,
+  .project-card,
+  .provider-card,
+  .media-card,
+  .scene-card,
+  .stat-card,
+  .dashboard-card,
+  .studio-card
+)::before {
+  content: "";
+  position: absolute;
+  z-index: 3;
+  inset: -1px;
+  padding: 1.25px;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: .58;
+  background: conic-gradient(
+    from var(--ella-edge-angle),
+    transparent 0deg 258deg,
+    color-mix(in srgb, var(--ella-edge-color) 30%, transparent) 276deg,
+    var(--ella-edge-color) 292deg,
+    rgba(255,255,255,.98) 300deg,
+    var(--ella-edge-color) 307deg,
+    transparent 326deg 360deg
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: ella-edge-orbit 7s linear infinite;
+  transition: opacity .25s ease, filter .25s ease;
+}
+:where(
+  .panel,
+  .card,
+  .idea-entry-card,
+  .manual-story-split-panel,
+  .manual-scene-draft,
+  .ai-scene-assistant,
+  .ai-scene-suggestion,
+  .ella-pro-feature,
+  .ella-mode-card,
+  .ella-mode-mini,
+  .project-card,
+  .provider-card,
+  .media-card,
+  .scene-card,
+  .stat-card,
+  .dashboard-card,
+  .studio-card
+)::after {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  top: -3px;
+  left: 0;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: .82;
+  background: #e9f7ff;
+  box-shadow:
+    0 0 5px 2px rgba(225,245,255,.9),
+    0 0 13px 5px var(--ella-edge-color),
+    0 0 25px 9px color-mix(in srgb, var(--ella-edge-color) 42%, transparent);
+  offset-path: inset(3px round 18px);
+  offset-distance: 0%;
+  animation: ella-edge-dot 7s linear infinite;
+}
+.ella-mode-card.mode-quick, .ella-mode-mini.mode-quick { --ella-edge-color: rgba(244,190,111,.95); }
+.ella-mode-card.mode-pro, .ella-pro-feature { --ella-edge-color: rgba(151,184,246,.95); }
+.ella-mode-card.mode-manual, .ella-mode-mini.mode-manual,
+.manual-story-split-panel, .manual-scene-draft { --ella-edge-color: rgba(133,211,177,.95); }
+:where(.panel,.card,.idea-entry-card,.manual-story-split-panel,.manual-scene-draft,.ai-scene-assistant,.ai-scene-suggestion,.ella-pro-feature,.ella-mode-card,.ella-mode-mini,.project-card,.provider-card,.media-card,.scene-card,.stat-card,.dashboard-card,.studio-card):hover::before {
+  opacity: .95;
+  filter: brightness(1.12);
+}
+@keyframes ella-edge-orbit { to { --ella-edge-angle: 360deg; } }
+@keyframes ella-edge-dot { to { offset-distance: 100%; } }
+
+/* Buttons feel pressed, like native mobile controls */
+:where(button,.btn,[role="button"],a.ella-pro-primary,a.ella-mode-mini,.storyboard-upload-label) {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transform: translateY(0) scale(1);
+  transition:
+    transform .12s cubic-bezier(.2,.8,.2,1),
+    box-shadow .12s ease,
+    filter .12s ease,
+    background-color .12s ease;
+}
+:where(button,.btn,[role="button"],a.ella-pro-primary,a.ella-mode-mini,.storyboard-upload-label):not(:disabled):not([aria-disabled="true"]):active {
+  transform: translateY(2px) scale(.975);
+  filter: brightness(.94);
+  box-shadow:
+    inset 0 3px 7px rgba(0,0,0,.22),
+    0 1px 2px rgba(0,0,0,.12) !important;
+}
+:where(button,.btn,[role="button"],a.ella-pro-primary,a.ella-mode-mini):focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 3px;
+}
+:where(button,.btn):disabled,[aria-disabled="true"] {
+  cursor: not-allowed;
+  filter: saturate(.55);
+}
+@media (hover: hover) and (pointer: fine) {
+  :where(button,.btn,[role="button"],a.ella-pro-primary,a.ella-mode-mini):not(:disabled):hover {
+    filter: brightness(1.06);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :where(.panel,.card,.idea-entry-card,.manual-story-split-panel,.manual-scene-draft,.ai-scene-assistant,.ai-scene-suggestion,.ella-pro-feature,.ella-mode-card,.ella-mode-mini,.project-card,.provider-card,.media-card,.scene-card,.stat-card,.dashboard-card,.studio-card)::before,
+  :where(.panel,.card,.idea-entry-card,.manual-story-split-panel,.manual-scene-draft,.ai-scene-assistant,.ai-scene-suggestion,.ella-pro-feature,.ella-mode-card,.ella-mode-mini,.project-card,.provider-card,.media-card,.scene-card,.stat-card,.dashboard-card,.studio-card)::after {
+    animation: none;
+  }
+  :where(button,.btn,[role="button"],a.ella-pro-primary,a.ella-mode-mini,.storyboard-upload-label) { transition: none; }
+}
