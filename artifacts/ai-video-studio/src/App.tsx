@@ -655,13 +655,13 @@ function ManualSceneImagePicker({sceneNumber,file,disabled,lang,onChange,onError
     {file&&<button type="button" className="btn btn-quiet manual-scene-image-remove" disabled={disabled} onClick={()=>{onChange(null);onError('');}}><Trash2 size={14}/>{tx(lang,'إزالة الصورة','Remove image')}</button>}
   </div>;
 }
-function ProjectForm({ onClose, initial, initialMode = 'auto', initialTemplateId = '', onSave, pending, freeMode = true, textProviderReady = false, checkingProvider = false, generationError = false, projectCreated = false, onOpenCreated, inline = false }: { onClose: () => void; initial?: Partial<ProjectInput>; initialTemplateId?: string; onSave: (data: ProjectInput, approvePotentialCharges?: boolean, templateId?: string, mode?: 'auto' | 'manual', sceneCount?: number, sceneDurationSeconds?: number, allowExternalProviders?: boolean, manualScenes?: ManualSceneDraft[], manualFullStory?: string, splitManualStory?: boolean, reviewBeforeRendering?: boolean) => void | Promise<void>; pending: boolean; freeMode?: boolean; textProviderReady?: boolean; checkingProvider?: boolean; generationError?: boolean; projectCreated?: boolean; onOpenCreated?: () => void; initialMode?: 'auto' | 'manual'; inline?: boolean }) {
+function ProjectForm({ onClose, initial, initialMode = 'auto', initialTemplateId = '', onSave, pending, freeMode = true, textProviderReady = false, checkingProvider = false, generationError = false, projectCreated = false, onOpenCreated, inline = false }: { onClose: () => void; initial?: Partial<ProjectInput>; initialTemplateId?: string; onSave: (data: ProjectInput, approvePotentialCharges?: boolean, templateId?: string, mode?: 'auto' | 'manual', sceneCount?: number, sceneDurationSeconds?: number, allowExternalProviders?: boolean, manualScenes?: ManualSceneDraft[], manualFullStory?: string, splitManualStory?: boolean, reviewBeforeRendering?: boolean) => void | Promise<void>; pending: boolean; freeMode?: boolean; textProviderReady?: boolean; checkingProvider?: boolean; generationError?: boolean; projectCreated?: boolean; onOpenCreated?: () => void; initialMode?: 'auto' | 'manual'; initialExperienceMode?: 'quick' | 'pro'; inline?: boolean }) {
   const { lang } = useApp();
   const initialPreset = projectTemplates.find(item => item.id === initialTemplateId);
   const [form, setForm] = useState<ProjectInput>(() => ({ ...blankProject, language: lang, ...initial, ...(initialPreset ? { videoType: initialPreset.videoType, aspectRatio: initialPreset.aspectRatio, visualStyle: initialPreset.visualStyle, audience: lang === 'ar' ? 'الجمهور العام' : initialPreset.audience } : {}) }));
   const [template, setTemplate] = useState(initialTemplateId);
   const [mode, setMode] = useState<'auto' | 'manual'>(initialMode);
-  const [experienceMode, setExperienceMode] = useState<'quick' | 'pro'>(inline ? 'quick' : 'pro');
+  const [experienceMode, setExperienceMode] = useState<'quick' | 'pro'>(initialExperienceMode ?? (inline ? 'quick' : 'pro'));
   const [customLanguage, setCustomLanguage] = useState('');
   const [approvePotentialCharges, setApprovePotentialCharges] = useState(false);
   const [sceneCount, setSceneCount] = useState(5);
@@ -754,7 +754,7 @@ function ProjectForm({ onClose, initial, initialMode = 'auto', initialTemplateId
         <button type="button" role="tab" aria-selected={experienceMode==='pro'} className={experienceMode==='pro'?'is-selected':''} onClick={()=>chooseExperienceMode('pro')} disabled={projectCreated}>{tx(lang,'احترافي','Professional')}</button>
       </div>}
       {!editing && mode !== 'manual' && plan && <FilmPlanCard plan={plan} lang={lang} pending={pending} approveDisabled={useTextProvider && !approvePotentialCharges} onEdit={()=>setPlan(null)} onReanalyze={()=>setPlan(makePlan())} onApprove={approvePlan} />}
-      {!editing && inline && experienceMode === 'quick' ? <>
+      {!editing && experienceMode === 'quick' ? <>
         <div className="quick-idea-entry is-inline"><label><span className="field-label">{tx(lang,'فكرة الفيلم','Film idea')}</span><textarea required maxLength={1500} rows={5} className="studio-input resize-y quick-idea-input" value={form.idea} onChange={e=>update('idea',e.target.value)} placeholder={tx(lang,'اكتب فكرتك وسنحوّلها إلى فيلم كامل…','Write your idea and we’ll shape it into a complete film…')} data-testid="input-project-idea" disabled={projectCreated} autoFocus /></label><WritingAssistant lang={lang} context="idea" values={{idea:form.idea}} onApply={(field,value)=>{if(field==='idea')update('idea',value)}} /></div>
         <div className="quick-toolbar">
           <label><span className="field-label">{tx(lang,'نوع الفيديو','Video type')}</span><select className="studio-input" value={form.videoType} disabled={projectCreated} onChange={e=>update('videoType',e.target.value)}>{videoTypes.map(([value,ar,en])=><option key={value} value={value}>{tx(lang,ar,en)}</option>)}</select></label>
@@ -875,7 +875,7 @@ function Projects({ homePage = false }: { homePage?: boolean }) {
   const [open, setOpen] = useState(false);
   const [newTemplate, setNewTemplate] = useState<string | undefined>(undefined);
   const openNewProject = (templateId?: string) => { setNewTemplate(templateId); setOpen(true); };
-  useEffect(() => { const params = new URLSearchParams(location.split('?')[1] || ''); const requestedMode = params.get('mode'); if (!homePage && params.get('new') === '1') setOpen(true); if (!homePage && (requestedMode === 'manual' || requestedMode === 'auto')) setOpen(true); }, [location, homePage]);
+  useEffect(() => { const params = new URLSearchParams(location.split('?')[1] || ''); const requestedMode = params.get('mode'); if (!homePage && params.get('new') === '1') setOpen(true); if (!homePage && (requestedMode === 'manual' || requestedMode === 'auto' || requestedMode === 'quick' || requestedMode === 'pro')) setOpen(true); }, [location, homePage]);
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<'updated' | 'name' | 'status'>('updated');
   const [createdProjectId, setCreatedProjectId] = useState<string | null>(null);
@@ -1177,16 +1177,23 @@ function Projects({ homePage = false }: { homePage?: boolean }) {
             </div>
             <div className="ella-welcome-meta"><span className="ella-live-indicator"><i /> {tx(lang, 'مساحة العمل جاهزة', 'WORKSPACE READY')}</span><span>{recentProjects.length} {tx(lang, 'مشاريع حديثة', 'RECENT PROJECTS')}</span></div>
           </header>
-          <section className="ella-composer-zone">
-            <div className="ella-composer-label"><span>{tx(lang, '01 — ابدأ من فكرتك', '01 — START WITH YOUR IDEA')}</span><small>{tx(lang, 'لا حاجة لإعداد مشروع يدوي', 'NO MANUAL SETUP REQUIRED')}</small></div>
-            <div className="ella-composer">{projectForm(true)}</div>
-            <div className="ella-template-strip">
-              <div className="ella-template-heading"><span>{tx(lang, 'أو اختر نقطة انطلاق', 'OR START FROM A FORMAT')}</span><small>{tx(lang, 'إعدادات جاهزة بنقرة واحدة', 'ONE-CLICK PRESETS')}</small></div>
-              <div className="ella-template-options">
-                {[{id:'reels',ar:'ريلز / Shorts',en:'Reels / Shorts',icon:Smartphone},{id:'shortfilm',ar:'فيلم قصير',en:'Short film',icon:Clapperboard},{id:'children',ar:'أطفال وخيال',en:'Kids & fantasy',icon:Sparkles},{id:'documentary',ar:'وثائقي',en:'Documentary',icon:Globe2}].map(item => { const Icon=item.icon; return <button type="button" key={item.id} onClick={() => openNewProject(item.id)}><Icon size={16}/><span>{tx(lang,item.ar,item.en)}</span><ArrowLeft size={13}/></button>; })}
-              </div>
+          <section className="ella-mode-picker">
+            <div className="ella-mode-picker-heading">
+              <div><span className="ella-overline">{tx(lang, '01 — اختر مساحة الإنتاج', '01 — CHOOSE YOUR WORKFLOW')}</span><h3>{tx(lang, 'كيف بدك تصنع فيلمك؟', 'How do you want to create?')}</h3><p>{tx(lang, 'ثلاث طرق واضحة، ومحرك إنتاج واحد مشترك. ابدأ بالطريقة التي تناسبك وغيّر أسلوب التحكم لاحقًا.', 'Three clear workflows, one shared production engine. Start your way and change how much control you want later.')}</p></div>
+              <span className="ella-mode-engine"><i/> {tx(lang, 'محرك الإنتاج موحّد', 'SHARED PRODUCTION ENGINE')}</span>
             </div>
-            <div className="ella-trust-line"><span><i/> {tx(lang, 'لا يتم إرسال طلب مدفوع دون موافقتك', 'No paid request is sent without your approval')}</span><Link href="/settings/providers">{tx(lang, 'إدارة المحركات والمزوّدات', 'Manage engines & providers')} <ArrowLeft size={13}/></Link></div>
+            <div className="ella-mode-grid">
+              <Link href="/projects?new=1&mode=quick" className="ella-mode-card mode-quick">
+                <span className="ella-mode-number">01</span><span className="ella-mode-icon"><WandSparkles size={22}/></span><span className="ella-mode-tag">{tx(lang, 'ابدأ فورًا', 'FASTEST START')}</span><b>{tx(lang, 'السريع', 'QUICK AUTO')}</b><p>{tx(lang, 'اكتب فكرة الفيلم فقط. إيلا تتولى السيناريو والشخصيات وتقسيم المشاهد وتجهيز الإنتاج تلقائيًا.', 'Describe your idea. Ella plans the screenplay, characters, scenes, and production setup automatically.')}</p><span className="ella-mode-action">{tx(lang, 'ابدأ بفكرتك', 'Start with an idea')} <ArrowLeft size={16}/></span>
+              </Link>
+              <Link href="/projects?new=1&mode=pro" className="ella-mode-card mode-pro">
+                <span className="ella-mode-number">02</span><span className="ella-mode-icon"><Clapperboard size={22}/></span><span className="ella-mode-tag">{tx(lang, 'تحكم متقدم', 'ADVANCED CONTROL')}</span><b>{tx(lang, 'الاحترافي', 'PRO STUDIO')}</b><p>{tx(lang, 'تحكم بتفاصيل الفيلم والمشاهد والأسلوب والإعدادات والمزوّدات قبل اعتماد خطة الإنتاج.', 'Control film details, scenes, visual direction, settings, and providers before approving the production plan.')}</p><span className="ella-mode-action">{tx(lang, 'افتح الاستوديو الاحترافي', 'Open Pro Studio')} <ArrowLeft size={16}/></span>
+              </Link>
+              <Link href="/projects?new=1&mode=manual" className="ella-mode-card mode-manual">
+                <span className="ella-mode-number">03</span><span className="ella-mode-icon"><Settings2 size={22}/></span><span className="ella-mode-tag">{tx(lang, 'تحرير مباشر', 'HANDS-ON WORKSPACE')}</span><b>{tx(lang, 'اليدوي', 'MANUAL STUDIO')}</b><p>{tx(lang, 'ابدأ بمشروع فارغ، اكتب المشاهد بنفسك، وارفع مراجعك وتحكم بكل لقطة دون استدعاء AI لكتابة السيناريو.', 'Start with a blank project, write scenes yourself, add references, and control every shot without AI script writing.')}</p><span className="ella-mode-action">{tx(lang, 'افتح مساحة العمل اليدوية', 'Open Manual Studio')} <ArrowLeft size={16}/></span>
+              </Link>
+            </div>
+            <div className="ella-mode-safety"><ShieldCheck size={15}/><span>{tx(lang, 'لا يتم تشغيل أي خدمة مدفوعة أو إرسال طلب توليد إلا بعد موافقتك الصريحة.', 'No paid service or generation request runs without your explicit approval.')}</span><Link href="/settings/providers">{tx(lang, 'إدارة المزوّدات', 'Manage providers')} <ArrowLeft size={13}/></Link></div>
           </section>
           <section className="ella-activity-bar">
             <div className="ella-activity-title"><Activity size={16}/><span>{tx(lang, 'نشاط الإنتاج', 'PRODUCTION ACTIVITY')}</span></div>
@@ -1219,7 +1226,7 @@ function Projects({ homePage = false }: { homePage?: boolean }) {
     {backupProgress&&<p className="save-state mt-2" role="status">{backupProgress}</p>}
     <div className="list-controls"><label className="searchbox"><Search size={17}/><input value={search} onChange={e => setSearch(e.target.value)} placeholder={tx(lang,'ابحث في مشاريعك','Search projects')} data-testid="input-project-search" /></label><label className="project-sort"><span className="field-label">{tx(lang,'ترتيب','Sort')}</span><select className="studio-input" value={sort} onChange={e => setSort(e.target.value as typeof sort)} data-testid="select-project-sort"><option value="updated">{tx(lang,'آخر تعديل','Recently updated')}</option><option value="name">{tx(lang,'الاسم','Name')}</option><option value="status">{tx(lang,'الحالة','Status')}</option></select></label><span className="result-count">{list.length} {tx(lang,'مشروع','projects')}</span></div>
     {q.isLoading ? <div className="project-grid">{[1,2,3].map(n=><SkeletonBlock key={n} className="h-52" />)}</div> : q.isError ? <StateError lang={lang} retry={() => q.refetch()} /> : list.length ? <div className="project-grid">{list.map(p=><ProjectCard key={p.id} project={p} onExport={exportBackup} exporting={backupExportingId===p.id} onDelete={id => { if (window.confirm(tx(lang,'هل تريد حذف المشروع وكل مشاهده؟','Delete this project and all its scenes?'))) remove.mutate({projectId:id},{onSuccess:()=>{afterChange();qc.invalidateQueries({queryKey:getGetProjectQueryKey(id)});}}); }} />)}</div> : <Empty title={search ? tx(lang,'لا توجد مطابقة','No matching projects') : tx(lang,'ابدأ بمشهد أول','Start with a first frame')} body={search ? tx(lang,'جرّب كلمات بحث أخرى.','Try another search term.') : tx(lang,'أنشئ مشروعًا ليصبح لديك مكان لصياغة الفكرة وبناء المشاهد.','Create a project to shape the idea and build your scenes.')} action={!search && <button className="btn btn-primary" onClick={() => setOpen(true)}><Plus size={16}/>{tx(lang,'إنشاء أول مشروع','Create your first project')}</button>} />}
-    {open && <ProjectForm initialTemplateId={newTemplate} initialMode={new URLSearchParams(location.split('?')[1] || '').get('mode') === 'manual' ? 'manual' : 'auto'} onClose={() => { setOpen(false); setNewTemplate(undefined); setCreatedProjectId(null); setProjectSaveError(false); }} pending={create.isPending || generate.isPending || createScene.isPending || updateProviderSettings.isPending || savingManualScenes || autoFilmRunning} freeMode={freeMode} textProviderReady={textProviderReady} checkingProvider={keysQuery.isLoading} generationError={projectSaveError || (generate.isError && Boolean(createdProjectId))} projectCreated={Boolean(createdProjectId)} onOpenCreated={createdProjectId ? openCreatedProject : undefined} onSave={saveProjectAndWriteStory} />}
+    {open && <ProjectForm initialTemplateId={newTemplate} initialMode={new URLSearchParams(location.split('?')[1] || '').get('mode') === 'manual' ? 'manual' : 'auto'} initialExperienceMode={new URLSearchParams(location.split('?')[1] || '').get('mode') === 'quick' ? 'quick' : 'pro'} onClose={() => { setOpen(false); setNewTemplate(undefined); setCreatedProjectId(null); setProjectSaveError(false); }} pending={create.isPending || generate.isPending || createScene.isPending || updateProviderSettings.isPending || savingManualScenes || autoFilmRunning} freeMode={freeMode} textProviderReady={textProviderReady} checkingProvider={keysQuery.isLoading} generationError={projectSaveError || (generate.isError && Boolean(createdProjectId))} projectCreated={Boolean(createdProjectId)} onOpenCreated={createdProjectId ? openCreatedProject : undefined} onSave={saveProjectAndWriteStory} />}
   </AppFrame>;
 }
 
