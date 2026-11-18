@@ -1891,3 +1891,111 @@ a[href]:active,
   .quick-advanced summary { padding: 11px; }
   .quick-advanced summary small { max-width: 48%; }
 }
+
+
+/* ─────────────────────────────────────────────────────────────
+   ELLA CREATIVE WORKSPACE — cinematic production desk
+   ───────────────────────────────────────────────────────────── */
+.ella-studio-home{display:grid;grid-template-columns:minmax(0,1fr) 310px;gap:22px;align-items:start;max-width:1600px;margin:0 auto;padding:4px 0 28px;color:var(--foreground)}
+.ella-studio-main{min-width:0;display:flex;flex-direction:column;gap:20px}
+.ella-studio-welcome{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;padding:14px 4px 4px}
+.ella-studio-welcome-copy{min-width:0}
+.ella-overline,.ella-rail-eyebrow{display:flex;align-items:center;gap:9px;color:#a8a29a;font-size:10px;font-weight:800;letter-spacing:.16em}
+.ella-overline>i,.ella-live-indicator i,.ella-trust-line i{width:7px;height:7px;border-radius:50%;background:#d4a85f;box-shadow:0 0 14px #d4a85f88}
+.ella-overline span{color:#55545a}
+.ella-studio-welcome h2{font-size:clamp(28px,3.4vw,43px);line-height:1.13;letter-spacing:-.045em;font-weight:750;margin:15px 0 8px;color:#f5f1e9}
+.ella-studio-welcome p{max-width:660px;color:#96949a;font-size:13px;line-height:1.8;margin:0}
+.ella-welcome-meta{display:flex;flex-direction:column;align-items:flex-end;gap:9px;white-space:nowrap;color:#77757d;font-size:10px}
+.ella-live-indicator{display:flex;align-items:center;gap:8px;border:1px solid #ffffff12;background:#ffffff06;border-radius:99px;padding:8px 12px;color:#c8c3b9;font-size:9px;font-weight:800;letter-spacing:.1em}
+.ella-composer-zone{position:relative;border:1px solid #ffffff14;border-radius:23px;padding:22px;background:radial-gradient(ellipse at 80% 0%,#c49b5c12,transparent 38%),linear-gradient(145deg,#17181d,#111216 72%);box-shadow:0 24px 70px #0004,inset 0 1px #ffffff08;overflow:hidden}
+.ella-composer-label,.ella-template-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;color:#b6a17f;font-size:10px;font-weight:800;letter-spacing:.12em;margin-bottom:14px}
+.ella-composer-label small,.ella-template-heading small{font-size:9px;color:#696971;letter-spacing:.08em}
+.ella-composer .inline-project-form{border:0!important;background:transparent!important;box-shadow:none!important;padding:0!important;margin:0!important}
+.ella-composer .inline-project-form>.modal-head{display:none!important}
+.ella-composer .form-stack{gap:13px}
+.ella-composer .experience-mode-switch{display:inline-flex;width:max-content;padding:4px;background:#ffffff08;border:1px solid #ffffff12;border-radius:11px;margin-bottom:1px}
+.ella-composer .experience-mode-switch button{padding:8px 15px;border-radius:8px;font-size:11px;color:#96949b}
+.ella-composer .experience-mode-switch button.is-selected{background:linear-gradient(135deg,#d6b477,#a98045);color:#171513;box-shadow:0 4px 15px #bd965333;font-weight:800}
+.ella-composer .quick-idea-entry{display:flex;flex-direction:column;gap:10px}
+.ella-composer .field-label{font-size:11px;color:#c8c3b9;font-weight:700;margin-bottom:8px}
+.ella-composer .quick-idea-input{min-height:156px;max-height:240px;resize:vertical;background:#0c0d11!important;border:1px solid #ffffff16!important;border-radius:16px!important;padding:18px 19px!important;color:#f2eee7!important;font-size:16px!important;line-height:1.85!important;box-shadow:inset 0 2px 12px #0003;outline:none;transition:border-color .2s,box-shadow .2s}
+.ella-composer .quick-idea-input:focus{border-color:#c9a56888!important;box-shadow:0 0 0 3px #c9a56816,inset 0 2px 12px #0003}
+.ella-composer .quick-idea-input::placeholder{color:#66656d}
+.ella-composer .quick-idea-entry .writing-assistant{align-self:flex-start}
+.ella-composer .quick-toolbar{display:grid;grid-template-columns:minmax(0,1fr) minmax(150px,.42fr);gap:12px}
+.ella-composer .quick-toolbar label{min-width:0}
+.ella-composer .quick-toolbar .studio-input,.ella-composer .quick-advanced .studio-input{min-height:42px;background:#111217!important;border:1px solid #ffffff16!important;border-radius:10px!important;color:#e8e3d9!important;font-size:12px}
+.ella-composer [data-testid="button-create-project"]{width:100%;min-height:48px;justify-content:center;border-radius:12px!important;background:linear-gradient(110deg,#e2c38b,#bd9255)!important;color:#171513!important;font-size:13px;font-weight:850;box-shadow:0 8px 28px #bd925522}
+.ella-composer [data-testid="button-create-project"]:hover{filter:brightness(1.08);transform:translateY(-1px)}
+.ella-composer .quick-advanced{border-top:1px solid #ffffff10;padding-top:12px;margin-top:1px}
+.ella-composer .quick-advanced summary{display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;list-style:none;color:#d0c5b4;font-size:11px;font-weight:700}
+.ella-composer .quick-advanced summary::-webkit-details-marker{display:none}
+.ella-composer .quick-advanced summary:after{content:"＋";color:#d3ad70;font-size:16px}
+.ella-composer .quick-advanced[open] summary:after{content:"−"}
+.ella-composer .quick-advanced summary small{color:#77747b;font-size:10px;font-weight:500}
+.ella-composer .quick-advanced[open]>*:not(summary){margin-top:14px}
+.ella-composer .quick-advanced .rotation-row{background:#ffffff05;border:1px solid #ffffff10;border-radius:12px;padding:12px}
+.ella-composer .quick-advanced .service-purpose-hint{background:#ffffff06;border-color:#ffffff10;color:#aaa}
+.ella-composer .quick-advanced .form-two{gap:12px}
+.ella-composer .quick-duration-hint{color:#a99c84;font-size:10px}
+.ella-composer .plan-card,.ella-composer .film-plan-card{background:#14151a;border-color:#ffffff15}
+.ella-template-strip{margin-top:23px;padding-top:18px;border-top:1px solid #ffffff10}
+.ella-template-heading{margin-bottom:12px;color:#aaa6a0}
+.ella-template-options{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
+.ella-template-options button{display:flex;align-items:center;justify-content:center;gap:8px;min-width:0;padding:12px 9px;border-radius:11px;border:1px solid #ffffff12;background:#ffffff05;color:#c7c2b8;font-size:11px;transition:.18s}
+.ella-template-options button svg:first-child{color:#c8a66e;flex:none}
+.ella-template-options button svg:last-child{opacity:.4;flex:none}
+.ella-template-options button:hover{background:#c6a16b12;border-color:#c6a16b55;color:#f3e9d8}
+.ella-trust-line{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:15px;color:#77767d;font-size:10px}
+.ella-trust-line span,.ella-trust-line a{display:flex;align-items:center;gap:7px}
+.ella-trust-line i{width:6px;height:6px;background:#6fbd91;box-shadow:0 0 10px #6fbd9166}
+.ella-trust-line a{color:#c9a66f}
+.ella-studio-rail{display:flex;flex-direction:column;gap:13px;min-width:0;padding-top:14px}
+.ella-rail-card{border:1px solid #ffffff12;border-radius:17px;background:linear-gradient(145deg,#191a20,#131419);padding:17px;box-shadow:0 12px 36px #0002}
+.ella-rail-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:14px}
+.ella-rail-heading>div>span{font-size:9px;font-weight:800;letter-spacing:.15em;color:#c5a16a}
+.ella-rail-heading h3,.ella-engine-card h3{font-size:15px;line-height:1.45;font-weight:750;color:#eee9e0;margin:5px 0 0}
+.ella-rail-heading>a{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:#ffffff08;color:#aaa}
+.ella-recent-list{display:flex;flex-direction:column;gap:3px}
+.ella-recent-project{display:flex;align-items:center;gap:10px;min-width:0;padding:10px 7px;border-radius:10px;color:#c7c3bd;transition:background .15s}
+.ella-recent-project:hover{background:#ffffff08}
+.ella-project-index{font:10px 'IBM Plex Mono',monospace;color:#827967}
+.ella-project-info{display:flex;flex:1;flex-direction:column;min-width:0;gap:4px}
+.ella-project-info b{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:650}
+.ella-project-info small{font-size:9px;color:#77757d}
+.ella-project-state{width:7px;height:7px;border-radius:50%;background:#777}
+.ella-project-state.state-completed{background:#69b58d;box-shadow:0 0 9px #69b58d66}
+.ella-project-state.state-failed{background:#cf7777}
+.ella-project-state.state-scripting,.ella-project-state.state-editing,.ella-project-state.state-exporting{background:#d4ac69;box-shadow:0 0 9px #d4ac6966}
+.ella-recent-project>svg{color:#6e6b72;flex:none}
+.ella-rail-footer{display:flex;align-items:center;justify-content:center;gap:7px;margin-top:12px;padding:11px;border-top:1px solid #ffffff10;color:#c9a66f;font-size:10px;font-weight:750}
+.ella-rail-empty{display:flex;align-items:center;flex-direction:column;gap:7px;padding:22px 8px;color:#777}
+.ella-rail-empty svg{color:#b79562}
+.ella-rail-empty b{font-size:11px;color:#c8c2b8}
+.ella-rail-empty span{font-size:10px}
+.ella-engine-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:13px}
+.ella-engine-icon{display:grid;place-items:center;width:34px;height:34px;border-radius:11px;background:#c6a16b17;color:#d3b27b}
+.ella-engine-count{font:800 9px 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#80b999}
+.ella-engine-card .ella-rail-eyebrow{font-size:9px}
+.ella-engine-card h3{font-size:17px;margin-top:8px}
+.ella-engine-card p{font-size:10px;line-height:1.8;color:#88868d;margin:8px 0 15px}
+.ella-engine-foot{display:flex;justify-content:space-between;align-items:center;border-top:1px solid #ffffff10;padding-top:12px;color:#85838a;font-size:9px}
+.ella-engine-foot span,.ella-engine-foot a{display:flex;align-items:center;gap:7px}
+.ella-engine-foot a{color:#c9a66f}
+.ella-engine-pulse{width:6px;height:6px;border-radius:50%;background:#74b994;box-shadow:0 0 9px #74b994}
+.ella-flow-steps{display:grid;gap:11px;margin-top:13px}
+.ella-flow-steps span{display:flex;align-items:center;gap:10px;color:#aaa7a0;font-size:10px}
+.ella-flow-steps i{display:grid;place-items:center;width:24px;height:24px;border:1px solid #ffffff12;border-radius:8px;color:#c5a16a;font:10px 'IBM Plex Mono',monospace;font-style:normal}
+.ella-activity-bar{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:14px;padding:14px 17px;border:1px solid #ffffff10;border-radius:14px;background:#14151a}
+.ella-activity-title{display:flex;align-items:center;gap:8px;color:#c5a16a;font-size:10px;font-weight:800;white-space:nowrap}
+.ella-activity-bar>p{margin:0;color:#77757d;font-size:10px}
+.ella-activity-items{display:flex;gap:8px;min-width:0;overflow:hidden}
+.ella-activity-items a{display:flex;align-items:center;gap:7px;min-width:0;max-width:50%;padding:7px 9px;border-radius:8px;background:#ffffff06;color:#aaa;font-size:9px}
+.ella-activity-items a span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ella-activity-items a b{font:10px 'IBM Plex Mono',monospace;color:#d6b77f}
+.ella-job-dot{width:6px;height:6px;border-radius:50%;background:#d1a45f;flex:none}
+.ella-job-dot.is-completed{background:#6db78d}.ella-job-dot.is-failed{background:#cb7777}
+.ella-activity-link{white-space:nowrap;color:#c7a36c;font-size:10px}
+@media(max-width:1150px){.ella-studio-home{grid-template-columns:minmax(0,1fr) 270px;gap:15px}.ella-composer-zone{padding:18px}.ella-template-options{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:850px){.ella-studio-home{grid-template-columns:1fr;gap:15px}.ella-studio-main{gap:15px}.ella-studio-rail{display:grid;grid-template-columns:1fr 1fr;padding-top:0}.ella-rail-projects{grid-row:span 2}.ella-studio-welcome{padding-top:4px}.ella-activity-bar{grid-template-columns:1fr auto}.ella-activity-title{grid-column:1/-1}.ella-activity-items{grid-column:1/-1;grid-row:2}.ella-activity-link{grid-column:2;grid-row:1}}
+@media(max-width:560px){.ella-studio-home{padding-top:0;gap:12px}.ella-studio-welcome{align-items:flex-start;flex-direction:column;gap:10px;padding:5px 1px}.ella-studio-welcome h2{font-size:29px;margin:12px 0 6px}.ella-studio-welcome p{font-size:11px;line-height:1.7}.ella-welcome-meta{flex-direction:row;align-items:center;gap:10px;font-size:9px}.ella-live-indicator{padding:6px 9px}.ella-composer-zone{padding:14px 12px;border-radius:17px}.ella-composer-label{font-size:9px}.ella-composer-label small{font-size:8px}.ella-composer .experience-mode-switch{width:100%}.ella-composer .experience-mode-switch button{flex:1}.ella-composer .quick-idea-input{min-height:138px;padding:14px!important;font-size:14px!important}.ella-composer .quick-toolbar{grid-template-columns:1fr 1fr;gap:8px}.ella-composer .quick-toolbar .field-label{font-size:10px}.ella-composer [data-testid="button-create-project"]{min-height:47px}.ella-composer .quick-advanced summary{align-items:flex-start;flex-direction:column;gap:5px}.ella-composer .quick-advanced summary:after{position:absolute;inset-inline-end:16px}.ella-template-options{grid-template-columns:1fr 1fr;gap:7px}.ella-template-options button{justify-content:flex-start;padding:11px 9px;font-size:10px}.ella-trust-line{align-items:flex-start;flex-direction:column;gap:9px;font-size:9px}.ella-studio-rail{grid-template-columns:1fr}.ella-rail-projects{grid-row:auto}.ella-rail-card{padding:14px}.ella-activity-bar{grid-template-columns:1fr auto;padding:12px}.ella-activity-items{flex-direction:column}.ella-activity-items a{max-width:100%}.ella-activity-bar>p{grid-column:1/-1}.ella-activity-link{font-size:9px}}
