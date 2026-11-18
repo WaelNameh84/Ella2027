@@ -708,7 +708,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [openverse, wikimedia, archive, pexels, pixabay, unsplash]
+            enum: [openverse, wikimedia, archive, nasa, pexels, pixabay, unsplash]
             default: openverse
         - name: orientation
           in: query
