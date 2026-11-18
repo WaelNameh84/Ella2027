@@ -919,7 +919,7 @@ router.post("/projects/:projectId/scenes/:sceneId/assistant", async (req, res): 
     try {
       const result = await generateWithProvider(key.provider, decryptProviderKey(key.encryptedKey), prompt);
       await db.update(providerKeysTable).set({ status: "valid", usedCount: key.usedCount + 1, cooldownUntil: null, testMessage: "Last scene assistant request succeeded." }).where(eq(providerKeysTable.id, key.id));
-      res.json({ text: result, provider: key.provider, model: key.model || null });
+      res.json({ text: result, provider: key.provider });
       return;
     } catch (error) {
       lastError = error instanceof Error ? error.message : lastError;
