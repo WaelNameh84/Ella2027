@@ -1,5 +1,5 @@
 from __future__ import annotations
-import asyncio, base64, json, os, re, shutil, subprocess, tempfile, time, uuid
+import asyncio, base64, json, os, re, shutil, sqlite3, subprocess, tempfile, time, uuid
 from pathlib import Path
 from typing import Any
 import httpx
@@ -10,7 +10,100 @@ APP = FastAPI(title="Ella GPU Video Worker", version="1.0.0")
 COMFY = os.getenv("COMFYUI_URL", "http://127.0.0.1:8188").rstrip("/")
 TOKEN = os.getenv("WORKER_API_TOKEN", "")
 WORKFLOW = Path(os.getenv("COMFYUI_WORKFLOW", "/app/workflows/video_api.json"))
+# Durable job metadata and outputs. Mount ELLA_DATA_DIR as a persistent volume in production.
+DATA_DIR = Path(os.getenv("ELLA_DATA_DIR", "/data"))
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+DB_PATH = DATA_DIR / "ella_jobs.sqlite3"
+OUTPUT_DIR = DATA_DIR / "outputs"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 JOBS: dict[str, dict[str, Any]] = {}
+
+
+def db_connect():
+    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def init_job_store():
+    with db_connect() as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS video_jobs (
+                job_id TEXT PRIMARY KEY,
+                status TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                output_path TEXT,
+                created_at REAL NOT NULL,
+                updated_at REAL NOT NULL
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_video_jobs_updated ON video_jobs(updated_at DESC)")
+        # A process cannot safely resume a ComfyUI task after losing its in-memory coroutine.
+        # Preserve the record and mark it interrupted so the caller can retry only this scene.
+        rows = conn.execute("SELECT job_id, payload_json FROM video_jobs WHERE status IN ('queued','running')").fetchall()
+        for row in rows:
+            payload = json.loads(row["payload_json"])
+            payload.update({"status": "interrupted", "error": "Worker restarted during generation. Retry this scene; completed scenes remain untouched."})
+            conn.execute("UPDATE video_jobs SET status='interrupted', payload_json=?, updated_at=? WHERE job_id=?",
+                         (json.dumps(payload), time.time(), row["job_id"]))
+
+
+def persist_job(job_id: str, job: dict[str, Any]):
+    snapshot = dict(job)
+    encoded = snapshot.pop("video_base64", None)
+    output_path = None
+    if encoded:
+        raw = base64.b64decode(encoded)
+        target = OUTPUT_DIR / f"{job_id}.mp4"
+        temp = target.with_suffix(".mp4.tmp")
+        temp.write_bytes(raw)
+        temp.replace(target)
+        output_path = str(target)
+    with db_connect() as conn:
+        existing = conn.execute("SELECT output_path FROM video_jobs WHERE job_id=?", (job_id,)).fetchone()
+        if output_path is None and existing:
+            output_path = existing["output_path"]
+        created = float(snapshot.get("created_at", time.time()))
+        conn.execute("""
+            INSERT INTO video_jobs(job_id,status,payload_json,output_path,created_at,updated_at)
+            VALUES(?,?,?,?,?,?)
+            ON CONFLICT(job_id) DO UPDATE SET
+              status=excluded.status, payload_json=excluded.payload_json,
+              output_path=COALESCE(excluded.output_path, video_jobs.output_path),
+              updated_at=excluded.updated_at
+        """, (job_id, snapshot.get("status", "queued"), json.dumps(snapshot),
+              output_path, created, time.time()))
+
+
+def load_job(job_id: str):
+    with db_connect() as conn:
+        row = conn.execute("SELECT payload_json, output_path FROM video_jobs WHERE job_id=?", (job_id,)).fetchone()
+    if not row:
+        return None
+    job = json.loads(row["payload_json"])
+    output_path = row["output_path"]
+    if output_path and Path(output_path).is_file():
+        job["video_base64"] = base64.b64encode(Path(output_path).read_bytes()).decode("ascii")
+    elif job.get("status") == "completed":
+        job.update({"status": "failed", "error": "The output file is missing from persistent storage. Retry this scene."})
+    return job
+
+
+def list_jobs(limit: int = 100):
+    with db_connect() as conn:
+        rows = conn.execute(
+            "SELECT job_id,status,payload_json,created_at,updated_at FROM video_jobs ORDER BY updated_at DESC LIMIT ?",
+            (max(1, min(limit, 500)),)
+        ).fetchall()
+    result = []
+    for row in rows:
+        payload = json.loads(row["payload_json"])
+        payload.pop("video_base64", None)
+        result.append({"job_id": row["job_id"], **payload, "updated_at": row["updated_at"]})
+    return result
+
+
+init_job_store()
 MAX_UPLOAD_BYTES = int(os.getenv("MAX_REFERENCE_IMAGE_BYTES", str(20 * 1024 * 1024)))
 MAX_OUTPUT_BYTES = int(os.getenv("MAX_OUTPUT_BYTES", str(250 * 1024 * 1024)))
 
@@ -42,9 +135,11 @@ def model_catalog(free_vram: float | None):
     # The workflow is supplied by the operator; do not claim a model is installed unless configured.
     model = os.getenv("ELLA_MODEL_ID", "wan2.2-ti2v-5b")
     required = float(os.getenv("ELLA_MODEL_VRAM_GB", "8"))
-    ready = WORKFLOW.exists() and bool(os.getenv("COMFYUI_VIDEO_OUTPUT_NODE"))
-    fits = free_vram is None or free_vram >= required
-    return {model: {"available": ready, "ready": ready and fits, "estimated_vram_gb": required,
+    workflow_configured = WORKFLOW.exists() and bool(os.getenv("COMFYUI_VIDEO_OUTPUT_NODE"))
+    installed = os.getenv("ELLA_MODEL_INSTALLED", "false").lower() == "true"
+    fits = free_vram is not None and free_vram >= required
+    ready = workflow_configured and installed and fits
+    return {model: {"available": workflow_configured, "installed": installed, "workflow_configured": workflow_configured, "ready": ready, "estimated_vram_gb": required,
                     "free_vram_gb": free_vram, "max_clip_seconds": int(os.getenv("ELLA_MAX_CLIP_SECONDS", "5")),
                     "max_resolution": os.getenv("ELLA_MAX_RESOLUTION", "720p"),
                     "supports_image_to_video": os.getenv("ELLA_SUPPORTS_IMAGE_TO_VIDEO", "true").lower() == "true",
@@ -60,8 +155,10 @@ async def health(authorization: str | None = Header(default=None)):
         async with httpx.AsyncClient(timeout=3) as c:
             r = await c.get(f"{COMFY}/system_stats"); comfy_ok = r.is_success
     except Exception: pass
-    return {"status": "ok" if comfy_ok else "degraded", "gpu": name, "available": comfy_ok,
-            "comfyui_connected": comfy_ok, "free_vram_gb": free, "total_vram_gb": total}
+    gpu_ok = free is not None
+    ready = comfy_ok and gpu_ok
+    return {"status": "ok" if ready else "degraded", "gpu": name, "available": ready,
+            "gpu_detected": gpu_ok, "comfyui_connected": comfy_ok, "free_vram_gb": free, "total_vram_gb": total}
 
 
 @APP.get("/capabilities")
@@ -173,7 +270,7 @@ async def render_job(job_id: str, request: dict):
             segment_seconds = min(max_clip, requested - i * max_clip) if do_split else requested
             continuity = "" if count == 1 else f" Continuity: this is shot {i+1} of {count}; preserve the same character face, costume, location, lighting and visual style as the reference image. Begin with visual continuity from the previous shot."
             prompt = str(request.get("prompt", "")).strip() + continuity
-            job.update({"status":"running", "progress": int(i / count * 90), "current_segment": i+1, "total_segments": count})
+            job.update({"status":"running", "progress": int(i / count * 90), "current_segment": i+1, "total_segments": count}); persist_job(job_id, job)
             clip_bytes = await comfy_generate(prompt, segment_seconds, request.get("aspect_ratio", "16:9"), request.get("image"), job)
             dest = temp_dir / f"clip_{i:04d}.mp4"; dest.write_bytes(clip_bytes); clips.append(dest)
         if len(clips) == 1: final = clips[0]
@@ -189,9 +286,9 @@ async def render_job(job_id: str, request: dict):
         size = final.stat().st_size
         if size > MAX_OUTPUT_BYTES: raise RuntimeError("Final MP4 exceeds configured output limit")
         encoded = base64.b64encode(final.read_bytes()).decode("ascii")
-        job.update({"status":"completed", "progress":100, "video_base64":encoded, "duration_seconds":duration, "size_bytes":size})
+        job.update({"status":"completed", "progress":100, "video_base64":encoded, "duration_seconds":duration, "size_bytes":size}); persist_job(job_id, job)
     except Exception as e:
-        job.update({"status":"failed", "error":str(e)[:800]})
+        job.update({"status":"failed", "error":str(e)[:800]}); persist_job(job_id, job)
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
 
@@ -208,6 +305,7 @@ async def create_video(body: dict, authorization: str | None = Header(default=No
         raise HTTPException(503, "Configured ComfyUI workflow/model is not ready or does not fit available VRAM")
     job_id = uuid.uuid4().hex
     JOBS[job_id] = {"status":"queued", "progress":0, "created_at":time.time()}
+    persist_job(job_id, JOBS[job_id])
     asyncio.create_task(render_job(job_id, body))
     return JSONResponse({"job_id":job_id, "status":"queued", "model":model}, status_code=202)
 
@@ -215,6 +313,12 @@ async def create_video(body: dict, authorization: str | None = Header(default=No
 @APP.get("/v1/videos/{job_id}")
 async def get_video(job_id: str, authorization: str | None = Header(default=None)):
     auth(authorization)
-    job = JOBS.get(job_id)
-    if not job: raise HTTPException(404, "Job not found (jobs are held in worker memory)")
+    job = JOBS.get(job_id) or load_job(job_id)
+    if not job: raise HTTPException(404, "Job not found")
     return {k:v for k,v in job.items() if k != "comfy_prompt_id"}
+
+
+@APP.get("/v1/jobs")
+async def get_jobs(limit: int = 100, authorization: str | None = Header(default=None)):
+    auth(authorization)
+    return {"jobs": list_jobs(limit)}
