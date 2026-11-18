@@ -1599,7 +1599,7 @@ export const searchFreeMediaQueryPageDefault = 1;
 export const SearchFreeMediaQueryParams = zod.object({
   "q": zod.string(),
   "mediaType": zod.enum(['image', 'video', 'audio']).default(searchFreeMediaQueryMediaTypeDefault),
-  "source": zod.enum(['openverse', 'wikimedia', 'archive', 'pexels', 'pixabay', 'unsplash']).default(searchFreeMediaQuerySourceDefault),
+  "source": zod.enum(['openverse', 'wikimedia', 'archive', 'nasa', 'pexels', 'pixabay', 'unsplash']).default(searchFreeMediaQuerySourceDefault),
   "orientation": zod.enum(['landscape', 'portrait', 'square']).optional(),
   "page": zod.coerce.number().int().min(1).default(searchFreeMediaQueryPageDefault)
 })
