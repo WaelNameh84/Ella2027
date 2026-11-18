@@ -3,7 +3,9 @@ import { test } from "node:test";
 import {
   classifyProviderResponse,
   generateWithProvider,
+  getAllowedColabBaseUrl,
   providerCredentialUsable,
+  providerCatalog,
   testProviderCredential,
 } from "../src/lib/providerRegistry.ts";
 import {
@@ -188,6 +190,79 @@ test("provider credential test classifies a mocked successful response", async (
   assert.equal(captured.headers.get("authorization"), "Bearer test-only-key");
 });
 
+test("Colab worker URLs are restricted to HTTPS public tunnel domains", () => {
+  assert.equal(getAllowedColabBaseUrl("https://abc.trycloudflare.com"), "https://abc.trycloudflare.com");
+  assert.equal(getAllowedColabBaseUrl("https://abc.ngrok-free.app/"), "https://abc.ngrok-free.app");
+  assert.equal(getAllowedColabBaseUrl("http://abc.trycloudflare.com"), null);
+  assert.equal(getAllowedColabBaseUrl("https://example.com"), null);
+  assert.equal(getAllowedColabBaseUrl("http://127.0.0.1:3000"), null);
+  assert.equal(getAllowedColabBaseUrl("https://localhost"), null);
+});
+
+test("Colab credential test checks the public worker health without sending the URL as a bearer token", async (t) => {
+  let captured;
+  mockFetch(t, async (url, init) => {
+    captured = { url: String(url), headers: new Headers(init.headers) };
+    return jsonResponse({ status: "ok", available: true });
+  });
+  const result = await testProviderCredential("colab-t5", "https://abc.trycloudflare.com");
+  assert.equal(result.status, "valid");
+  assert.equal(captured.url, "https://abc.trycloudflare.com/health");
+  assert.equal(captured.headers.has("authorization"), false);
+  assert.match(result.message, /not that a model is loaded/i);
+});
+
+test("Colab credential test blocks arbitrary hosts before making a request", async (t) => {
+  let requestCount = 0;
+  mockFetch(t, async () => { requestCount += 1; return jsonResponse({ status: "ok" }); });
+  const result = await testProviderCredential("colab-t5", "https://127.0.0.1:8080");
+  assert.equal(result.status, "invalid");
+  assert.equal(requestCount, 0);
+});
+
+test("Stability AI balance check verifies credentials without submitting an image", async (t) => {
+  let captured;
+  mockFetch(t, async (url, init) => {
+    captured = { url: String(url), headers: new Headers(init.headers) };
+    return jsonResponse({ credits: 0 });
+  });
+  const result = await testProviderCredential("stability", "test-only-key");
+  assert.equal(result.status, "quota_limited");
+  assert.equal(captured.url, "https://api.stability.ai/v1/user/balance");
+  assert.equal(captured.headers.get("authorization"), "Bearer test-only-key");
+  assert.equal(providerCredentialUsable("stability", result.status), true);
+});
+
+test("Google TTS and Azure Speech credential checks use read-only endpoints and provider auth headers", async (t) => {
+  const calls = [];
+  mockFetch(t, async (url, init) => {
+    calls.push({ url: String(url), headers: new Headers(init.headers) });
+    return jsonResponse({ voices: [] });
+  });
+  assert.equal((await testProviderCredential("google-tts", "google-test-key")).status, "valid");
+  assert.equal((await testProviderCredential("azure-speech", "azure-test-key")).status, "valid");
+  assert.equal(calls[0].url, "https://texttospeech.googleapis.com/v1/voices?key=google-test-key");
+  assert.equal(calls[1].url, "https://eastus.tts.speech.microsoft.com/cognitiveservices/voices/list");
+  assert.equal(calls[1].headers.get("ocp-apim-subscription-key"), "azure-test-key");
+});
+
+test("Google Speech key status is explicitly untested rather than falsely verified", async (t) => {
+  let requestCount = 0;
+  mockFetch(t, async () => { requestCount += 1; return jsonResponse({}); });
+  const result = await testProviderCredential("google-speech", "google-speech-key");
+  assert.equal(result.status, "untested");
+  assert.match(result.message, /no safe key-only verification endpoint/i);
+  assert.equal(requestCount, 0);
+});
+
+test("provider catalog does not advertise providers without a wired adapter", () => {
+  const ids = providerCatalog.map((provider) => provider.id);
+  for (const unsupported of ["runway", "segmind", "cartesia", "luma", "wan22", "cogvideox", "ltx-video", "hunyuan-video", "musicgen"]) {
+    assert.equal(ids.includes(unsupported), false, unsupported);
+  }
+  assert.equal(ids.includes("local-video-worker"), true);
+});
+
 test("OpenAI image adapter converts a mocked base64 image response", async (t) => {
   let captured;
   mockFetch(t, async (url, init) => {
@@ -209,6 +284,31 @@ test("provider error responses preserve status for rotation logic", async (t) =>
     generateStill("openai", "test-only-key", "A test image", "gpt-image-1", 512),
     (error) => error instanceof ProviderCallError && error.providerStatus === 429,
   );
+});
+
+test("Google Cloud TTS adapter creates MP3 narration", async (t) => {
+  let captured;
+  mockFetch(t, async (url, init) => {
+    captured = { url: String(url), body: JSON.parse(init.body) };
+    return jsonResponse({ audioContent: Buffer.from("google-mp3").toString("base64") });
+  });
+  const audio = await generateNarration("google-tts", "google-test-key", "en-US-Neural2-C", "Hello");
+  assert.equal(audio.toString(), "google-mp3");
+  assert.equal(captured.url, "https://texttospeech.googleapis.com/v1/text:synthesize?key=google-test-key");
+  assert.equal(captured.body.input.text, "Hello");
+});
+
+test("Azure Speech adapter creates MP3 narration with regional subscription authentication", async (t) => {
+  let captured;
+  mockFetch(t, async (url, init) => {
+    captured = { url: String(url), headers: new Headers(init.headers), body: String(init.body) };
+    return new Response(Buffer.from("azure-mp3"), { status: 200, headers: { "content-type": "audio/mpeg" } });
+  });
+  const audio = await generateNarration("azure-speech", "azure-test-key", "en-US-JennyNeural", "Hello");
+  assert.equal(audio.toString(), "azure-mp3");
+  assert.equal(captured.url, "https://eastus.tts.speech.microsoft.com/cognitiveservices/v1");
+  assert.equal(captured.headers.get("ocp-apim-subscription-key"), "azure-test-key");
+  assert.match(captured.body, /Hello/);
 });
 
 test("ElevenLabs adapter sends narration and returns mocked audio bytes", async (t) => {
