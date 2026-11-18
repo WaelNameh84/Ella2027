@@ -848,7 +848,7 @@ router.post("/projects/:projectId/scenes/:sceneId/assistant", async (req, res): 
   const projectId = String(req.params.projectId || "");
   const sceneId = String(req.params.sceneId || "");
   const userId = userIdOf(res);
-  const body = req.body as { instruction?: unknown; task?: unknown; providerKeyId?: unknown };
+  const body = req.body as { instruction?: unknown; task?: unknown; providerKeyId?: unknown; approvePotentialCharges?: unknown };
   const instruction = typeof body.instruction === "string" ? body.instruction.trim() : "";
   const task = typeof body.task === "string" ? body.task : "scene";
   const providerKeyId = typeof body.providerKeyId === "string" ? body.providerKeyId : "";
@@ -856,7 +856,7 @@ router.post("/projects/:projectId/scenes/:sceneId/assistant", async (req, res): 
     res.status(400).json({ error: "Enter a scene idea or instruction (up to 4,000 characters)." });
     return;
   }
-  if (!["scene", "dialogue", "visual", "rewrite"].includes(task)) {
+  if (body.approvePotentialCharges !== true) {\n    res.status(400).json({ error: "Approve possible text-provider charges before using the AI scene assistant." });\n    return;\n  }\n  if (!["scene", "dialogue", "visual", "rewrite"].includes(task)) {
     res.status(400).json({ error: "Choose a supported assistant task." });
     return;
   }
