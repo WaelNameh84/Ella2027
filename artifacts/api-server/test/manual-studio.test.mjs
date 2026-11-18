@@ -50,7 +50,7 @@ test("Quick and Professional converge on the same scene production engine", asyn
   assert.match(app, /useQueueSceneImageGeneration\(\)/);
   assert.match(app, /useQueueSceneVideoGeneration\(\)/);
   assert.match(app, /useQueueSceneVoiceGeneration\(\)/);
-  assert.match(app, /function saveProjectAndWriteStory/);
+  assert.match(app, /const saveProjectAndWriteStory = async/);
   assert.match(app, /if \(mode === 'manual'\)/);
   assert.match(app, /runAutoFilm\(/);
   assert.match(app, /GenerationPanel/);
