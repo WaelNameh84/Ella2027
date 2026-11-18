@@ -1324,6 +1324,10 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [chargeApproved, setChargeApproved] = useState(false);
   const [scriptSettings, setScriptSettings] = useState({ sceneCount: 6, sceneDurationSeconds: 8, sceneStyle: 'Cinematic' });
+  const [manualSceneCount, setManualSceneCount] = useState(2);
+  const [manualCountBusy, setManualCountBusy] = useState(false);
+  const [manualCountError, setManualCountError] = useState('');
+  const manualCountInitialized = useRef(false);
   const [editProjectOpen, setEditProjectOpen] = useState(false);
   const [previewPlaying,setPreviewPlaying]=useState(false);
   const previewVideo=useRef<HTMLVideoElement|null>(null);
@@ -1345,6 +1349,12 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
   };
   const completedJobsRef = useRef<Set<string>>(new Set());
   useEffect(() => { if (project?.scenes?.length && !selected) setSelected(project.scenes[0].id); }, [project, selected]);
+  useEffect(() => {
+    if (project && !manualCountInitialized.current) {
+      setManualSceneCount(Math.max(1, Math.min(24, project.scenes.length || 2)));
+      manualCountInitialized.current = true;
+    }
+  }, [project?.id]);
   const scenes = [...(project?.scenes || [])].sort((a,b) => a.sortOrder-b.sortOrder);
   const activeScene = scenes.find(s => s.id === selected) || scenes[0];
   const downloadScript = () => {
@@ -1464,6 +1474,59 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
     refresh();
     setSelected(copy.id);
   };
+
+  const applyManualSceneCount = async () => {
+    const target = Math.max(1, Math.min(24, Math.floor(manualSceneCount || 1)));
+    if (manualCountBusy || createScene.isPending || deleteScene.isPending) return;
+    if (target < scenes.length && !window.confirm(tx(
+      lang,
+      `سيتم حذف آخر ${scenes.length - target} مشهدًا من المشروع. قد تُحذف صورها ومقاطعها المرتبطة. هل تريد المتابعة؟`,
+      `This will delete the last ${scenes.length - target} scene(s), including their linked assets. Continue?`,
+    ))) return;
+    setManualCountBusy(true);
+    setManualCountError('');
+    try {
+      if (target > scenes.length) {
+        let lastCreated: Scene | null = null;
+        const perSceneDuration = Math.max(1, Math.min(600, Math.floor(project.durationSeconds / target)));
+        for (let index = scenes.length; index < target; index++) {
+          lastCreated = await createScene.mutateAsync({
+            projectId,
+            data: {
+              sortOrder: index,
+              title: tx(lang, `مشهد ${index + 1}`, `Scene ${index + 1}`),
+              description: '',
+              imagePrompt: '',
+              narration: '',
+              durationSeconds: perSceneDuration,
+              assetUrl: null,
+              assetType: null,
+            },
+          });
+        }
+        if (lastCreated) setSelected(lastCreated.id);
+      } else if (target < scenes.length) {
+        const removed = scenes.slice(target);
+        for (const scene of [...removed].reverse()) {
+          await deleteScene.mutateAsync({ projectId, sceneId: scene.id });
+        }
+        if (removed.some(scene => scene.id === selected)) setSelected(scenes[target - 1]?.id ?? null);
+        for (const [index, scene] of scenes.slice(0, target).entries()) {
+          if (scene.sortOrder !== index) {
+            await updateScene.mutateAsync({ projectId, sceneId: scene.id, data: { sortOrder: index } });
+          }
+        }
+      }
+      await projectQuery.refetch();
+      refresh();
+      setManualSceneCount(target);
+    } catch (error) {
+      await projectQuery.refetch();
+      setManualCountError(error instanceof Error ? error.message : tx(lang, 'تعذر تطبيق العدد بالكامل. تحقق من عدد المشاهد المحفوظ ثم أعد المحاولة.', 'Could not apply the full scene count. Check the saved scene count and retry.'));
+    } finally {
+      setManualCountBusy(false);
+    }
+  };
   const [stage,setStage]=useState<StudioStageId>('storyboard');
   const [mobilePane,setMobilePane]=useState<'preview'|'tools'>('preview');
   const hasActiveProductionJob=(projectJobsQuery.data??[]).some(job=>job.status==='queued'||job.status==='running');
@@ -1515,7 +1578,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
         </div>
         <StoryboardBoard lang={lang} scenes={scenes} selectedId={activeScene?.id ?? null} onOpen={openScene} onGenerate={generateScene} onGenerateVideo={sceneId=>{setSelected(sceneId);setStage('video');setMobilePane('tools')}} onDuplicate={duplicateSceneById} onDelete={deleteSceneById} deleting={deleteScene.isPending} jobs={projectJobsQuery.data || []} imageProviderReady={keyReady('image')} />
         {activeScene && (activeScene.assetUrl || activeScene.description.trim() || activeScene.imagePrompt.trim()) && <button type="button" className="btn btn-primary mobile-video-cta" onClick={() => { setStage('video'); setMobilePane('tools'); }} data-testid="button-open-video-tools"><Film size={16}/>{tx(lang,'توليد فيديو لهذا المشهد','Generate video for this scene')}<ArrowLeft size={14}/></button>}
-        <div className="timeline-panel panel"><div className="section-heading !mb-4"><div><span className="eyebrow">{tx(lang,'خط الإنتاج','EDIT TIMELINE')}</span><h3>{tx(lang,'ترتيب المشاهد','Scene sequence')}</h3></div><button className="btn btn-quiet" onClick={()=>createScene.mutate({projectId,data:{sortOrder:scenes.length,title:tx(lang,`مشهد ${scenes.length+1}`,`Scene ${scenes.length+1}`),description:'',imagePrompt:'',narration:'',durationSeconds:6,assetUrl:null,assetType:null}},{onSuccess:s=>{refresh();setSelected(s.id)}})} disabled={createScene.isPending}><Plus size={16}/>{tx(lang,'إضافة مشهد','Add scene')}</button></div>
+        <div className="timeline-panel panel"><div className="section-heading !mb-4"><div><span className="eyebrow">{tx(lang,'MANUAL SCENE BUILDER','MANUAL SCENE BUILDER')}</span><h3>{tx(lang,'منشئ المشاهد اليدوي','Manual scene builder')}</h3></div><div className="flex flex-wrap items-center gap-2"><label className="manual-scene-count"><span>{tx(lang,'العدد المطلوب','Target count')}</span><input className="studio-input" type="number" min="1" max="24" value={manualSceneCount} onChange={event=>setManualSceneCount(Math.max(1,Math.min(24,Number(event.target.value)||1)))} aria-label={tx(lang,'عدد المشاهد المطلوب','Target scene count')}/></label><button type="button" className="btn btn-primary" onClick={()=>void applyManualSceneCount()} disabled={manualCountBusy||manualSceneCount===scenes.length||hasActiveProductionJob}>{manualCountBusy?<LoaderCircle size={15} className="animate-spin"/>:<Check size={15}/ >}{tx(lang,'تطبيق العدد','Apply count')}</button><button className="btn btn-quiet" onClick={()=>createScene.mutate({projectId,data:{sortOrder:scenes.length,title:tx(lang,`مشهد ${scenes.length+1}`,`Scene ${scenes.length+1}`),description:'',imagePrompt:'',narration:'',durationSeconds:6,assetUrl:null,assetType:null}},{onSuccess:s=>{refresh();setSelected(s.id)}})} disabled={createScene.isPending||hasActiveProductionJob}><Plus size={16}/>{tx(lang,'إضافة','Add')}</button></div></div>{manualCountError&&<p className="inline-error" role="alert">{manualCountError}</p>}
            {scenes.length === 0 ? <div className="timeline-empty"><span className="timeline-empty-line"/><span>{tx(lang,'لم تُنشأ مشاهد بعد','No scenes yet')}</span><button className="text-link" onClick={()=>createScene.mutate({projectId,data:{sortOrder:0,title:tx(lang,'المشهد الأول','Scene one'),description:'',imagePrompt:'',narration:'',durationSeconds:6}},{onSuccess:s=>{refresh();setSelected(s.id)}})}>{tx(lang,'أضف أول مشهد','Add the first scene')}</button></div> : <FilmTimeline scenes={scenes} selectedId={activeScene?.id ?? null} musicUrl={project.musicUrl} musicVolume={project.musicVolume} lang={lang} previewing={previewing} onPreview={()=>void requestPreview()} onSelect={setSelected} onReorder={(source,target)=>void reorderDrop(source,target)} onSaveScene={(sceneId,data)=>updateScene.mutateAsync({projectId,sceneId,data}).then(()=>{refresh()})} onSaveProject={data=>updateProject.mutateAsync({projectId,data}).then(()=>{refresh()})} />}
         </div>
         {currentJob && <div className="job-progress panel" role="status"><div className="job-progress-head"><div><b>{tx(lang,({script:'توليد السيناريو',export:'تصدير الفيديو',image:'توليد صورة',video:'توليد فيديو',voice:'توليد صوت'})[currentJob.jobType],({script:'Script generation',export:'Video export',image:'Image generation',video:'Video generation',voice:'Voice generation'})[currentJob.jobType])}</b><span className={`job-state job-${currentJob.status}`}>{tx(lang,currentJob.status==='queued'?'في الانتظار':currentJob.status==='running'?'قيد التنفيذ':currentJob.status==='completed'?'مكتملة':'فشلت',currentJob.status)}</span></div><Link href="/jobs" className="text-link">{tx(lang,'عرض المهام','View jobs')}</Link></div>{(currentJob.status==='queued'||currentJob.status==='running')&&<div className="job-progress-track"><span style={{width:`${currentJob.progress}%`}}/></div>}{currentJob.error ? <ErrorRecoveryPanel compact lang={lang} message={currentJob.error} sceneTitle={scenes.find(scene=>scene.id===(currentJob as StudioJob & { sceneId?: string }).sceneId)?.title} retrying={retryJob.isPending} onRetry={()=>{if(!window.confirm(tx(lang,'ستُرسل المهمة مجددًا إلى مزوّد خارجي وقد تُحتسب رسوم. هل تريد المتابعة؟','This resubmits the job to an external provider and may incur charges. Continue?')))return;retryJob.mutate({jobId:currentJob.id,data:{approvePotentialCharges:currentJob.jobType!=='export'}},{onSuccess:refresh})}} freeAlternative={currentJob.jobType==='script'?{ar:'استخدام قالب محلي مجاني',en:'Use a free local template',onClick:()=>{setStage('script');setMobilePane('tools')}}:currentJob.jobType==='image'&&generationKeys.some(key=>key.provider==='ai-horde'&&key.enabled)?{ar:'استخدام AI Horde المجاني',en:'Use free AI Horde',onClick:()=>{setStage('images');setMobilePane('tools')}}:currentJob.jobType==='voice'&&generationKeys.some(key=>key.provider==='piper-local'&&key.enabled)?{ar:'استخدام صوت Piper المحلي',en:'Use local Piper voice',onClick:()=>{setStage('voice');setMobilePane('tools')}}:undefined} /> : <p>{currentJob.message}</p>}{latestExportJob?.status==='completed'&&<ExportActions projectId={projectId} lang={lang}/>}</div>}
