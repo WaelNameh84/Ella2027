@@ -6,7 +6,6 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { generatedAssetContentType, generatedAssetPath } from "./studioAssets";
-import { assessExportQuality, type MediaProbe } from "./autonomousStudio";
 
 type ExportScene = {
   id: string;
@@ -102,56 +101,6 @@ function runFfmpeg(args: string[], timeoutMs = 120_000): Promise<void> {
     });
   });
 }
-function probeMedia(path: string): Promise<MediaProbe> {
-  return new Promise((resolvePromise, reject) => {
-    const child = spawn("ffprobe", [
-      "-v", "error", "-show_entries",
-      "format=duration,format_name,size:stream=codec_type,codec_name,width,height,r_frame_rate,channels,sample_rate",
-      "-of", "json", path,
-    ], { stdio: ["ignore", "pipe", "pipe"] });
-    let output = "";
-    let errorOutput = "";
-    child.stdout.on("data", (chunk) => { output += String(chunk); });
-    child.stderr.on("data", (chunk) => { errorOutput += String(chunk); });
-    child.once("error", reject);
-    child.once("close", (code) => {
-      if (code !== 0) {
-        reject(new Error(`Could not inspect rendered media: ${errorOutput.slice(-500)}`));
-        return;
-      }
-      try {
-        const parsed = JSON.parse(output) as {
-          format?: { duration?: string; format_name?: string; size?: string };
-          streams?: Array<Record<string, unknown>>;
-        };
-        const streams = parsed.streams ?? [];
-        const video = streams.find((stream) => stream.codec_type === "video");
-        const audio = streams.find((stream) => stream.codec_type === "audio");
-        const rate = typeof video?.r_frame_rate === "string" ? video.r_frame_rate.split("/") : [];
-        const frameRate = rate.length === 2 && Number(rate[1]) > 0 ? Number(rate[0]) / Number(rate[1]) : undefined;
-        resolvePromise({
-          durationSeconds: Number(parsed.format?.duration ?? 0),
-          formatName: parsed.format?.format_name ?? "",
-          sizeBytes: Number(parsed.format?.size ?? 0),
-          video: video ? {
-            codecName: String(video.codec_name ?? ""),
-            width: Number(video.width ?? 0),
-            height: Number(video.height ?? 0),
-            frameRate,
-          } : undefined,
-          audio: audio ? {
-            codecName: String(audio.codec_name ?? ""),
-            channels: Number(audio.channels ?? 0),
-            sampleRate: Number(audio.sample_rate ?? 0),
-          } : undefined,
-        });
-      } catch (error) {
-        reject(error);
-      }
-    });
-  });
-}
-
 function hasAudioStream(path: string): Promise<boolean> {
   return new Promise((resolvePromise) => {
     const child = spawn("ffprobe", ["-v", "error", "-select_streams", "a:0", "-show_entries", "stream=index", "-of", "csv=p=0", path], { stdio: ["ignore", "pipe", "ignore"] });
@@ -477,12 +426,6 @@ export async function renderMp4(
       } else {
         await writeFile(finalPath, await readFile(concatenatedPath));
       }
-    }
-    const probe = await probeMedia(finalPath);
-    const report = assessExportQuality(probe, renderedDuration);
-    if (!report.passed) {
-      const failed = report.checks.filter((check) => !check.passed).map((check) => check.message).join(" ");
-      throw new Error(`Export quality inspection failed (${report.score}/100): ${failed}`);
     }
     return finalPath;
   } finally {

@@ -110,7 +110,7 @@ export function assessExportQuality(probe: MediaProbe, expectedDurationSeconds?:
   checks.push({ id: "video_stream", passed: Boolean(video), message: video ? "Video stream detected." : "No video stream detected." });
   checks.push({ id: "duration", passed: Number.isFinite(probe.durationSeconds) && probe.durationSeconds >= 0.5, message: probe.durationSeconds >= 0.5 ? "Duration is valid." : "Video is empty or shorter than 0.5 seconds." });
   checks.push({ id: "file_size", passed: Number.isFinite(probe.sizeBytes) && probe.sizeBytes > 1024, message: probe.sizeBytes > 1024 ? "Output file size is valid." : "Output file is empty or unexpectedly small." });
-  checks.push({ id: "dimensions", passed: Boolean(video && video.width >= 2 && video.height >= 2), message: video && video.width >= 2 && video.height >= 2 ? `Video dimensions: ${video.width}×${video.height}.` : "Video dimensions are missing or invalid." });
+  checks.push({ id: "dimensions", passed: Boolean(video && Number(video.width) >= 2 && Number(video.height) >= 2), message: video && video.width >= 2 && video.height >= 2 ? `Video dimensions: ${video.width}×${video.height}.` : "Video dimensions are missing or invalid." });
   checks.push({ id: "audio_stream", passed: Boolean(probe.audio), message: probe.audio ? "Audio stream detected." : "No audio stream detected." });
   if (expectedDurationSeconds && expectedDurationSeconds > 0) {
     const tolerance = Math.max(1.5, expectedDurationSeconds * 0.08);

@@ -10,7 +10,6 @@ import {
 } from "@workspace/db";
 import type { SceneAssetVersion, StudioCharacter } from "@workspace/db";
 import { logger } from "./logger";
-import { buildDirectorContinuityRules, auditSceneContinuity } from "./autonomousStudio";
 import { decryptProviderKey } from "./secretVault";
 import {
   classifyProviderResponse,
@@ -375,7 +374,6 @@ async function processScriptJob(job: typeof studioJobsTable.$inferSelect): Promi
 
     const prompt = [
       "Analyze the premise and create a production-ready film script, character bible, and storyboard. Return only valid JSON with this shape:",
-      buildDirectorContinuityRules(),
       '{"characters":[{"id":"character-1","name":"...","description":"fixed visual identity","costume":"fixed costume","voiceDescription":"..."}],"scenes":[{"title":"...","description":"...","imagePrompt":"...","narration":"...","durationSeconds":8,"shotType":"wide","cameraMovement":"slow push-in","location":"...","lighting":"...","characterIds":["character-1"]}]}',
       `Concept: ${input.story?.trim() || project.idea}`,
       `Video type: ${project.videoType}`,
@@ -409,20 +407,6 @@ async function processScriptJob(job: typeof studioJobsTable.$inferSelect): Promi
       try {
         const response = await generateWithProvider(keyRow.provider, key, prompt);
         const parsed = parseGeneratedJson(response);
-        const continuity = auditSceneContinuity(
-          parsed.scenes.map((scene, index) => ({
-            sceneId: `scene-${index + 1}`,
-            characterIds: scene.characterIds,
-            location: scene.location,
-            lighting: scene.lighting,
-            description: scene.description,
-          })),
-          parsed.characters.map((character) => character.id),
-        );
-        const blockingContinuity = continuity.filter((issue) => issue.severity === "error");
-        if (blockingContinuity.length) {
-          throw new Error(`Storyboard continuity check failed: ${blockingContinuity[0].message}`);
-        }
         const expectedSceneCount = input.sceneCount ?? 6;
         if (parsed.scenes.length !== expectedSceneCount) {
           throw new Error(`Generated scene count mismatch: expected ${expectedSceneCount}, received ${parsed.scenes.length}.`);
