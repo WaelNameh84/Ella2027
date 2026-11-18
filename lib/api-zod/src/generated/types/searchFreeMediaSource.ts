@@ -13,6 +13,7 @@ export const SearchFreeMediaSource = {
   openverse: 'openverse',
   wikimedia: 'wikimedia',
   archive: 'archive',
+  nasa: 'nasa',
   pexels: 'pexels',
   pixabay: 'pixabay',
   unsplash: 'unsplash',
