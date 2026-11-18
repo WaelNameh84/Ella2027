@@ -2809,7 +2809,7 @@ a[href]:active,
     filter .12s ease,
     background-color .12s ease;
 }
-:where(button,.btn,[role="button],a.ella-pro-primary,a.ella-mode-mini,.storyboard-upload-label):not(:disabled):not([aria-disabled="true"]):active {
+:where(button,.btn,[role="button"],a.ella-pro-primary,a.ella-mode-mini,.storyboard-upload-label):not(:disabled):not([aria-disabled="true"]):active {
   transform: translateY(2px) scale(.975);
   filter: brightness(.94);
   box-shadow:
