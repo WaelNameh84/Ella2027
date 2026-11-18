@@ -1,67 +1,64 @@
 import { useState } from 'react';
-import { Check, Copy, Sparkles, X } from 'lucide-react';
-import { buildSuggestion, type AssistField, type AssistInput, type AssistTargetId } from '@/lib/writing-assistant';
+import { Check, Copy, LoaderCircle, Sparkles, X } from 'lucide-react';
 
-const targets: { id: AssistTargetId; ar: string; en: string; ideaOnly?: boolean }[] = [
-  { id: 'idea', ar: 'تحسين الفكرة', en: 'Improve idea', ideaOnly: true },
-  { id: 'dialogue', ar: 'الحوار', en: 'Dialogue' },
-  { id: 'tone', ar: 'النبرة', en: 'Tone' },
-  { id: 'shorten', ar: 'اختصار', en: 'Shorten' },
-  { id: 'suspense', ar: 'تشويق', en: 'Suspense' },
-  { id: 'style', ar: 'أسلوب سينمائي', en: 'Cinematic style' },
-  { id: 'camera', ar: 'حركة الكاميرا', en: 'Camera movement' },
-  { id: 'music', ar: 'الموسيقى', en: 'Music' },
-  { id: 'effects', ar: 'المؤثرات', en: 'Effects' },
+type Lang = 'ar' | 'en';
+type Task = 'scene' | 'dialogue' | 'visual' | 'rewrite';
+type ApplyField = 'description' | 'imagePrompt' | 'narration';
+
+const tasks: { id: Task; ar: string; en: string; field: ApplyField }[] = [
+  { id: 'scene', ar: 'كتابة مشهد كامل', en: 'Write a full scene', field: 'description' },
+  { id: 'dialogue', ar: 'كتابة الحوار', en: 'Write dialogue', field: 'narration' },
+  { id: 'visual', ar: 'وصف بصري سينمائي', en: 'Cinematic visual prompt', field: 'imagePrompt' },
+  { id: 'rewrite', ar: 'تحسين المشهد الحالي', en: 'Improve current scene', field: 'description' },
 ];
 
-export function WritingAssistant({ lang, values, context = 'scene', onApply }: {
-  lang: 'ar' | 'en';
-  values: AssistInput;
-  context?: 'scene' | 'idea';
-  onApply: (field: AssistField, value: string) => void;
+export function WritingAssistant({ lang, projectId, sceneId, onApply }: {
+  lang: Lang;
+  projectId: string;
+  sceneId: string;
+  onApply: (field: ApplyField, value: string) => void;
 }) {
   const t = (ar: string, en: string) => lang === 'ar' ? ar : en;
   const [open, setOpen] = useState(false);
-  const [target, setTarget] = useState<AssistTargetId | null>(null);
-  const [text, setText] = useState('');
+  const [task, setTask] = useState<Task>('scene');
+  const [instruction, setInstruction] = useState('');
+  const [result, setResult] = useState('');
+  const [approved, setApproved] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
   const [applied, setApplied] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const available = targets.filter(item => context === 'idea' ? item.id === 'idea' || item.id === 'tone' || item.id === 'shorten' || item.id === 'suspense' : !item.ideaOnly);
-  const suggestion = target ? buildSuggestion(target, values, lang) : null;
-  const choose = (id: AssistTargetId) => {
-    const next = buildSuggestion(id, values, lang);
-    setTarget(id);
-    setText(next.value);
-    setApplied(false);
-    setCopied(false);
-  };
-  const apply = () => {
-    if (!suggestion) return;
-    onApply(suggestion.field, suggestion.advisory ? text : (suggestion.target === 'camera' ? suggestion.value : text));
-    setApplied(true);
+  const selected = tasks.find(item => item.id === task)!;
+  const generate = async () => {
+    if (!instruction.trim() || !approved || busy) return;
+    setBusy(true); setError(''); setResult(''); setApplied(false);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/scenes/${sceneId}/assistant`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ task, instruction: instruction.trim(), approvePotentialCharges: true }),
+      });
+      const body = await response.json().catch(() => ({})) as { text?: string; error?: string };
+      if (!response.ok || !body.text?.trim()) throw new Error(body.error || t('لم يصل رد صالح من مزوّد الذكاء الاصطناعي.', 'The AI provider returned no usable response.'));
+      setResult(body.text.trim());
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : t('تعذر الاتصال بالمساعد.', 'Could not reach the assistant.'));
+    } finally { setBusy(false); }
   };
   const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1800);
-    } catch {
-      setCopied(false);
-    }
+    try { await navigator.clipboard.writeText(result); } catch { setError(t('تعذر النسخ؛ يمكنك تحديد النص ونسخه يدويًا.', 'Copy failed; select and copy the text manually.')); }
   };
   return <div className="writing-assistant">
-    <button type="button" className="btn btn-quiet writing-assistant-toggle" onClick={() => setOpen(current => !current)} aria-expanded={open} data-testid="button-writing-assistant"><Sparkles size={15} />{t('مساعد الكتابة', 'Writing assistant')}</button>
-    {open && <section className="writing-assistant-panel" aria-label={t('اقتراحات مساعد الكتابة', 'Writing assistant suggestions')}>
-      <div className="writing-assistant-head"><div><span className="eyebrow">{t('اقتراحات قابلة للمراجعة', 'REVIEWABLE SUGGESTIONS')}</span><h4>{t('جرّب تحسينًا، ثم قرّر.', 'Try an improvement, then decide.')}</h4></div><button type="button" className="btn btn-ghost !p-1" onClick={() => setOpen(false)} aria-label={t('إغلاق المساعد', 'Close assistant')}><X size={14} /></button></div>
-      <div className="writing-assistant-targets">{available.map(item => <button type="button" key={item.id} className={target === item.id ? 'is-active' : ''} onClick={() => choose(item.id)}>{t(item.ar, item.en)}</button>)}</div>
-      {suggestion ? <div className="writing-assistant-suggestion">
-        <p className="writing-assistant-rationale">{t(suggestion.rationaleAr, suggestion.rationaleEn)}</p>
-        <textarea className="studio-input" rows={suggestion.target === 'camera' ? 2 : 5} value={suggestion.target === 'camera' ? t('حركة مقترحة: Dolly in بطيء نحو الوجه.', 'Suggested movement: slow dolly-in toward the face.') : text} onChange={event => { if (suggestion.target !== 'camera') setText(event.target.value); setApplied(false); }} aria-label={t('نص الاقتراح', 'Suggestion text')} />
-        <p className="writing-assistant-note">{suggestion.advisory ? t('اقتراح إرشادي يُنسخ يدويًا؛ لا يوجد حقل نصي مطابق في المشروع.', 'An advisory suggestion to copy manually; the project has no matching text field.') : t('لن يُطبّق شيء قبل ضغط «تطبيق بعد المراجعة».', 'Nothing is applied until you press “Apply after review”.')}</p>
-        {applied && <p className="writing-assistant-applied" role="status"><Check size={13} />{suggestion.advisory ? t('تم نسخ الاقتراح إلى الحافظة عبر زر النسخ.', 'Suggestion copied with the copy button.') : t('طُبّق الاقتراح بعد مراجعتك. يمكنك التراجع بتعديل الحقل.', 'Applied after your review. You can undo by editing the field.')}</p>}
-        <div className="writing-assistant-actions"><button type="button" className="btn btn-quiet" onClick={() => void copy()}><Copy size={14} />{copied ? t('تم النسخ', 'Copied') : t('نسخ', 'Copy')}</button><button type="button" className="btn btn-ghost" onClick={() => { setTarget(null); setText(''); setApplied(false); }}>{t('تجاهل', 'Discard')}</button><button type="button" className="btn btn-primary" onClick={apply} disabled={suggestion.advisory || (suggestion.target !== 'camera' && !text.trim())} title={suggestion.advisory ? t('اقتراح إرشادي فقط؛ استخدم النسخ.', 'Advisory only; use copy.') : undefined}>{t('تطبيق بعد المراجعة', 'Apply after review')}</button></div>
-      </div> : <p className="writing-assistant-empty">{t('اختر نوع الاقتراح لعرض نسخة قابلة للتعديل قبل تطبيقها.', 'Choose a suggestion type to preview an editable version before applying.')}</p>}
-      <p className="writing-assistant-source">{t('اقتراحات مبنية بقواعد نصية محلية وليست نتيجة نموذج ذكاء اصطناعي. لا تُحفظ أي نسخة غير مطبّقة.', 'Suggestions are generated by local text rules, not an AI model. Unapplied drafts are never saved.')}</p>
+    <button type="button" className="btn btn-quiet writing-assistant-toggle" onClick={() => setOpen(value => !value)} aria-expanded={open} data-testid="button-writing-assistant"><Sparkles size={15}/>{t('مساعد الذكاء الاصطناعي للمشهد', 'AI scene assistant')}</button>
+    {open && <section className="writing-assistant-panel" aria-label={t('مساعد كتابة المشهد', 'Scene writing assistant')}>
+      <div className="writing-assistant-head"><div><span className="eyebrow">ELLA AI · SCENE COPILOT</span><h4>{t('أعطه فكرتك ودعه يكتب المسودة.', 'Give it your idea and let it draft the scene.')}</h4></div><button type="button" className="btn btn-ghost !p-1" onClick={() => setOpen(false)} aria-label={t('إغلاق المساعد', 'Close assistant')}><X size={14}/></button></div>
+      <div className="writing-assistant-targets">{tasks.map(item => <button type="button" key={item.id} className={task === item.id ? 'is-active' : ''} onClick={() => {setTask(item.id);setResult('');setApplied(false);}}>{t(item.ar,item.en)}</button>)}</div>
+      <label className="inspector-field"><span className="field-label">{t('فكرتك أو تعليماتك','Your idea or instruction')}</span><textarea className="studio-input" rows={4} value={instruction} onChange={event => setInstruction(event.target.value)} placeholder={t('مثلاً: يدخل البطل إلى المطعم، يرى حبيبته السابقة، ويحاول إخفاء صدمته...','Example: The hero enters the restaurant, sees his former lover, and tries to hide his shock...')}/></label>
+      <label className="checkline"><input type="checkbox" checked={approved} onChange={event => setApproved(event.target.checked)}/><span>{t('أوافق على إرسال طلبي إلى مزوّد النص المحدد وقد تُحتسب رسوم. لن يتم الإرسال قبل موافقتي.','I approve sending this request to the configured text provider; charges may apply. Nothing is sent without my approval.')}</span></label>
+      <button type="button" className="btn btn-primary w-full" onClick={() => void generate()} disabled={!instruction.trim() || !approved || busy}>{busy ? <LoaderCircle size={15} className="animate-spin"/> : <Sparkles size={15}/ >}{busy ? t('يكتب المشهد الآن…','Writing your scene…') : t('اكتب لي','Generate with AI')}</button>
+      {error && <p className="inline-error" role="alert">{error}</p>}
+      {result && <div className="writing-assistant-suggestion"><div className="writing-assistant-rationale">{t('مسودة قابلة للتحرير — لم يتم تغيير المشهد بعد.','Editable draft — your scene has not been changed yet.')}</div><textarea className="studio-input" rows={9} value={result} onChange={event => setResult(event.target.value)}/><div className="writing-assistant-actions"><button type="button" className="btn btn-quiet" onClick={() => void copy()}><Copy size={14}/>{t('نسخ','Copy')}</button><button type="button" className="btn btn-primary" onClick={() => {onApply(selected.field,result);setApplied(true);}}><Check size={14}/>{t('اعتماد وإضافة للمشهد','Apply to scene')}</button></div>{applied && <p className="writing-assistant-applied" role="status">{t('تم تطبيق النص وحفظه تلقائيًا.','Text applied; it will be saved automatically.')}</p>}</div>}
+      <p className="writing-assistant-source">{t('يستخدم مزوّد النص المفعّل في إعداداتك. إذا لم يتوفر مزوّد صالح، سيعرض سبب التعذر ولن يستبدل النص الحالي.','Uses your configured text provider. If none is available, it reports the reason and keeps your existing text unchanged.')}</p>
     </section>}
   </div>;
 }
