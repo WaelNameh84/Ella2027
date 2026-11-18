@@ -135,9 +135,11 @@ def model_catalog(free_vram: float | None):
     # The workflow is supplied by the operator; do not claim a model is installed unless configured.
     model = os.getenv("ELLA_MODEL_ID", "wan2.2-ti2v-5b")
     required = float(os.getenv("ELLA_MODEL_VRAM_GB", "8"))
-    ready = WORKFLOW.exists() and bool(os.getenv("COMFYUI_VIDEO_OUTPUT_NODE"))
-    fits = free_vram is None or free_vram >= required
-    return {model: {"available": ready, "ready": ready and fits, "estimated_vram_gb": required,
+    workflow_configured = WORKFLOW.exists() and bool(os.getenv("COMFYUI_VIDEO_OUTPUT_NODE"))
+    installed = os.getenv("ELLA_MODEL_INSTALLED", "false").lower() == "true"
+    fits = free_vram is not None and free_vram >= required
+    ready = workflow_configured and installed and fits
+    return {model: {"available": workflow_configured, "installed": installed, "workflow_configured": workflow_configured, "ready": ready, "estimated_vram_gb": required,
                     "free_vram_gb": free_vram, "max_clip_seconds": int(os.getenv("ELLA_MAX_CLIP_SECONDS", "5")),
                     "max_resolution": os.getenv("ELLA_MAX_RESOLUTION", "720p"),
                     "supports_image_to_video": os.getenv("ELLA_SUPPORTS_IMAGE_TO_VIDEO", "true").lower() == "true",
@@ -153,8 +155,10 @@ async def health(authorization: str | None = Header(default=None)):
         async with httpx.AsyncClient(timeout=3) as c:
             r = await c.get(f"{COMFY}/system_stats"); comfy_ok = r.is_success
     except Exception: pass
-    return {"status": "ok" if comfy_ok else "degraded", "gpu": name, "available": comfy_ok,
-            "comfyui_connected": comfy_ok, "free_vram_gb": free, "total_vram_gb": total}
+    gpu_ok = free is not None
+    ready = comfy_ok and gpu_ok
+    return {"status": "ok" if ready else "degraded", "gpu": name, "available": ready,
+            "gpu_detected": gpu_ok, "comfyui_connected": comfy_ok, "free_vram_gb": free, "total_vram_gb": total}
 
 
 @APP.get("/capabilities")
