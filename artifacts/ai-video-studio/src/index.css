@@ -2111,3 +2111,41 @@ a[href]:active,
   .ai-scene-suggestion-grid { grid-template-columns: 1fr; }
   .ai-scene-assistant { padding: .8rem; }
 }
+
+
+.storyboard-upload-label {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.9rem;
+  min-height: 1.9rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: .55rem;
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--background));
+  cursor: pointer;
+  transition: border-color .16s ease, color .16s ease, background .16s ease;
+}
+.storyboard-upload-label:hover {
+  border-color: hsl(var(--primary) / .45);
+  color: hsl(var(--primary));
+  background: hsl(var(--primary) / .06);
+}
+.storyboard-upload-label input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+.storyboard-upload-label:focus-within {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+.storyboard-upload-label:has(input:disabled) {
+  opacity: .55;
+  cursor: wait;
+}
