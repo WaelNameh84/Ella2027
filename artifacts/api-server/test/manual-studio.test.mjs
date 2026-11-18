@@ -39,3 +39,26 @@ test("Scene image upload remains scoped to the selected scene", async () => {
   assert.match(app, /storyboard-upload-label/);
   assert.match(app, /onUploadImage=\{uploadSceneImage\}/);
 });
+
+test("Quick and Professional converge on the same scene production engine", async () => {
+  const fs = await import("node:fs/promises");
+  const app = await fs.readFile(new URL("../../ai-video-studio/src/App.tsx", import.meta.url), "utf8");
+
+  // Both authoring modes create normal project/scene records; media generation is
+  // deliberately centralized in one scene panel and the same queue mutations.
+  assert.match(app, /function GenerationPanel\(/);
+  assert.match(app, /useQueueSceneImageGeneration\(\)/);
+  assert.match(app, /useQueueSceneVideoGeneration\(\)/);
+  assert.match(app, /useQueueSceneVoiceGeneration\(\)/);
+  assert.match(app, /function saveProjectAndWriteStory/);
+  assert.match(app, /if \(mode === 'manual'\)/);
+  assert.match(app, /runAutoFilm\(/);
+  assert.match(app, /GenerationPanel/);
+
+  // Keep the shared media-job contract explicit: mode-specific authoring must
+  // not create separate image/video/voice endpoints or renderers.
+  const generationRoutes = await fs.readFile(new URL("../src/routes/generation.ts", import.meta.url), "utf8");
+  assert.match(generationRoutes, /\/projects\/:projectId\/scenes\/:sceneId\/jobs\/image/);
+  assert.match(generationRoutes, /\/projects\/:projectId\/scenes\/:sceneId\/jobs\/video/);
+  assert.match(generationRoutes, /\/projects\/:projectId\/scenes\/:sceneId\/jobs\/voice/);
+});
