@@ -25,6 +25,13 @@ try {
       stdio: "inherit",
     });
     exitCode = result.status ?? 1;
+    if (exitCode === 0) {
+      const manualTests = spawnSync(process.execPath, ["--test", resolve(packageDir, "test/manual-studio.test.mjs")], {
+        cwd: packageDir,
+        stdio: "inherit",
+      });
+      exitCode = manualTests.status ?? 1;
+    }
   } else {
     exitCode = build.status ?? 1;
   }
