@@ -86,10 +86,56 @@ const FREE_TEST_KEYS: ProviderKey[] = [
   { id: '00000000-0000-4000-8000-000000000000', provider: 'free-test', label: 'Free local image test', serviceType: 'image', enabled: true, priority: -100, status: 'valid', lastTestAt: null, testMessage: 'Offline fixture; no provider call.', usedCount: 0, cooldownUntil: null, createdAt: new Date(0).toISOString() },
   { id: '00000000-0000-4000-8000-000000000001', provider: 'piper-local', label: 'Piper Arabic — local, free', serviceType: 'voice', enabled: true, priority: -100, status: 'valid', lastTestAt: null, testMessage: 'Local Arabic Jordanian narration. No provider API key or cloud inference fee.', usedCount: 0, cooldownUntil: null, createdAt: new Date(0).toISOString() },
   { id: '00000000-0000-4000-8000-000000000002', provider: 'ai-horde', label: 'AI Horde — anonymous, free, low priority', serviceType: 'image', enabled: true, priority: -200, status: 'valid', lastTestAt: null, testMessage: 'Official anonymous API identifier; no personal key. Anonymous requests have the lowest priority and may be restricted under load.', usedCount: 0, cooldownUntil: null, createdAt: new Date(0).toISOString() },
+  { id: '00000000-0000-4000-8000-000000000003', provider: 'puter', label: 'Puter AI — no API key, account usage', serviceType: 'image', enabled: true, priority: -150, status: 'valid', lastTestAt: null, testMessage: 'Browser-based Puter.js integration. Requires Puter sign-in; generation charges or free allowance depend on the account and model.', usedCount: 0, cooldownUntil: null, createdAt: new Date(0).toISOString() },
 ];
 
+type PuterSdk = {
+  auth: { isSignedIn: () => boolean; signIn: () => Promise<unknown> };
+  ai: { txt2img: (prompt: string, options?: Record<string, unknown>) => Promise<HTMLImageElement> };
+};
+declare global { interface Window { puter?: PuterSdk } }
+let puterSdkPromise: Promise<PuterSdk> | null = null;
+
+function loadPuterSdk(): Promise<PuterSdk> {
+  if (window.puter) return Promise.resolve(window.puter);
+  if (!puterSdkPromise) {
+    puterSdkPromise = new Promise<PuterSdk>((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://js.puter.com/v2/';
+      script.async = true;
+      script.dataset.ellaPuterSdk = 'true';
+      script.onload = () => window.puter ? resolve(window.puter) : reject(new Error('Puter SDK loaded without exposing its API.'));
+      script.onerror = () => reject(new Error('Could not load the Puter SDK. Check your connection and try again.'));
+      document.head.appendChild(script);
+    }).catch(error => { puterSdkPromise = null; throw error; });
+  }
+  return puterSdkPromise;
+}
+
+async function getPuterUploadBlob(src: string): Promise<Blob> {
+  const response = await fetch(src, { mode: 'cors', credentials: 'omit' });
+  if (!response.ok) throw new Error('Puter generated an image, but the image file could not be downloaded for saving.');
+  const source = await response.blob();
+  const supported = ['image/jpeg', 'image/png', 'image/webp'];
+  if (supported.includes(source.type.toLowerCase()) && source.size <= 8 * 1024 * 1024) return source;
+  const bitmap = await createImageBitmap(source);
+  const scale = Math.min(1, 2048 / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('This browser could not prepare the generated image for saving.');
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  const converted = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Could not convert the generated image.')), 'image/webp', 0.88);
+  });
+  if (converted.size > 8 * 1024 * 1024) throw new Error('The generated image is larger than the app upload limit. Choose a smaller model or output size.');
+  return converted;
+}
+
 function providerKeyIsUsable(provider: string, status: ProviderKey['status'], cooldownUntil: string | null = null) {
-  if (provider === 'free-test') return true;
+  if (provider === 'free-test' || provider === 'puter') return true;
   if (status === 'quota_limited' || status === 'rate_limited') {
     return !cooldownUntil || new Date(cooldownUntil).getTime() <= Date.now();
   }
@@ -143,7 +189,7 @@ function userFacingProviderTestMessage(message: string | null, providerLabel: st
 function providerSupports(provider: string, service: string) {
   if (provider === 'free-test') return ['image', 'voice'].includes(service);
   if (service === 'text') return ['openai','gemini','anthropic','groq','cloudflare','openrouter','llama-free','huggingface','colab-t5','mistral','cerebras','together','sambanova','deepseek','nvidia','cohere'].includes(provider);
-  if (service === 'image') return ['openai','stability','replicate','huggingface','ai-horde'].includes(provider);
+  if (service === 'image') return ['openai','stability','replicate','huggingface','ai-horde','puter'].includes(provider);
   if (service === 'video') return ['replicate','fal','agnes','magic-hour','local-video-worker'].includes(provider);
   if (service === 'voice') return ['elevenlabs','openai','openai-audio','google-tts','azure-speech','piper-local'].includes(provider);
   if (service === 'transcription') return ['openai','whisper','huggingface','deepgram','assemblyai','google-speech','azure-speech'].includes(provider);
@@ -2009,7 +2055,8 @@ function GenerationPanel({projectId,scene,keys,lang,onQueued,freeMode,services,c
   const imageJob=useQueueSceneImageGeneration(),videoJob=useQueueSceneVideoGeneration(),voiceJob=useQueueSceneVoiceGeneration();
   const allowedServices=services&&services.length?services:(['image','video','voice'] as const);
   const builtinHordeKey=FREE_TEST_KEYS.find(key=>key.provider==='ai-horde')!;
-  const generationKeys=[...keys.filter(key=>key.provider!=='ai-horde'),builtinHordeKey];
+  const builtinPuterKey=FREE_TEST_KEYS.find(key=>key.provider==='puter')!;
+  const generationKeys=[...keys.filter(key=>key.provider!=='ai-horde'&&key.provider!=='puter'),builtinHordeKey,builtinPuterKey];
   const [action,setAction]=useState<'image'|'video'|'voice'|null>(null);
   const [providerId,setProviderId]=useState('');
   const [model,setModel]=useState('');
@@ -2020,27 +2067,62 @@ function GenerationPanel({projectId,scene,keys,lang,onQueued,freeMode,services,c
   const [resolution,setResolution]=useState<512|768|1024>(1024);
   const [seed,setSeed]=useState('');
   const [negativePrompt,setNegativePrompt]=useState('');
+  const [puterBusy,setPuterBusy]=useState(false);
+  const [puterFeedback,setPuterFeedback]=useState('');
+  const [puterTestImage,setPuterTestImage]=useState('');
   const service=action==='image'?'image':action==='video'?'video':action==='voice'?'voice':null;
   const readyKeys=generationKeys.filter(key=>key.enabled&&key.serviceType===service&&providerSupports(key.provider,service||'')&&providerKeyIsUsable(key.provider,key.status,key.cooldownUntil)).sort((a,b)=>Number(b.provider==='ai-horde')-Number(a.provider==='ai-horde')||Number(b.provider==='piper-local')-Number(a.provider==='piper-local'));
   const activeKey=readyKeys.find(key=>key.id===providerId)||readyKeys[0];
   const aiHordeSelected=action==='image'&&activeKey?.provider==='ai-horde';
+  const puterSelected=action==='image'&&activeKey?.provider==='puter';
   const sceneCharacterIds=Array.isArray(scene.characterIds)?scene.characterIds:[];
   const assignedReferenceCharacters=characters.filter(character=>sceneCharacterIds.includes(character.id)&&Boolean(character.referenceImageUrl?.trim()));
   const supportsSeed=action==='image'&&(activeKey?.provider==='stability'||activeKey?.provider==='huggingface');
   const supportsNegative=supportsSeed;
-  const supportsResolution=action==='image'&&!aiHordeSelected&&activeKey?.provider!=='replicate';
+  const supportsResolution=action==='image'&&!aiHordeSelected&&activeKey?.provider!=='replicate'&&activeKey?.provider!=='puter';
   const approvalSignature=JSON.stringify({scene:scene.id,imagePrompt:scene.imagePrompt,description:scene.description,action,provider:activeKey?.id||'',model,outputs:proMode?outputs:1,resolution,seed:supportsSeed?seed:'',negativePrompt:supportsNegative?negativePrompt:'',mode,voiceId,characterReferences:assignedReferenceCharacters.map(character=>[character.id,character.referenceImageUrl])});
   const [approved,setApproved]=useRequestApproval(approvalSignature);
   const [acceptedHordeSharing,setAcceptedHordeSharing]=useRequestApproval(`ai-horde-sharing:${approvalSignature}`);
   const aiHordeModelsQuery=useQuery({queryKey:['ai-horde-active-image-models'],enabled:Boolean(aiHordeSelected),staleTime:60_000,retry:false,queryFn:async()=>{const response=await fetch(`${basePath}/api/providers/ai-horde/models`,{credentials:'include'});const body=await response.json().catch(()=>({})) as {models?:AiHordeModelOption[];error?:string};if(!response.ok)throw new Error(body.error||'AI Horde models are temporarily unavailable.');return Array.isArray(body.models)?body.models:[];}});
   const aiHordeModels=aiHordeModelsQuery.data||[];
   useEffect(()=>{if(aiHordeSelected&&aiHordeModels.length&&!aiHordeModels.some(item=>item.name===model))setModel(aiHordeModels[0].name);},[aiHordeSelected,aiHordeModels,model]);
+  useEffect(()=>{if(puterSelected&&!model.trim())setModel('gpt-image-2.6-flare');},[puterSelected,model]);
   useEffect(()=>{if(action==='video'&&!model.trim())setModel(defaultVideoModel(activeKey?.provider,mode));if(action==='voice'&&!voiceId.trim())setVoiceId(defaultVoiceId(activeKey?.provider));},[action,activeKey?.provider,mode]);
-  const busy=imageJob.isPending||videoJob.isPending||voiceJob.isPending;
-  const close=()=>{setAction(null);setApproved(false);setAcceptedHordeSharing(false);setModel('');setVoiceId('');setOutputs(1);setSeed('');setNegativePrompt('');};
-  const submit=()=>{
+  const busy=imageJob.isPending||videoJob.isPending||voiceJob.isPending||puterBusy;
+  const close=()=>{setAction(null);setApproved(false);setAcceptedHordeSharing(false);setModel('');setVoiceId('');setOutputs(1);setSeed('');setNegativePrompt('');setPuterFeedback('');setPuterTestImage('');};
+  const runPuterTest=async()=>{
+    setPuterBusy(true);setPuterFeedback('');setPuterTestImage('');
+    try{
+      const sdk=await loadPuterSdk();
+      if(!sdk.auth.isSignedIn())await sdk.auth.signIn();
+      const sample=await sdk.ai.txt2img('A simple red apple on a clean white background, studio product photography.',{model:model.trim()||'gpt-image-2.6-flare',test_mode:true});
+      if(!sample?.src)throw new Error('Puter test mode returned no image.');
+      setPuterTestImage(sample.src);
+      setPuterFeedback(tx(lang,'نجح اختبار اتصال Puter ووصلت صورة تجريبية بلا استخدام رصيد توليد.','Puter SDK test passed and returned a sample image without using generation credits.'));
+    }catch(error){setPuterFeedback(error instanceof Error?error.message:tx(lang,'فشل اختبار Puter.','Puter test failed.'));}
+    finally{setPuterBusy(false);}
+  };
+  const submit=async()=>{
     if(!action||!activeKey||!approved||(aiHordeSelected&&!acceptedHordeSharing))return;
     const done=()=>{onQueued();close()};
+    if(action==='image'&&puterSelected){
+      setPuterBusy(true);setPuterFeedback('');
+      try{
+        const sdk=await loadPuterSdk();
+        if(!sdk.auth.isSignedIn())await sdk.auth.signIn();
+        const characterNotes=assignedReferenceCharacters.map(character=>`${character.name}: ${character.description}. Clothing: ${character.costume}.`);
+        const prompt=[scene.imagePrompt||scene.description,scene.imagePrompt&&scene.description!==scene.imagePrompt?scene.description:'',...characterNotes,'Maintain the same character identity, facial details, hair, clothing, and visual style throughout the film.'].filter(Boolean).join('\\n');
+        const generated=await sdk.ai.txt2img(prompt,{model:model.trim()||'gpt-image-2.6-flare',aspect_ratio:'16:9',quality:'medium'});
+        if(!generated?.src)throw new Error('Puter completed without returning an image.');
+        const blob=await getPuterUploadBlob(generated.src);
+        const uploaded=await fetch(`${basePath}/api/projects/${projectId}/scenes/${scene.id}/assets/upload`,{method:'POST',credentials:'include',headers:{'Content-Type':blob.type},body:blob});
+        const uploadResult=await uploaded.json().catch(()=>({})) as {error?:string};
+        if(!uploaded.ok)throw new Error(uploadResult.error||'Puter image was generated but could not be saved to this scene.');
+        done();
+      }catch(error){setPuterFeedback(error instanceof Error?error.message:tx(lang,'تعذر توليد الصورة عبر Puter.','Puter image generation failed.'));}
+      finally{setPuterBusy(false);}
+      return;
+    }
     if(action==='image'){const parsedSeed=seed.trim()===''?null:Number(seed);if(parsedSeed!==null&&(!Number.isInteger(parsedSeed)||parsedSeed<0||parsedSeed>2147483647)){return}imageJob.mutate({projectId,sceneId:scene.id,data:{providerKeyId:activeKey.id,model:model.trim(),outputs:aiHordeSelected?1:proMode?outputs:1,resolution:aiHordeSelected?512:supportsResolution?resolution:1024,seed:supportsSeed?parsedSeed:null,negativePrompt:supportsNegative&&negativePrompt.trim()?negativePrompt.trim():null,acceptAiHordePrivacy:aiHordeSelected?acceptedHordeSharing:undefined,approvePotentialCharges:true} as any},{onSuccess:done});}
     if(action==='video')videoJob.mutate({projectId,sceneId:scene.id,data:{providerKeyId:activeKey.id,model:model.trim(),mode,approvePotentialCharges:true}},{onSuccess:done});
     if(action==='voice')voiceJob.mutate({projectId,sceneId:scene.id,data:{providerKeyId:activeKey.id,voiceId:voiceId.trim(),approvePotentialCharges:true}},{onSuccess:done});
@@ -2051,11 +2133,11 @@ function GenerationPanel({projectId,scene,keys,lang,onQueued,freeMode,services,c
     {allowedServices.map(kind=>{const availableKeys=generationKeys.filter(key=>key.enabled&&key.serviceType===kind&&providerSupports(key.provider,kind)&&providerKeyIsUsable(key.provider,key.status,key.cooldownUntil));const available=availableKeys.length>0;return <button key={kind} className="btn btn-quiet" disabled={!available} onClick={()=>{setAction(kind);setProviderId('');setApproved(false);if(kind==='voice')setVoiceId(defaultVoiceId(availableKeys[0]?.provider));if(kind==='video'){const nextMode=scene.assetType==='image'?'image':'text';setMode(nextMode);setModel(defaultVideoModel(availableKeys[0]?.provider,nextMode));}}} title={!available?tx(lang,'لا يوجد مزوّد متاح لهذه المهمة','No provider is available for this task'):undefined}>{kind==='image'?<ImagePlus size={15}/>:kind==='video'?<Film size={15}/>:<Languages size={15}/ >}{tx(lang,kind==='image'?'صورة':kind==='video'?'فيديو':'صوت',kind)}</button>})}{allowedServices.includes('video')&&!generationKeys.some(key=>key.enabled&&key.serviceType==='video'&&providerSupports(key.provider,'video')&&providerKeyIsUsable(key.provider,key.status,key.cooldownUntil))&&<div className="service-purpose-hint is-unavailable"><b>{tx(lang,'توليد الفيديو غير متاح حاليًا','Video generation is not available yet')}</b><span>{tx(lang,'تحتاج إلى مفتاح مزوّد فيديو صالح ومفعّل. توليد الفيديو ليس خدمة مجانية مدمجة؛ لن يبدأ أي طلب قبل موافقتك.','A valid, enabled video-provider key is required. Video generation is not a built-in free service; no request starts without your approval.')}</span><Link href="/settings/providers" className="text-link">{tx(lang,'إعداد مزوّد الفيديو','Set up a video provider')}<ArrowLeft size={14}/></Link></div>}
   </div><p className="generation-note">{tx(lang,'المخرجات تظهر هنا بعد اكتمال المهمة؛ لا توجد نتائج تجريبية.','Completed outputs appear here after the job finishes. No sample assets are shown.')}</p>
   {(imageJob.isError||videoJob.isError||voiceJob.isError)&&<ErrorRecoveryPanel compact lang={lang} sceneTitle={scene.title} message={(videoJob.error instanceof Error&&videoJob.error.message)||(imageJob.error instanceof Error&&imageJob.error.message)||(voiceJob.error instanceof Error&&voiceJob.error.message)||tx(lang,'تعذر إرسال طلب التوليد. تحقّق من المفتاح وإعدادات المزوّد.','Could not queue generation. Check the provider key and settings.')} />}
-      {action&&<Modal className="generation-modal" title={tx(lang,'تأكيد طلب التوليد','Confirm generation request')} subtitle={aiHordeSelected?tx(lang,'AI Horde مجهول ومجاني بلا حساب أو مفتاح شخصي؛ أولوية الانتظار منخفضة وقد يتوقف عند الضغط.','AI Horde anonymous use is free with no account or personal key; queue priority is low and access may be restricted under load.'):activeKey?.provider==='piper-local'?tx(lang,'Piper صوت عربي مجاني يُولّد محليًا على خادم التطبيق، دون اتصال بمزوّد صوت مدفوع.','Piper generates free Arabic narration locally on the app server; no paid voice provider is contacted.'):tx(lang,'قد تُحتسب رسوم على هذا الطلب، وقد يجرّب النظام مزوّدًا احتياطيًا آخر عند التعطل أو نفاد الحصة.','This request may incur charges. Automatic failover may also use another configured provider.')} onClose={close}><div className="form-stack">
+      {action&&<Modal className="generation-modal" title={tx(lang,'تأكيد طلب التوليد','Confirm generation request')} subtitle={aiHordeSelected?tx(lang,'AI Horde مجهول ومجاني بلا حساب أو مفتاح شخصي؛ أولوية الانتظار منخفضة وقد يتوقف عند الضغط.','AI Horde anonymous use is free with no account or personal key; queue priority is low and access may be restricted under load.'):puterSelected?tx(lang,'Puter لا يحتاج API Key، لكنه يتطلب تسجيل دخول وقد يستخدم رصيد حسابك حسب النموذج.','Puter needs no API key, but requires sign-in and may use your account allowance depending on the model.'):activeKey?.provider==='piper-local'?tx(lang,'Piper صوت عربي مجاني يُولّد محليًا على خادم التطبيق، دون اتصال بمزوّد صوت مدفوع.','Piper generates free Arabic narration locally on the app server; no paid voice provider is contacted.'):tx(lang,'قد تُحتسب رسوم على هذا الطلب، وقد يجرّب النظام مزوّدًا احتياطيًا آخر عند التعطل أو نفاد الحصة.','This request may incur charges. Automatic failover may also use another configured provider.')} onClose={close}><div className="form-stack">
     {!readyKeys.length?<div className="export-confirm"><ShieldCheck size={17}/>{tx(lang,'لا يوجد مفتاح مفعّل لهذه الخدمة. أضف مفتاحًا صالحًا من إعدادات المزوّدين.','No enabled key is available for this service. Add a working key in provider settings.')}</div>:<>
       {readyKeys.length>1&&<label><span className="field-label">{tx(lang,action==='voice'?'مزوّد الصوت':'مزوّد الخدمة',action==='voice'?'Voice provider':'Service provider')}</span><select className="studio-input" value={activeKey?.id||''} onChange={e=>{setProviderId(e.target.value);const selected=readyKeys.find(key=>key.id===e.target.value);if(action==='video')setModel(defaultVideoModel(selected?.provider,mode));if(action==='voice')setVoiceId(defaultVoiceId(selected?.provider));}}>{readyKeys.map(key=><option value={key.id} key={key.id}>{key.label} · {key.provider}</option>)}</select></label>}
       {aiHordeSelected&&<div className="export-confirm" role="note"><ShieldCheck size={17}/><div><b>{tx(lang,'تنبيه: طلب مجهول إلى AI Horde','Notice: anonymous request to AI Horde')}</b><p>{tx(lang,assignedReferenceCharacters.length?'سيُشارك مع AI Horde وصف المشهد وصور الشخصيات المرجعية المحددة والصورة الناتجة، وفق سياسة الخدمة. استخدم صورًا ووصفًا تقبل مشاركتهما. الدعم يختلف حسب النموذج، والانتظار قد يكون طويلًا.':'لأن الاستخدام مجهول، يوضح توثيق Horde أن المطالبات والصور تُشارك مع LAION. استخدم وصفًا تقبل مشاركته. الطلب له أقل أولوية وقد يطول انتظاره أو يُقيّد عند الازدحام.',assignedReferenceCharacters.length?'The scene prompt, selected character reference photos, and generated image will be shared with AI Horde under its service policy. Only use content you are comfortable sharing. Reference support varies by model and waits may be long.':'Horde documentation says anonymous prompts and images are shared with LAION. Only use prompts you are comfortable sharing. Anonymous requests have the lowest priority; waiting may be long or access may be restricted under load.')}</p></div></div>}
-      {action!=='voice'&&(aiHordeSelected?<div><label><span className="field-label">{tx(lang,'نموذج صورة نشط على AI Horde','Active AI Horde image model')}</span>{aiHordeModels.length>0&&<select className="studio-input" value={model} onChange={e=>setModel(e.target.value)}>{aiHordeModels.map(item=><option key={item.name} value={item.name}>{item.name} · {item.workers} {tx(lang,'عمّال','workers')} · {item.etaSeconds>0?`~${Math.ceil(item.etaSeconds/60)} ${tx(lang,'دقيقة','min')}`:tx(lang,'وقت انتظار غير متاح','ETA n/a')}</option>)}</select>}</label>{aiHordeModelsQuery.isLoading&&<p className="generation-note">{tx(lang,'جارٍ تحميل النماذج النشطة مرة واحدة...','Loading currently active models…')}</p>}{aiHordeModelsQuery.isError&&<div className="inline-error" role="alert">{aiHordeModelsQuery.error instanceof Error?aiHordeModelsQuery.error.message:tx(lang,'تعذر الوصول إلى قائمة نماذج AI Horde.','Could not load AI Horde models.')} <button type="button" className="text-link" onClick={()=>void aiHordeModelsQuery.refetch()} disabled={aiHordeModelsQuery.isFetching}>{tx(lang,'إعادة المحاولة','Retry')}</button></div>}{!aiHordeModelsQuery.isLoading&&!aiHordeModelsQuery.isError&&!aiHordeModels.length&&<p className="inline-error">{tx(lang,'لا توجد نماذج صور نشطة الآن؛ جرّب لاحقًا.','No active image models are available right now; try again later.')}</p>}</div>:<label><span className="field-label">{tx(lang,'معرّف النموذج لدى المزوّد','Provider model ID')}</span><input required className="studio-input" value={model} onChange={e=>setModel(e.target.value)} placeholder={action==='image'&&activeKey?.provider==='huggingface'?'black-forest-labs/FLUX.1-schnell':action==='video'&&activeKey?.provider==='fal'?'minimax/h3-max/text-to-video':tx(lang,'أدخل معرّف النموذج المتاح لحسابك','Enter a model ID available to your account')} /></label>)}
+      {action!=='voice'&&(aiHordeSelected?<div><label><span className="field-label">{tx(lang,'نموذج صورة نشط على AI Horde','Active AI Horde image model')}</span>{aiHordeModels.length>0&&<select className="studio-input" value={model} onChange={e=>setModel(e.target.value)}>{aiHordeModels.map(item=><option key={item.name} value={item.name}>{item.name} · {item.workers} {tx(lang,'عمّال','workers')} · {item.etaSeconds>0?`~${Math.ceil(item.etaSeconds/60)} ${tx(lang,'دقيقة','min')}`:tx(lang,'وقت انتظار غير متاح','ETA n/a')}</option>)}</select>}</label>{aiHordeModelsQuery.isLoading&&<p className="generation-note">{tx(lang,'جارٍ تحميل النماذج النشطة مرة واحدة...','Loading currently active models…')}</p>}{aiHordeModelsQuery.isError&&<div className="inline-error" role="alert">{aiHordeModelsQuery.error instanceof Error?aiHordeModelsQuery.error.message:tx(lang,'تعذر الوصول إلى قائمة نماذج AI Horde.','Could not load AI Horde models.')} <button type="button" className="text-link" onClick={()=>void aiHordeModelsQuery.refetch()} disabled={aiHordeModelsQuery.isFetching}>{tx(lang,'إعادة المحاولة','Retry')}</button></div>}{!aiHordeModelsQuery.isLoading&&!aiHordeModelsQuery.isError&&!aiHordeModels.length&&<p className="inline-error">{tx(lang,'لا توجد نماذج صور نشطة الآن؛ جرّب لاحقًا.','No active image models are available right now; try again later.')}</p>}</div>:<div><label><span className="field-label">{tx(lang,'معرّف النموذج لدى المزوّد','Provider model ID')}</span><input required className="studio-input" value={model} onChange={e=>setModel(e.target.value)} placeholder={puterSelected?'gpt-image-2.6-flare':action==='image'&&activeKey?.provider==='huggingface'?'black-forest-labs/FLUX.1-schnell':action==='video'&&activeKey?.provider==='fal'?'minimax/h3-max/text-to-video':tx(lang,'أدخل معرّف النموذج المتاح لحسابك','Enter a model ID available to your account')} /></label>{puterSelected&&<div className="export-confirm" role="note"><ShieldCheck size={17}/><div><b>{tx(lang,'Puter: لا مفتاح، لكن الاستخدام ليس مضمون المجانية','Puter: no key, but usage is not guaranteed free')}</b><p>{tx(lang,'يتم التوليد من المتصفح عبر حساب Puter الخاص بك. قد توجد حصة مجانية أو قد تُستهلك أرصدة وفق النموذج. زر الاختبار أدناه يستخدم test_mode ولا يستهلك رصيد توليد.','Generation runs in your browser through your Puter account. A free allowance may exist, but usage can consume credits depending on the model. The test button below uses test_mode and does not consume generation credits.')}</p><button type="button" className="btn btn-quiet" onClick={()=>void runPuterTest()} disabled={puterBusy}>{puterBusy?<LoaderCircle size={14} className="animate-spin"/>:<ShieldCheck size={14}/ >}{tx(lang,'اختبار اتصال مجاني','Free connection test')}</button>{puterFeedback&&<p className={puterTestImage?'generation-note':'inline-error'} role="status">{puterFeedback}</p>}{puterTestImage&&<img src={puterTestImage} alt={tx(lang,'صورة اختبار Puter','Puter test image')} className="w-full max-h-44 object-contain rounded-xl border mt-2"/></div></div>}</div>)}
       <div className="generation-mode-switch" role="group" aria-label={tx(lang,'وضع التوليد','Generation mode')}><button type="button" className={!proMode?'is-active':''} onClick={()=>{setProMode(false);setApproved(false)}}>{tx(lang,'سريع','Quick')}</button><button type="button" className={proMode?'is-active':''} onClick={()=>{setProMode(true);setApproved(false)}}>{tx(lang,'احترافي','Professional')}</button></div>
       {proMode&&action==='image'&&supportsResolution&&!aiHordeSelected&&<label><span className="field-label">{tx(lang,'الدقة','Resolution')}</span><select className="studio-input" value={resolution} onChange={e=>{setResolution(Number(e.target.value) as 512|768|1024);setApproved(false)}}><option value={512}>512 × 512</option><option value={768}>768 × 768</option><option value={1024}>1024 × 1024</option></select></label>}
       {proMode&&supportsSeed&&<label><span className="field-label">{tx(lang,'Seed (اختياري)','Seed (optional)')}</span><input className="studio-input" inputMode="numeric" value={seed} onChange={e=>{setSeed(e.target.value);setApproved(false)}} placeholder={tx(lang,'اتركه فارغًا لعشوائية جديدة','Leave empty for a random seed')} /></label>}
@@ -2066,10 +2148,11 @@ function GenerationPanel({projectId,scene,keys,lang,onQueued,freeMode,services,c
       {action==='voice'&&activeKey?.provider==='piper-local'&&<p className="generation-note">{tx(lang,'الصوت المحدد: Kareem — لهجة عربية أردنية. لا يلزم مفتاح أو معرّف صوت.','Selected voice: Kareem — Jordanian Arabic. No API key or voice ID is needed.')}</p>}
       {action==='voice'&&activeKey?.provider!=='piper-local'&&<label><span className="field-label">{tx(lang,'معرّف الصوت','Voice ID')}</span><input required className="studio-input" value={voiceId} onChange={e=>setVoiceId(e.target.value)} placeholder={tx(lang,'أدخل معرّفًا يقدّمه مزوّدك','Enter a voice ID from your provider')} /></label>}
       {aiHordeSelected&&assignedReferenceCharacters.length>0&&<p className="generation-note">{tx(lang,`سيُرفق ${Math.min(assignedReferenceCharacters.length,4)} صور مرجعية للشخصيات المعيّنة في هذا المشهد. هذا يساعد على الاستمرارية ولا يضمن تطابقًا كاملًا.`,`Up to ${Math.min(assignedReferenceCharacters.length,4)} references for assigned characters will be attached. This can improve continuity but cannot guarantee an exact match.`)}</p>}
+      {puterSelected&&<p className="generation-note">{tx(lang,'لن يبدأ التوليد الفعلي إلا بعد موافقتك أدناه. اختبار الاتصال لا يستخدم أرصدة، أما الصورة الفعلية فقد تُحتسب على حساب Puter.','Actual generation starts only after your approval below. The connection test uses no credits; a real image may be charged to your Puter account.')}</p>}
       {aiHordeSelected&&<label className="checkline horde-privacy-consent"><input type="checkbox" checked={acceptedHordeSharing} onChange={event=>setAcceptedHordeSharing(event.target.checked)} />{tx(lang,assignedReferenceCharacters.length?'أوافق على إرسال وصف المشهد وصور الشخصيات المرجعية المختارة والصورة الناتجة إلى AI Horde وفق تنبيه الخصوصية أعلاه.':'أوافق على إرسال وصف هذا المشهد والصورة الناتجة إلى AI Horde ومشاركتها وفق تنبيه الخصوصية أعلاه.',assignedReferenceCharacters.length?'I agree to send the scene prompt, selected character reference images, and generated image to AI Horde as described above.':'I agree to send this scene prompt and resulting image to AI Horde for sharing as described in the privacy notice above.')}</label>}
       {activeKey && action && <ChargeApprovalCard lang={lang} service={action} provider={activeKey.provider} providerLabel={activeKey.label} model={action==='voice'?(activeKey.provider==='piper-local'?'Kareem — Piper local':voiceId):model} scenes={1} variants={action==='image'&&proMode?outputs:1} approved={approved} onChange={setApproved} />}
     </>}
-    <div className="modal-actions"><button className="btn btn-quiet" onClick={close}>{tx(lang,'إلغاء','Cancel')}</button><button className="btn btn-primary" disabled={!readyKeys.length||busy||!approved||!modelValid||(aiHordeSelected&&!acceptedHordeSharing)} onClick={submit}>{busy?<LoaderCircle size={15} className="animate-spin"/>:<WandSparkles size={15}/ >}{tx(lang,'إرسال إلى قائمة المهام','Queue generation')}</button></div>
+    <div className="modal-actions"><button className="btn btn-quiet" onClick={close}>{tx(lang,'إلغاء','Cancel')}</button><button className="btn btn-primary" disabled={!readyKeys.length||busy||!approved||!modelValid||(aiHordeSelected&&!acceptedHordeSharing)} onClick={submit}>{busy?<LoaderCircle size={15} className="animate-spin"/>:<WandSparkles size={15}/ >}{tx(lang,puterSelected?'توليد الصورة عبر Puter':'إرسال إلى قائمة المهام',puterSelected?'Generate image with Puter':'Queue generation')}</button></div>
   </div></Modal>}
   </div>;
 }
