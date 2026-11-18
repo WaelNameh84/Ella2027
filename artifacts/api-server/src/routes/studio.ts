@@ -843,6 +843,102 @@ router.post("/projects/:projectId/jobs/export", async (req, res): Promise<void> 
   res.status(202).json(QueueProjectExportResponse.parse(studioJobDto(job)));
 });
 
+
+router.post("/projects/:projectId/scenes/:sceneId/assistant", async (req, res): Promise<void> => {
+  const projectId = String(req.params.projectId || "");
+  const sceneId = String(req.params.sceneId || "");
+  const userId = userIdOf(res);
+  const body = req.body as { instruction?: unknown; task?: unknown; providerKeyId?: unknown };
+  const instruction = typeof body.instruction === "string" ? body.instruction.trim() : "";
+  const task = typeof body.task === "string" ? body.task : "scene";
+  const providerKeyId = typeof body.providerKeyId === "string" ? body.providerKeyId : "";
+  if (!/^[a-f0-9-]{36}$/i.test(projectId) || !/^[a-f0-9-]{36}$/i.test(sceneId) || !instruction || instruction.length > 4000) {
+    res.status(400).json({ error: "Enter a scene idea or instruction (up to 4,000 characters)." });
+    return;
+  }
+  if (!["scene", "dialogue", "visual", "rewrite"].includes(task)) {
+    res.status(400).json({ error: "Choose a supported assistant task." });
+    return;
+  }
+  if (await isZeroSpendMode(userId)) {
+    res.status(403).json({ error: ZERO_SPEND_ERROR });
+    return;
+  }
+  const project = await projectForUser(projectId, userId);
+  const [scene] = await db.select().from(scenesTable).where(and(
+    eq(scenesTable.id, sceneId), eq(scenesTable.projectId, projectId), eq(scenesTable.userId, userId),
+  )).limit(1);
+  if (!project || !scene) {
+    res.status(404).json({ error: "Project or scene not found." });
+    return;
+  }
+  const settings = await settingsForUser(userId);
+  const rows = await db.select().from(providerKeysTable).where(and(
+    eq(providerKeysTable.userId, userId), eq(providerKeysTable.serviceType, "text"), eq(providerKeysTable.enabled, true),
+  )).orderBy(asc(providerKeysTable.priority), asc(providerKeysTable.createdAt));
+  const now = Date.now();
+  const usable = rows.filter(key =>
+    providerCredentialUsable(key.provider, key.status as ProviderStatus)
+    && (!key.cooldownUntil || key.cooldownUntil.getTime() <= now),
+  );
+  const selected = providerKeyId ? usable.find(key => key.id === providerKeyId) : undefined;
+  if (providerKeyId && !selected) {
+    res.status(409).json({ error: "The selected text provider is unavailable or not enabled." });
+    return;
+  }
+  const candidates = selected ? [selected, ...usable.filter(key => key.id !== selected.id)] : usable;
+  if (!candidates.length) {
+    res.status(409).json({ error: "No ready text provider. Add and test a text provider key in Settings." });
+    return;
+  }
+  const language = project.language || "Arabic";
+  const taskBrief = task === "dialogue" ? "Write natural, performable dialogue for this scene."
+    : task === "visual" ? "Create a precise visual and camera-direction prompt for this scene."
+    : task === "rewrite" ? "Rewrite and improve the existing scene while preserving its story intent."
+    : "Develop the user's idea into one complete, production-ready film scene.";
+  const prompt = [
+    "You are an experienced film screenwriter and visual director.",
+    taskBrief,
+    "Return only the requested scene content in the project's language. Be concrete, shootable, emotionally clear, and concise. Do not add unrelated scenes.",
+    "Preserve continuity with the project and the existing scene. Never silently change character identity, wardrobe, location timeline, or established facts.",
+    `Project concept: ${project.idea}`,
+    `Genre / video type: ${project.videoType}; visual style: ${project.visualStyle}; audience: ${project.audience}`,
+    `Language: ${language}`,
+    `Existing scene title: ${scene.title}`,
+    `Existing scene description: ${scene.description}`,
+    `Existing image prompt: ${scene.imagePrompt}`,
+    `Existing dialogue / narration: ${scene.narration}`,
+    `Shot: ${scene.shotType}; camera: ${scene.cameraMovement}; location: ${scene.location}; lighting: ${scene.lighting}`,
+    `User instruction: ${instruction}`,
+    task === "scene" ? "Format: Scene title, action and emotional beats, camera direction, visual details, and optional dialogue." : "",
+    task === "visual" ? "Focus on a model-ready image/video prompt; specify subject placement, composition, lighting, lens feel, motion, and continuity." : "",
+    task === "dialogue" ? "Use speaker names and dialogue lines. Keep the dialogue natural and paced for the scene duration." : "",
+  ].filter(Boolean).join("\n");
+  let lastError = "The text provider could not complete this request.";
+  for (const key of candidates.slice(0, Math.max(1, Math.min(settings?.maxAttempts ?? 2, 3)))) {
+    try {
+      const result = await generateWithProvider(key.provider, decryptProviderKey(key.encryptedKey), prompt);
+      await db.update(providerKeysTable).set({ status: "valid", usedCount: key.usedCount + 1, cooldownUntil: null, testMessage: "Last scene assistant request succeeded." }).where(eq(providerKeysTable.id, key.id));
+      res.json({ text: result, provider: key.provider, model: key.model || null });
+      return;
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : lastError;
+      const details = error as Error & { providerStatus?: number; responseBody?: string };
+      if (details.providerStatus) {
+        const classification = classifyProviderResponse(details.providerStatus, details.responseBody ?? "");
+        const cooldownUntil = ["rate_limited", "quota_limited"].includes(classification.status)
+          ? new Date(Date.now() + Math.max(60, settings?.retryDelaySeconds ?? 60) * 1000) : null;
+        await db.update(providerKeysTable).set({ status: classification.status, testMessage: classification.message, cooldownUntil }).where(eq(providerKeysTable.id, key.id));
+        if (!["rate_limited", "quota_limited", "unavailable"].includes(classification.status)) break;
+      } else {
+        await db.update(providerKeysTable).set({ status: "unavailable", testMessage: "The provider could not be reached for the scene assistant." }).where(eq(providerKeysTable.id, key.id));
+        if (!settings?.rotateOnConnectionFailure) break;
+      }
+    }
+  }
+  res.status(502).json({ error: lastError });
+});
+
 router.get("/jobs", async (req, res): Promise<void> => {
   const parsed = ListStudioJobsQueryParams.safeParse(req.query);
   if (!parsed.success) {
