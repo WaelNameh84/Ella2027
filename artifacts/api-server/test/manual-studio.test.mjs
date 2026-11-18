@@ -40,6 +40,20 @@ test("Scene image upload remains scoped to the selected scene", async () => {
   assert.match(app, /onUploadImage=\{uploadSceneImage\}/);
 });
 
+test("Puter image provider uses browser auth, no-credit test mode, and saves output to the selected scene", async () => {
+  const fs = await import("node:fs/promises");
+  const app = await fs.readFile(new URL("../../ai-video-studio/src/App.tsx", import.meta.url), "utf8");
+  assert.match(app, /provider: 'puter'/);
+  assert.match(app, /https:\/\/js\.puter\.com\/v2\//);
+  assert.match(app, /puter\.auth\.signIn/);
+  assert.match(app, /test_mode:true/);
+  assert.match(app, /puter\.ai\.txt2img/);
+  assert.match(app, /getPuterUploadBlob/);
+  assert.match(app, /assets\/upload/);
+  assert.match(app, /freeMode&&puterSelected/);
+  assert.match(app, /AI Horde — anonymous, free, low priority/);
+});
+
 test("Quick and Professional converge on the same scene production engine", async () => {
   const fs = await import("node:fs/promises");
   const app = await fs.readFile(new URL("../../ai-video-studio/src/App.tsx", import.meta.url), "utf8");
