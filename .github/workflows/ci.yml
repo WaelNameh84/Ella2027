@@ -21,6 +21,9 @@ jobs:
       - run: pnpm run typecheck
       - run: pnpm --filter @workspace/api-server test
       - run: pnpm --filter @workspace/api-server build
+      - name: Live free image provider smoke check
+        run: node artifacts/api-server/test/provider-live-smoke.mjs
+        continue-on-error: true
   gpu-worker:
     runs-on: ubuntu-latest
     steps:
