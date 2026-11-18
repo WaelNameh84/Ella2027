@@ -1327,7 +1327,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
   const [manualSceneCount, setManualSceneCount] = useState(2);
   const [manualCountBusy, setManualCountBusy] = useState(false);
   const [manualCountError, setManualCountError] = useState('');
-  const manualCountInitialized = useRef(false);
+  const manualCountProjectId = useRef<string | null>(null);
   const [editProjectOpen, setEditProjectOpen] = useState(false);
   const [previewPlaying,setPreviewPlaying]=useState(false);
   const previewVideo=useRef<HTMLVideoElement|null>(null);
@@ -1350,9 +1350,9 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
   const completedJobsRef = useRef<Set<string>>(new Set());
   useEffect(() => { if (project?.scenes?.length && !selected) setSelected(project.scenes[0].id); }, [project, selected]);
   useEffect(() => {
-    if (project && !manualCountInitialized.current) {
+    if (project && manualCountProjectId.current !== project.id) {
       setManualSceneCount(Math.max(1, Math.min(24, project.scenes.length || 2)));
-      manualCountInitialized.current = true;
+      manualCountProjectId.current = project.id;
     }
   }, [project?.id]);
   const scenes = [...(project?.scenes || [])].sort((a,b) => a.sortOrder-b.sortOrder);
