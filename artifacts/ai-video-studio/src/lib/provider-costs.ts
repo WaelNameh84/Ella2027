@@ -19,6 +19,7 @@ export function estimateCostText(provider: string | undefined, service: CostServ
   if (provider === 'piper-local') return lang === 'ar' ? 'مجاني — صوت عربي محلي على الخادم' : 'Free — local Arabic voice on the app server';
   if (provider === 'ai-horde') return lang === 'ar' ? 'مجاني — استخدام مجهول، أولوية منخفضة' : 'Free — anonymous use, low priority';
   if (provider === 'free-test') return lang === 'ar' ? 'مجاني — اختبار محلي' : 'Free — local test';
+  if (provider === 'puter') return lang === 'ar' ? 'السعر يحدده نموذج Puter وحسابك؛ اختبار الاتصال مجاني ولا يستهلك رصيد توليد' : 'Price depends on the Puter model and your account; connection test is free and uses no generation credits';
   if (!range) return lang === 'ar' ? 'غير متاح لهذا المزوّد' : 'Not available for this provider';
   return `$${(range[0] * units).toFixed(2)}–$${(range[1] * units).toFixed(2)}`;
 }
