@@ -4,7 +4,7 @@ import { decryptProviderKey } from "./secretVault";
 import { classifyProviderResponse } from "./providerRegistry";
 
 type MediaKind = "image" | "video" | "audio";
-type MediaSource = "openverse" | "wikimedia" | "archive" | "pexels" | "pixabay" | "unsplash";
+type MediaSource = "openverse" | "wikimedia" | "archive" | "nasa" | "pexels" | "pixabay" | "unsplash";
 export type MediaOrientation = "landscape" | "portrait" | "square" | undefined;
 export type CatalogItem = {
   id: string;
@@ -72,14 +72,9 @@ function openverseUrl(kind: MediaKind, term: string, page: number): URL {
 
 async function searchOpenverse(term: string, kind: MediaKind, page: number) {
   const { response, text, payload } = await jsonRequest(openverseUrl(kind, term, page));
-  if (!response.ok && (response.status === 401 || response.status === 403)) {
-    // Openverse may reject anonymous requests. Keep no-key search usable by
-    // switching to Wikimedia for images and Internet Archive for audio/video.
-    return kind === "image"
-      ? searchWikimedia(term, kind, page)
-      : searchArchive(term, kind, page);
+  if (!response.ok) {
+    return searchKeylessFallback(term, kind, page);
   }
-  if (!response.ok) throw new Error(`Openverse search failed (HTTP ${response.status}).`);
   const rows = Array.isArray(payload.results) ? payload.results as Array<Record<string, unknown>> : [];
   const results = rows.flatMap((item, index) => cleanResult({
     id: typeof item.id === "string" ? item.id : `${page}-${index}`,
@@ -93,6 +88,7 @@ async function searchOpenverse(term: string, kind: MediaKind, page: number) {
     creator: typeof item.creator === "string" ? item.creator : null,
     mediaType: kind,
   }, kind));
+  if (!results.length) return searchKeylessFallback(term, kind, page);
   return {
     results,
     total: Number(payload.result_count ?? 0),
@@ -140,6 +136,66 @@ async function searchWikimedia(term: string, kind: MediaKind, page: number) {
     }, "image");
   });
   return { results, total: results.length, source: "Wikimedia Commons" };
+}
+
+async function searchNasa(term: string, kind: MediaKind, page: number) {
+  const url = new URL("https://images-api.nasa.gov/search");
+  url.searchParams.set("q", term);
+  url.searchParams.set("media_type", kind);
+  url.searchParams.set("page", String(page));
+  url.searchParams.set("page_size", "24");
+  const { response, payload } = await jsonRequest(url);
+  if (!response.ok) throw new Error(`NASA media search failed (HTTP ${response.status}).`);
+  const collection = payload.collection as { items?: Array<Record<string, unknown>>; metadata?: { total_hits?: number } } | undefined;
+  const rows = collection?.items ?? [];
+  const results = await Promise.all(rows.map(async (item, index): Promise<CatalogItem[]> => {
+    const data = (item.data as Array<Record<string, unknown>> | undefined)?.[0];
+    if (!data || data.media_type !== kind) return [];
+    const nasaId = typeof data.nasa_id === "string" ? data.nasa_id : `${page}-${index}`;
+    const links = item.links as Array<{ rel?: string; href?: string }> | undefined;
+    const preview = publicUrl(links?.find(link => link.rel === "preview")?.href);
+    let mediaUrl = preview;
+    if (kind !== "image" && typeof data.nasa_id === "string") {
+      const manifestUrl = new URL(`https://images-api.nasa.gov/asset/${encodeURIComponent(nasaId)}`);
+      const manifest = await jsonRequest(manifestUrl).catch(() => null);
+      const files = (manifest?.payload.collection as { items?: Array<{ href?: string }> } | undefined)?.items ?? [];
+      const extension = kind === "video" ? /\.mp4(?:$|\?)/i : /\.(?:mp3|wav|m4a|ogg)(?:$|\?)/i;
+      mediaUrl = publicUrl(files.find(file => typeof file.href === "string" && extension.test(file.href))?.href) ?? preview;
+    }
+    if (!mediaUrl) return [];
+    const title = typeof data.title === "string" ? data.title : `NASA ${kind}`;
+    const itemUrl = `https://images.nasa.gov/details/${encodeURIComponent(nasaId)}`;
+    return cleanResult({
+      id: nasaId,
+      title,
+      description: typeof data.description === "string" ? data.description : "NASA media. Review the item details for third-party rights or usage restrictions.",
+      url: mediaUrl,
+      thumbnailUrl: preview,
+      source: "NASA Image and Video Library",
+      license: "NASA media — verify item rights",
+      licenseUrl: itemUrl,
+      creator: typeof data.photographer === "string" ? data.photographer : typeof data.center === "string" ? data.center : null,
+      mediaType: kind,
+    }, kind);
+  }));
+  return { results: results.flat(), total: Number(collection?.metadata?.total_hits ?? results.length), source: "NASA Image and Video Library" };
+}
+
+async function searchKeylessFallback(term: string, kind: MediaKind, page: number) {
+  const candidates = kind === "image"
+    ? [() => searchWikimedia(term, kind, page), () => searchNasa(term, kind, page)]
+    : [() => searchArchive(term, kind, page), () => searchNasa(term, kind, page)];
+  let lastError: unknown;
+  for (const search of candidates) {
+    try {
+      const result = await search();
+      if (result.results.length) return result;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  if (lastError instanceof Error) throw lastError;
+  return { results: [], total: 0, source: kind === "image" ? "Wikimedia / NASA" : "Internet Archive / NASA" };
 }
 
 async function searchArchive(term: string, kind: MediaKind, page: number) {
@@ -404,5 +460,6 @@ export async function searchMediaCatalog({
   if (source === "openverse") return searchOpenverse(q, mediaType, page);
   if (source === "wikimedia") return searchWikimedia(q, mediaType, page);
   if (source === "archive") return searchArchive(q, mediaType, page);
+  if (source === "nasa") return searchNasa(q, mediaType, page);
   return searchKeyedSource(userId, source, q, mediaType, page, orientation);
 }
