@@ -598,6 +598,137 @@ export async function generateStill(
   throw new Error("Image generation is currently supported for OpenAI, Stability AI, Replicate, and Hugging Face Inference.");
 }
 
+
+async function localVideoWorkerPrediction(
+  token: string,
+  model: string,
+  prompt: string,
+  referenceImage: string | undefined,
+  durationSeconds: number,
+  aspectRatio: string,
+  maxWaitMs = 20 * 60_000,
+): Promise<Buffer> {
+  const configured = process.env.LOCAL_VIDEO_WORKER_URL?.trim();
+  if (!configured) throw new Error("Local Video Worker is not configured. Set LOCAL_VIDEO_WORKER_URL on the API server.");
+  const base = new URL(configured);
+  if (!["https:", "http:"].includes(base.protocol) || base.username || base.password || base.search || base.hash) {
+    throw new Error("LOCAL_VIDEO_WORKER_URL must be a valid HTTP(S) base URL without credentials or query parameters.");
+  }
+  if (base.protocol === "http:" && !["localhost", "127.0.0.1"].includes(base.hostname)) {
+    throw new Error("Use HTTPS for a remote Local Video Worker.");
+  }
+  const root = base.toString().replace(/\/$/, "");
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    "Content-Type": "application/json",
+    Accept: "application/json",
+  };
+  // Ask the worker what the selected model can really render. Older workers may
+  // omit this endpoint; in that case the documented conservative limit is 30s.
+  let maxClipSeconds = 30;
+  let supportsAutoSplit = false;
+  const autoModelRequested = !model || model === "auto";
+  let effectiveModel = autoModelRequested ? "wan2.2" : model;
+  try {
+    const capabilityResponse = await fetch(`${root}/capabilities`, {
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+      signal: AbortSignal.timeout(8_000),
+      redirect: "error",
+    });
+    if (capabilityResponse.ok) {
+      const capabilityData = await capabilityResponse.json() as Record<string, unknown>;
+      const models = capabilityData.models && typeof capabilityData.models === "object"
+        ? capabilityData.models as Record<string, unknown> : {};
+      const recommended = typeof capabilityData.recommended_model === "string" ? capabilityData.recommended_model : "";
+      const freeVram = Number(capabilityData.free_vram_gb ?? capabilityData.available_vram_gb);
+      const canFit = (entry: Record<string, unknown>) => {
+        if (entry.available === false || entry.ready === false) return false;
+        const required = Number(entry.estimated_vram_gb ?? entry.min_vram_gb);
+        const reportedFree = Number(entry.free_vram_gb ?? freeVram);
+        return !Number.isFinite(required) || !Number.isFinite(reportedFree) || reportedFree >= required;
+      };
+      if (autoModelRequested && recommended && models[recommended] && canFit(models[recommended] as Record<string, unknown>)) effectiveModel = recommended;
+      if (autoModelRequested && (!recommended || !models[recommended] || !canFit(models[recommended] as Record<string, unknown>))) {
+        const compatible = Object.entries(models)
+          .filter(([, value]) => value && typeof value === "object" && canFit(value as Record<string, unknown>))
+          .sort(([, a], [, b]) => Number((a as Record<string, unknown>).estimated_vram_gb ?? 999) - Number((b as Record<string, unknown>).estimated_vram_gb ?? 999));
+        effectiveModel = compatible[0]?.[0] || "wan2.2";
+      }
+      const selected = models[effectiveModel] && typeof models[effectiveModel] === "object"
+        ? models[effectiveModel] as Record<string, unknown> : capabilityData;
+      const reportedMax = Number(selected.max_clip_seconds ?? selected.max_duration_seconds);
+      if (Number.isFinite(reportedMax) && reportedMax >= 1 && reportedMax <= 600) maxClipSeconds = Math.floor(reportedMax);
+      supportsAutoSplit = selected.supports_auto_split === true;
+    }
+  } catch {
+    // A capability probe is optional for backwards compatibility.
+  }
+  const requestedDuration = Math.max(1, Math.min(600, Math.round(durationSeconds)));
+  if (requestedDuration > maxClipSeconds && !supportsAutoSplit) {
+    throw new Error(`The selected model supports up to ${maxClipSeconds} seconds per clip. The GPU worker must implement /capabilities with supports_auto_split=true to split this scene automatically.`);
+  }
+  const response = await fetch(`${root}/v1/videos`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      model: effectiveModel,
+      prompt,
+      image: referenceImage ?? null,
+      duration_seconds: Math.min(requestedDuration, maxClipSeconds),
+      requested_duration_seconds: requestedDuration,
+      max_clip_seconds: maxClipSeconds,
+      auto_split: requestedDuration > maxClipSeconds && supportsAutoSplit,
+      continuity_mode: "preserve_scene_and_character_identity",
+      aspect_ratio: ["16:9", "9:16", "1:1"].includes(aspectRatio) ? aspectRatio : "16:9",
+      output_format: "mp4",
+    }),
+    signal: AbortSignal.timeout(90_000),
+    redirect: "error",
+  });
+  if (!response.ok) {
+    throw new ProviderCallError(`Local Video Worker returned HTTP ${response.status}.`, response.status, (await response.text()).slice(0, 4000));
+  }
+  let result = await response.json() as Record<string, unknown>;
+  const jobId = typeof result.job_id === "string" ? result.job_id : "";
+  if (typeof result.video_base64 === "string") {
+    const encoded = result.video_base64;
+    if (encoded.length > 350 * 1024 * 1024 || !/^[A-Za-z0-9+/=\r\n]+$/.test(encoded)) {
+      throw new Error("Local Video Worker returned invalid or oversized video data.");
+    }
+    const bytes = Buffer.from(encoded, "base64");
+    await validateGeneratedMp4(bytes);
+    return bytes;
+  }
+  if (!jobId || !/^[a-zA-Z0-9._:-]{1,160}$/.test(jobId)) {
+    throw new Error("Local Video Worker must return video_base64 or a valid job_id.");
+  }
+  const deadline = Date.now() + maxWaitMs;
+  while (Date.now() < deadline) {
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 4000));
+    const poll = await fetch(`${root}/v1/videos/${encodeURIComponent(jobId)}`, {
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+      signal: AbortSignal.timeout(30_000),
+      redirect: "error",
+    });
+    if (!poll.ok) throw new ProviderCallError(`Local Video Worker status returned HTTP ${poll.status}.`, poll.status, (await poll.text()).slice(0, 4000));
+    result = await poll.json() as Record<string, unknown>;
+    const status = typeof result.status === "string" ? result.status.toLowerCase() : "";
+    if (["failed", "error", "cancelled", "canceled"].includes(status)) {
+      throw new Error(typeof result.error === "string" ? result.error.slice(0, 800) : "Local Video Worker could not generate this video.");
+    }
+    if (["completed", "complete", "succeeded", "success"].includes(status)) {
+      const encoded = typeof result.video_base64 === "string" ? result.video_base64 : "";
+      if (!encoded || encoded.length > 350 * 1024 * 1024 || !/^[A-Za-z0-9+/=\r\n]+$/.test(encoded)) {
+        throw new Error("Local Video Worker completed without valid MP4 data.");
+      }
+      const bytes = Buffer.from(encoded, "base64");
+      await validateGeneratedMp4(bytes);
+      return bytes;
+    }
+  }
+  throw new Error("Local Video Worker is still processing. Check its job status before submitting another request.");
+}
+
 export async function generateVideo(
   provider: string,
   key: string,
@@ -607,6 +738,9 @@ export async function generateVideo(
   durationSeconds = 5,
   aspectRatio = "16:9",
 ): Promise<Buffer> {
+  if (provider === "local-video-worker") {
+    return localVideoWorkerPrediction(key, model || "wan2.2", prompt, referenceImage, durationSeconds, aspectRatio);
+  }
   if (provider === "magic-hour") {
     const videoUrl = await magicHourVideoPrediction(
       key,

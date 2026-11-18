@@ -138,7 +138,7 @@ function safeJobError(error: unknown): string {
 
 function supportsJob(provider: string, jobType: JobKind): boolean {
   if (jobType === "image") return ["openai", "stability", "replicate", "huggingface"].includes(provider);
-  if (jobType === "video") return ["replicate", "fal", "agnes"].includes(provider);
+  if (jobType === "video") return ["replicate", "fal", "agnes", "magic-hour", "local-video-worker"].includes(provider);
   if (jobType === "voice") return ["elevenlabs", "openai", "openai-audio", "google-tts", "azure-speech", "piper-local"].includes(provider);
   return false;
 }
@@ -385,6 +385,7 @@ async function processScriptJob(job: typeof studioJobsTable.$inferSelect): Promi
       `Scene direction: ${input.sceneStyle ?? (project.visualStyle || "Cinematic")}`,
       `Target duration: ${project.durationSeconds} seconds`,
       `Return exactly ${input.sceneCount ?? 6} scenes. Set durationSeconds to exactly ${input.sceneDurationSeconds ?? 8} for every scene.`,
+      "Create a character bible with stable IDs and fixed facial identity, age, hair, build, costume, palette and voice identity. Assign characterIds to each scene. Keep character, prop, location and timeline continuity across the whole film. Every scene must contain a clear shot type, camera movement, location, lighting, action, speaker-labelled dialogue/narration, and sound design notes. Internally plan multiple short visual beats per scene so the video worker can split long scenes to the model's clip limit without losing story continuity.",
       input.story?.trim()
         ? "Treat the Concept as a complete source story. Preserve the main events, order, tone, characters, relationships, and ending. Divide it into the exact requested number of scenes without changing the plot. Enrich each scene with detailed action, setting, character continuity, cinematic direction, and dialogue. Put complete speaker-labeled dialogue plus any narrator voiceover in the narration field, and include suitable sound-effect suggestions in the scene description. Return the fixed character bible so the same characters remain consistent across all scenes."
         : "Use 1 to 24 scenes. Create 1 to 8 recurring character profiles, and refer to them by their stable IDs. Keep each character's face, age, hair, body, costume, palette, and environment consistent across every scene. Make each image prompt include only the relevant character profile details, shot size, camera movement, lens feel, location, lighting, and composition. Write narration in the selected language and keep scene durations close to the target total.",
@@ -799,6 +800,8 @@ async function processVideoJob(job: typeof studioJobsTable.$inferSelect): Promis
           ? (requestedModel || "agnes-video-2.5")
           : provider === "magic-hour"
             ? (requestedModel || "ltx-2.5")
+            : provider === "local-video-worker"
+              ? (requestedModel || "wan2.2")
           : (segments === 2 ? requestedModel : "minimax/video-01");
       return generateVideo(
         provider,
@@ -924,9 +927,15 @@ async function processNextJob(): Promise<void> {
   const job = await claimNextJob();
   if (!job) return;
   try {
+    const jobProviderKeyId = String((job.input as JobInput).providerKeyId ?? "");
     const localFreeVoice = job.jobType === "voice"
-      && [FREE_TEST_PROVIDER_KEY, PIPER_LOCAL_PROVIDER_KEY].includes(String((job.input as JobInput).providerKeyId ?? ""));
-    if (job.jobType !== "export" && !localFreeVoice && await isZeroSpendMode(job.userId)) {
+      && [FREE_TEST_PROVIDER_KEY, PIPER_LOCAL_PROVIDER_KEY].includes(jobProviderKeyId);
+    const localFreeVideo = job.jobType === "video" && Boolean(jobProviderKeyId) && (await db.select({ provider: providerKeysTable.provider }).from(providerKeysTable).where(and(
+      eq(providerKeysTable.id, jobProviderKeyId),
+      eq(providerKeysTable.userId, job.userId),
+      eq(providerKeysTable.serviceType, "video"),
+    )).limit(1))[0]?.provider === "local-video-worker";
+    if (job.jobType !== "export" && !localFreeVoice && !localFreeVideo && await isZeroSpendMode(job.userId)) {
       throw new Error(ZERO_SPEND_ERROR);
     }
     if (job.jobType === "script") {

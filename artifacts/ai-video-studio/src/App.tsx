@@ -39,6 +39,7 @@ import { ErrorRecoveryPanel } from '@/components/error-recovery';
 import { FilmPlanCard } from '@/components/film-plan';
 import { buildFilmPlan, type FilmPlan } from '@/lib/film-plan';
 import { defaultVideoModel, defaultVoiceId, estimateCostText } from '@/lib/provider-costs';
+import { buildCinematicPrompt } from '@/lib/cinematic-director';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { downloadProjectBackup, PROJECT_BACKUP_MAX_BYTES, parseProjectBackup } from '@/lib/project-backup';
@@ -143,7 +144,7 @@ function providerSupports(provider: string, service: string) {
   if (provider === 'free-test') return ['image', 'voice'].includes(service);
   if (service === 'text') return ['openai','gemini','anthropic','groq','cloudflare','openrouter','llama-free','huggingface','colab-t5','mistral','cerebras','together','sambanova','deepseek','nvidia','cohere'].includes(provider);
   if (service === 'image') return ['openai','stability','replicate','huggingface','ai-horde'].includes(provider);
-  if (service === 'video') return ['replicate','fal','agnes','magic-hour'].includes(provider);
+  if (service === 'video') return ['replicate','fal','agnes','magic-hour','local-video-worker'].includes(provider);
   if (service === 'voice') return ['elevenlabs','openai','openai-audio','google-tts','azure-speech','piper-local'].includes(provider);
   if (service === 'transcription') return ['openai','whisper','huggingface','deepgram','assemblyai','google-speech','azure-speech'].includes(provider);
   if (service === 'media') return ['pexels','pixabay','unsplash'].includes(provider);
@@ -242,6 +243,12 @@ function providerServicePurpose(service: string, lang: Lang, provider = '') {
     return {
       label: tx(lang, `فيديو محلي عبر ${provider}`, `Local video through ${provider}`),
       description: tx(lang, 'يحتاج Local Video Worker وسيرفر GPU. حفظه هنا يسجل اختيار النموذج ولا يبدأ التوليد قبل إعداد العامل المحلي.', 'Requires a Local Video Worker and a GPU server. Saving it records the model choice but does not generate until the worker is configured.'),
+    };
+  }
+  if (service === 'video' && provider === 'local-video-worker') {
+    return {
+      label: tx(lang, 'توليد عبر GPU الخاص بك', 'Generation through your GPU worker'),
+      description: tx(lang, 'يرسل المهمة إلى عامل GPU الذي تستضيفه وتتحكم به. يحتاج عنوان العامل ورمز الوصول، وقد تفرض منصة استضافة GPU رسوماً مستقلة.', 'Sends the job to your own hosted GPU worker. Requires its URL and access token; the GPU host may charge separately.'),
     };
   }
   if (service === 'video' && provider === 'fal') {
@@ -418,22 +425,47 @@ function ProjectCard({ project, onDelete, onExport, exporting = false }: { proje
 const blankProject: ProjectInput = { title: '', idea: '', videoType: 'documentary', language: 'ar', durationSeconds: 60, audience: '', visualStyle: '', aspectRatio: '16:9' };
 const videoTypes = [
   ['cinematic', 'واقعي سينمائي', 'Cinematic live action'],
+  ['documentary', 'وثائقي', 'Documentary'],
+  ['nature-documentary', 'وثائقي طبيعة وحياة برية', 'Nature & wildlife documentary'],
+  ['history-documentary', 'وثائقي تاريخي', 'Historical documentary'],
+  ['true-story', 'قصة حقيقية', 'Based on a true story'],
+  ['short-film', 'فيلم قصير', 'Short film'],
+  ['series-episode', 'حلقة مسلسل', 'Series episode'],
+  ['trailer', 'إعلان / تشويقة فيلم', 'Movie trailer / teaser'],
+  ['children-story', 'قصة أطفال', 'Children’s story'],
+  ['bedtime-story', 'قصة قبل النوم', 'Bedtime story'],
+  ['fairy-tale', 'حكاية خيالية للأطفال', 'Fairy tale for children'],
+  ['nursery-rhyme', 'أناشيد وأغاني أطفال', 'Nursery rhymes & kids songs'],
+  ['educational-kids', 'تعليم الأطفال', 'Kids learning video'],
+  ['cartoon-2d', 'كرتون ثنائي الأبعاد', '2D cartoon'],
   ['cartoon-3d', 'كرتون ثلاثي الأبعاد', '3D cartoon'],
+  ['anime', 'أنمي', 'Anime'],
   ['animation-2d', 'أنيميشن ثنائي الأبعاد', '2D animation'],
   ['animation-3d', 'أنيميشن ثلاثي الأبعاد', '3D animation'],
-  ['children-story', 'قصة أطفال', 'Children’s story'],
+  ['fantasy', 'فانتازيا وسحر', 'Fantasy & magic'],
+  ['science-fiction', 'خيال علمي', 'Science fiction'],
+  ['horror', 'رعب وتشويق', 'Horror & suspense'],
+  ['romance', 'رومانسي', 'Romance'],
+  ['comedy', 'كوميدي', 'Comedy'],
+  ['action', 'أكشن ومغامرات', 'Action & adventure'],
   ['education', 'تعليمي وشرح', 'Educational explainer'],
-  ['whiteboard', 'سبورة بيضاء', 'Whiteboard'],
+  ['science', 'علوم وتجارب', 'Science & experiments'],
+  ['history', 'تاريخ وحضارات', 'History & civilizations'],
+  ['travel', 'سفر وسياحة', 'Travel & tourism'],
+  ['food', 'طبخ ووصفات', 'Cooking & recipes'],
+  ['fitness', 'رياضة ولياقة', 'Fitness & workout'],
+  ['sports', 'رياضة ومباريات', 'Sports'],
+  ['interview', 'مقابلة وحوار', 'Interview & conversation'],
+  ['podcast', 'بودكاست مرئي', 'Video podcast'],
+  ['news', 'أخبار وتقارير', 'News report'],
   ['commercial', 'إعلان تجاري', 'Commercial'],
   ['product', 'عرض منتج', 'Product video'],
   ['marketing', 'تسويق', 'Marketing'],
   ['avatar', 'شخصية ناطقة', 'Talking avatar'],
-  ['documentary', 'وثائقي', 'Documentary'],
-  ['news', 'أخبار وتقارير', 'News report'],
+  ['whiteboard', 'سبورة بيضاء', 'Whiteboard'],
   ['music-video', 'فيديو موسيقي', 'Music video'],
   ['gaming', 'ألعاب', 'Gaming'],
   ['social', 'سوشيال ميديا', 'Social media'],
-  ['trailer', 'تشويقة سينمائية', 'Film teaser'],
   ['presentation', 'عرض تقديمي', 'Presentation'],
   ['photo-motion', 'صور مع حركة وموسيقى', 'Photo montage'],
   ['text-to-scenes', 'نص إلى مشاهد سينمائية', 'Text to cinematic scenes'],
@@ -449,6 +481,7 @@ const visualStyles = [
   ['Commercial', 'إعلاني'],
 ] as const;
 const providerOfficialUrls: Record<string, string> = {
+  'local-video-worker': 'https://github.com/comfyanonymous/ComfyUI',
   openai: 'https://platform.openai.com/api-keys',
   'magic-hour': 'https://magichour.ai/developer',
   cloudflare: 'https://dash.cloudflare.com/profile/api-tokens',
@@ -492,6 +525,7 @@ const providerOfficialUrls: Record<string, string> = {
   openverse: 'https://openverse.org/',
 };
 const providerPlanInfo: Record<string, { kind: string; ar: string; en: string; url: string }> = {
+  'local-video-worker': { kind: 'self-hosted', ar: 'لا توجد رسوم من Ella مقابل هذا المزوّد؛ تكلفة GPU تعتمد على منصة الاستضافة أو الجهاز الذي تشغّله عليه.', en: 'Ella does not charge for this provider; GPU costs depend on your host or the machine running it.', url: 'https://github.com/comfyanonymous/ComfyUI' },
   'magic-hour': { kind: 'trial', ar: 'قد يتوفر رصيد تجريبي للحسابات الجديدة؛ القيمة والشروط تعتمد على حساب Magic Hour، ولا يعني ذلك أن الاستخدام مجاني دائماً.', en: 'Starter credits may be available for new accounts; the amount and terms depend on the Magic Hour account and do not mean usage is permanently free.', url: 'https://docs.magichour.ai/get-started/quick-start' },
   huggingface: { kind: 'paid', ar: 'مدفوع للاستدلال: الخطة المجانية لا تشمل رصيدًا شهريًا لمزوّدي الاستدلال؛ فحص هوية المفتاح لا يعني أن الاستدلال مجاني.', en: 'Paid inference: the Free plan includes no monthly Inference Providers credits; identity validation does not make inference free.', url: 'https://huggingface.co/docs/inference-providers/pricing' },
   cloudflare: { kind: 'free-quota', ar: 'حصة مجانية مستمرة: 10,000 Neurons يوميًا، تتجدد عند 00:00 UTC؛ تجاوز الحصة على Workers Paid يُحاسب بـ 0.011 دولار لكل 1,000 Neurons، وبعض النماذج تتطلب خطة مدفوعة.', en: 'Ongoing free quota: 10,000 Neurons/day, reset at 00:00 UTC; usage above it is billed at $0.011 per 1,000 Neurons on Workers Paid, and some models require paid billing.', url: 'https://developers.cloudflare.com/workers-ai/platform/pricing/' },
@@ -621,7 +655,7 @@ function ManualSceneImagePicker({sceneNumber,file,disabled,lang,onChange,onError
     {file&&<button type="button" className="btn btn-quiet manual-scene-image-remove" disabled={disabled} onClick={()=>{onChange(null);onError('');}}><Trash2 size={14}/>{tx(lang,'إزالة الصورة','Remove image')}</button>}
   </div>;
 }
-function ProjectForm({ onClose, initial, initialMode = 'auto', initialTemplateId = '', onSave, pending, freeMode = true, textProviderReady = false, checkingProvider = false, generationError = false, projectCreated = false, onOpenCreated, inline = false }: { onClose: () => void; initial?: Partial<ProjectInput>; initialTemplateId?: string; onSave: (data: ProjectInput, approvePotentialCharges?: boolean, templateId?: string, mode?: 'auto' | 'manual', sceneCount?: number, sceneDurationSeconds?: number, allowExternalProviders?: boolean, manualScenes?: ManualSceneDraft[], manualFullStory?: string, splitManualStory?: boolean) => void | Promise<void>; pending: boolean; freeMode?: boolean; textProviderReady?: boolean; checkingProvider?: boolean; generationError?: boolean; projectCreated?: boolean; onOpenCreated?: () => void; initialMode?: 'auto' | 'manual'; inline?: boolean }) {
+function ProjectForm({ onClose, initial, initialMode = 'auto', initialTemplateId = '', onSave, pending, freeMode = true, textProviderReady = false, checkingProvider = false, generationError = false, projectCreated = false, onOpenCreated, inline = false }: { onClose: () => void; initial?: Partial<ProjectInput>; initialTemplateId?: string; onSave: (data: ProjectInput, approvePotentialCharges?: boolean, templateId?: string, mode?: 'auto' | 'manual', sceneCount?: number, sceneDurationSeconds?: number, allowExternalProviders?: boolean, manualScenes?: ManualSceneDraft[], manualFullStory?: string, splitManualStory?: boolean, reviewBeforeRendering?: boolean) => void | Promise<void>; pending: boolean; freeMode?: boolean; textProviderReady?: boolean; checkingProvider?: boolean; generationError?: boolean; projectCreated?: boolean; onOpenCreated?: () => void; initialMode?: 'auto' | 'manual'; inline?: boolean }) {
   const { lang } = useApp();
   const initialPreset = projectTemplates.find(item => item.id === initialTemplateId);
   const [form, setForm] = useState<ProjectInput>(() => ({ ...blankProject, language: lang, ...initial, ...(initialPreset ? { videoType: initialPreset.videoType, aspectRatio: initialPreset.aspectRatio, visualStyle: initialPreset.visualStyle, audience: lang === 'ar' ? 'الجمهور العام' : initialPreset.audience } : {}) }));
@@ -635,6 +669,8 @@ function ProjectForm({ onClose, initial, initialMode = 'auto', initialTemplateId
   const [manualScenes, setManualScenes] = useState<ManualSceneDraft[]>(() => Array.from({ length: 5 }, (_, index) => blankManualScene(index, lang)));
   const [manualFullStory, setManualFullStory] = useState('');
   const [splitManualStory, setSplitManualStory] = useState(false);
+  const [reviewBeforeRendering, setReviewBeforeRendering] = useState(false);
+  const [publicationFormat, setPublicationFormat] = useState('youtube');
   const [allowExternalProviders, setAllowExternalProviders] = useState(!freeMode);
   const [submitError, setSubmitError] = useState('');
   const [plan, setPlan] = useState<FilmPlan | null>(null);
@@ -657,7 +693,7 @@ function ProjectForm({ onClose, initial, initialMode = 'auto', initialTemplateId
   useEffect(() => { if (projectCreated && generationError) setApprovePotentialCharges(false); }, [projectCreated, generationError]);
   const chooseExperienceMode = (next: 'quick' | 'pro') => { setExperienceMode(next); if (next === 'quick') { setMode('auto'); setTemplate(''); } };
   const quickSceneCount = Math.max(1, Math.min(24, sceneCount));
-  const quickSceneDuration = Math.max(1, Math.floor(Math.max(5, form.durationSeconds) / quickSceneCount));
+  const quickSceneDuration = Math.max(1, Math.min(Math.floor(3600 / quickSceneCount), sceneDurationSeconds));
   const quickPlannedDuration = quickSceneCount * quickSceneDuration;
   const makePlan = () => buildFilmPlan({ idea: form.idea, videoType: form.videoType, sceneCount: experienceMode === 'quick' ? quickSceneCount : sceneCount, sceneDurationSeconds: experienceMode === 'quick' ? quickSceneDuration : sceneDurationSeconds, visualStyle: form.visualStyle || selectedTemplate?.visualStyle, lang, providerReady: Boolean(allowExternalProviders && textProviderReady) });
   const submit = async (planConfirmed = false, splitStory = splitManualStory) => {
@@ -686,7 +722,7 @@ function ProjectForm({ onClose, initial, initialMode = 'auto', initialTemplateId
     }
     try {
       const useTextProvider = !editing && mode === 'auto' && !selectedTemplate && allowExternalProviders && textProviderReady;
-      await onSave(payload, useTextProvider && approvePotentialCharges || splitStory && approvePotentialCharges, !editing ? selectedTemplate?.id : undefined, mode, effectiveSceneCount, effectiveSceneDuration, !editing && (mode === 'auto' || splitStory) ? allowExternalProviders : undefined, mode === 'manual' ? manualScenes : undefined, splitStory ? manualFullStory.trim() : undefined, splitStory);
+      await onSave(payload, useTextProvider && approvePotentialCharges || splitStory && approvePotentialCharges, !editing ? selectedTemplate?.id : undefined, mode, effectiveSceneCount, effectiveSceneDuration, !editing && (mode === 'auto' || splitStory) ? allowExternalProviders : undefined, mode === 'manual' ? manualScenes : undefined, splitStory ? manualFullStory.trim() : undefined, splitStory, reviewBeforeRendering);
       setSubmitError('');
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : tx(lang, 'تعذر حفظ إعدادات المشروع.', 'Could not save project settings.'));
@@ -721,10 +757,11 @@ function ProjectForm({ onClose, initial, initialMode = 'auto', initialTemplateId
       {!editing && inline && experienceMode === 'quick' ? <>
         <div className="quick-idea-entry is-inline"><label><span className="field-label">{tx(lang,'فكرة الفيلم','Film idea')}</span><textarea required maxLength={1500} rows={5} className="studio-input resize-y quick-idea-input" value={form.idea} onChange={e=>update('idea',e.target.value)} placeholder={tx(lang,'اكتب فكرتك وسنحوّلها إلى فيلم كامل…','Write your idea and we’ll shape it into a complete film…')} data-testid="input-project-idea" disabled={projectCreated} autoFocus /></label><WritingAssistant lang={lang} context="idea" values={{idea:form.idea}} onApply={(field,value)=>{if(field==='idea')update('idea',value)}} />{!plan && submitButton}</div>
         <div className="form-two"><label><span className="field-label">{tx(lang,'نوع العمل','Format')}</span><select className="studio-input" value={form.videoType} disabled={projectCreated} onChange={e=>update('videoType',e.target.value)}>{videoTypes.map(([value,ar,en])=><option key={value} value={value}>{tx(lang,ar,en)}</option>)}</select></label><label><span className="field-label">{tx(lang,'لغة الفيلم','Film language')}</span><select className="studio-input" value={form.language} disabled={projectCreated} onChange={e=>update('language',e.target.value)}><option value="ar">العربية</option><option value="en">English</option><option value="fr">Français</option><option value="es">Español</option><option value="de">Deutsch</option><option value="sv">Svenska</option></select></label></div>
-        <div className="form-two"><label><span className="field-label">{tx(lang,'المدة المستهدفة بالثواني','Target duration in seconds')}</span><input type="number" min="5" max="3600" className="studio-input" value={form.durationSeconds} disabled={projectCreated} onChange={e=>update('durationSeconds',Math.max(5,Math.min(3600,Number(e.target.value)||5)))}/></label><label><span className="field-label">{tx(lang,'عدد المشاهد','Number of scenes')}</span><input type="number" min="1" max="24" step="1" className="studio-input" value={sceneCount} disabled={projectCreated} onChange={e=>setSceneCount(Math.max(1,Math.min(24,Number(e.target.value)||1)))} data-testid="input-quick-scene-count" /></label></div>
+        <div className="form-two"><label><span className="field-label">{tx(lang,'عدد المشاهد','Number of scenes')}</span><input type="number" min="1" max="24" step="1" className="studio-input" value={sceneCount} disabled={projectCreated} onChange={e=>setSceneCount(Math.max(1,Math.min(24,Number(e.target.value)||1)))} data-testid="input-quick-scene-count" /></label><label><span className="field-label">{tx(lang,'مدة كل مشهد بالثواني','Seconds per scene')}</span><input type="number" min="1" max={Math.floor(3600/quickSceneCount)} step="1" className="studio-input" value={quickSceneDuration} disabled={projectCreated} onChange={e=>setSceneDurationSeconds(Math.max(1,Math.min(Math.floor(3600/quickSceneCount),Number(e.target.value)||1)))} data-testid="input-quick-scene-duration" /></label></div>
         <div className="form-two"><label><span className="field-label">{tx(lang,'الجمهور','Audience')}</span><input maxLength={300} className="studio-input" value={form.audience} disabled={projectCreated} onChange={e=>update('audience',e.target.value)} placeholder={tx(lang,'مثال: العائلة، الشباب','e.g. families, young adults')}/></label></div>
-        <div className="quick-duration-hint">{tx(lang,`المدة المستهدفة ${form.durationSeconds} ثانية؛ الخطة الحالية ${quickSceneCount} مشاهد × ${quickSceneDuration} ثوانٍ = ${quickPlannedDuration} ثانية.`,`Target ${form.durationSeconds}s; the current plan is ${quickSceneCount} scenes × ${quickSceneDuration}s = ${quickPlannedDuration}s.`)}</div>
-        <div className="form-two"><label><span className="field-label">{tx(lang,'الأسلوب البصري','Visual style')}</span><select className="studio-input" value={visualStyles.some(([value])=>value===form.visualStyle)?form.visualStyle:'custom'} disabled={projectCreated} onChange={e=>{if(e.target.value!=='custom')update('visualStyle',e.target.value);else if(visualStyles.some(([value])=>value===form.visualStyle))update('visualStyle','');}}><option value="custom">{tx(lang,'أسلوب مخصص','Custom style')}</option>{visualStyles.map(([value,ar])=><option key={value} value={value}>{lang==='ar'?ar:value}</option>)}</select>{!visualStyles.some(([value])=>value===form.visualStyle)&&<input className="studio-input mt-2" value={form.visualStyle} disabled={projectCreated} onChange={e=>update('visualStyle',e.target.value)} placeholder={tx(lang,'اكتب أسلوبك الخاص','Describe your style')}/>}</label><label><span className="field-label">{tx(lang,'نسبة العرض','Aspect ratio')}</span><select className="studio-input" value={form.aspectRatio} disabled={projectCreated} onChange={e=>update('aspectRatio',e.target.value)}><option>16:9</option><option>9:16</option><option>1:1</option></select></label></div>
+        <div className="quick-duration-hint">{tx(lang,`المدة الإجمالية ${quickPlannedDuration} ثانية (${Math.floor(quickPlannedDuration/60)} دقيقة و${quickPlannedDuration%60} ثانية). سيقسّم المخرج كل مشهد إلى لقطات أصغر حسب حدود نموذج الفيديو المتاح.`,`Total runtime ${quickPlannedDuration}s. The director will plan smaller shots around the selected video model's supported limits.`)}</div>
+        <div className="form-two"><label><span className="field-label">{tx(lang,'منصة النشر','Publishing platform')}</span><select className="studio-input" value={publicationFormat} disabled={projectCreated} onChange={e=>{const value=e.target.value;setPublicationFormat(value);update('aspectRatio',value==='shorts'||value==='tiktok'||value==='reels'||value==='stories'?'9:16':value==='square'?'1:1':value==='portrait'?'4:5':'16:9')}}><option value="youtube">YouTube أفقي 16:9</option><option value="shorts">YouTube Shorts عمودي 9:16</option><option value="tiktok">TikTok عمودي 9:16</option><option value="reels">Instagram Reels عمودي 9:16</option><option value="stories">Stories عمودي 9:16</option><option value="facebook">Facebook أفقي 16:9</option><option value="square">منشور مربع 1:1</option><option value="portrait">منشور عمودي 4:5</option><option value="custom">مخصص</option></select></label><label><span className="field-label">{tx(lang,'الأسلوب البصري','Visual style')}</span><select className="studio-input" value={visualStyles.some(([value])=>value===form.visualStyle)?form.visualStyle:'custom'} disabled={projectCreated} onChange={e=>{if(e.target.value!=='custom')update('visualStyle',e.target.value);else if(visualStyles.some(([value])=>value===form.visualStyle))update('visualStyle','');}}><option value="custom">{tx(lang,'أسلوب مخصص','Custom style')}</option>{visualStyles.map(([value,ar])=><option key={value} value={value}>{lang==='ar'?ar:value}</option>)}</select>{!visualStyles.some(([value])=>value===form.visualStyle)&&<input className="studio-input mt-2" value={form.visualStyle} disabled={projectCreated} onChange={e=>update('visualStyle',e.target.value)} placeholder={tx(lang,'اكتب أسلوبك الخاص','Describe your style')}/>}</label><label><span className="field-label">{tx(lang,'نسبة العرض','Aspect ratio')}</span><select className="studio-input" value={form.aspectRatio} disabled={projectCreated} onChange={e=>update('aspectRatio',e.target.value)}><option>16:9</option><option>9:16</option><option>1:1</option></select></label></div>
+        <label className="rotation-row"><span><b>{tx(lang,'مراجعة المشاهد قبل توليد الفيديو','Review scenes before video generation')}</b><small>{tx(lang,'إذا فعّلتها، يكتب النظام السيناريو ويبني الشخصيات والمشاهد أولاً، ثم يفتح المحرر لتعديلها قبل تشغيل GPU.','When enabled, the system creates the screenplay, character bible and scenes first, then opens the editor so you can revise them before GPU rendering.')}</small></span><input type="checkbox" checked={reviewBeforeRendering} disabled={projectCreated} onChange={e=>setReviewBeforeRendering(e.target.checked)} /></label>
         <label className="rotation-row"><span><b>{tx(lang,'السماح بمزوّد كتابة خارجي (قد تكون هناك رسوم)','Allow an external writing provider (may cost)')}</b><small>{tx(lang,'لا يُرسل النص قبل موافقتك. الموافقة تخص طلب كتابة واحدًا؛ إعادة المحاولة تحتاج موافقة جديدة.','Nothing is sent before your approval. Consent covers one writing request; retries require fresh approval.')}</small></span><input type="checkbox" checked={allowExternalProviders} disabled={pending||projectCreated} onChange={e=>setAllowExternalProviders(e.target.checked)} data-testid="checkbox-allow-external-providers" /></label>
         {allowExternalProviders && checkingProvider && <Busy text={tx(lang,'جارٍ التحقق من مزوّد الكتابة…','Checking the writing provider…')} />}
         {allowExternalProviders && !checkingProvider && !textProviderReady && <div className="service-purpose-hint is-unavailable"><b>{tx(lang,'لا يوجد مزوّد كتابة جاهز','No writing provider is ready')}</b><span>{tx(lang,'يمكنك المتابعة بقالب Storyboard محلي؛ هذا ليس تحليلًا أو كتابة AI.','You can continue with a local storyboard template; this is not AI analysis or writing.')}</span><Link href="/settings/providers" className="text-link">{tx(lang,'إعداد المزوّدات','Set up providers')}<ArrowLeft size={14}/></Link></div>}
@@ -940,24 +977,24 @@ function Projects({ homePage = false }: { homePage?: boolean }) {
       setLocation(`/projects/${projectId}`);
     },
   });
-  const runAutoFilm = async (projectId: string, sceneCount: number, sceneDurationSeconds: number, sceneStyle: string, useScriptProvider: boolean) => {
+  const runAutoFilm = async (projectId: string, sceneCount: number, sceneDurationSeconds: number, sceneStyle: string, useScriptProvider: boolean, reviewBeforeRendering = false) => {
     setAutoFilmRunning(true);
     const keys = keysQuery.data || [];
     const videoKey = keys.find(key => key.enabled && key.serviceType === 'video' && providerSupports(key.provider, 'video') && providerKeyIsUsable(key.provider, key.status));
-    if (!videoKey) {
+    if (!videoKey && !reviewBeforeRendering) {
       const configuredVideo = keys.filter(key => key.enabled && key.serviceType === 'video');
-      const detail = configuredVideo.length ? tx(lang, `المفاتيح موجودة لكن غير جاهزة: ${configuredVideo.map(key => `${key.label} (${key.status})`).join('، ')}. اختبر المفتاح من الإعدادات أولًا.`, `Video keys exist but are not ready: ${configuredVideo.map(key => `${key.label} (${key.status})`).join(', ')}. Test the key in Settings first.`) : tx(lang, 'لا يوجد مفتاح فيديو مفعّل. أضف مفتاح Magic Hour أو Agnes AI أو Replicate أو fal.ai من الإعدادات.', 'No enabled video key found. Add a Magic Hour, Agnes AI, Replicate, or fal.ai key in Settings.');
+      const detail = configuredVideo.length ? tx(lang, `المفاتيح موجودة لكن غير جاهزة: ${configuredVideo.map(key => `${key.label} (${key.status})`).join('، ')}. اختبر المفتاح من الإعدادات أولًا.`, `Video keys exist but are not ready: ${configuredVideo.map(key => `${key.label} (${key.status})`).join(', ')}. Test the key in Settings first.`) : tx(lang, 'لا يوجد مفتاح فيديو مفعّل. أضف مزوّد فيديو من الإعدادات.', 'No enabled video provider found. Add a video provider in Settings.');
       throw new Error(detail);
     }
     const voiceKey = keys.find(key => key.enabled && key.serviceType === 'voice' && providerSupports(key.provider, 'voice') && providerKeyIsUsable(key.provider, key.status));
-    const waitFor = async (predicate: (jobs: any[]) => boolean, label: string) => {
+    const waitFor = async (predicate: (jobs: any[]) => boolean, label: string, relevant: (job: any) => boolean = () => true) => {
       const deadline = Date.now() + 30 * 60 * 1000;
       while (Date.now() < deadline) {
         const response = await fetch(`${basePath}/api/jobs?projectId=${encodeURIComponent(projectId)}`, { credentials: 'include' });
         if (!response.ok) throw new Error(`${label}: ${response.status}`);
         const jobs = await response.json() as any[];
-        const active = jobs.find(job => job.status === 'failed' && ['script','video','voice','export'].includes(job.jobType));
-        if (active) throw new Error(active.error || `${label} failed.`);
+        const failed = jobs.find(job => job.status === 'failed' && relevant(job));
+        if (failed) throw new Error(failed.error || `${label} failed.`);
         if (predicate(jobs)) return jobs;
         await new Promise(resolve => setTimeout(resolve, 1500));
       }
@@ -966,32 +1003,46 @@ function Projects({ homePage = false }: { homePage?: boolean }) {
     if (useScriptProvider) {
       const scriptResponse = await fetch(`${basePath}/api/projects/${projectId}/jobs/script`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ providerKeyId: null, allowRotation: true, approvePotentialCharges: true, sceneCount, sceneDurationSeconds, sceneStyle }) });
       if (!scriptResponse.ok) throw new Error((await scriptResponse.json().catch(() => null))?.error || 'Could not start the script stage.');
-      await waitFor(jobs => jobs.some(job => job.jobType === 'script' && job.status === 'completed'), tx(lang, 'تأليف السيناريو', 'Script generation'));
+      await waitFor(jobs => jobs.some(job => job.jobType === 'script' && job.status === 'completed'), tx(lang, 'تأليف السيناريو', 'Script generation'), job => job.jobType === 'script');
     }
     const projectResponse = await fetch(`${basePath}/api/projects/${projectId}`, { credentials: 'include' });
     if (!projectResponse.ok) throw new Error('Could not load generated scenes.');
     const project = await projectResponse.json() as ProjectDetail;
     const scenes = project.scenes || [];
     if (!scenes.length) throw new Error('No scenes were created.');
+    if (reviewBeforeRendering) {
+      afterChange();
+      setAutoFilmRunning(false);
+      setOpen(false);
+      setCreatedProjectId(null);
+      setLocation(`/projects/${projectId}`);
+      return;
+    }
+    if (!videoKey) throw new Error(tx(lang, 'أضف مزوّد فيديو قبل بدء الرندر.', 'Add a video provider before rendering.'));
     const videoModel = defaultVideoModel(videoKey.provider, 'text');
     if (!videoModel) throw new Error(tx(lang, 'لا يوجد نموذج فيديو افتراضي لهذا المزوّد.', 'No default video model is configured for this provider.'));
-    for (const scene of scenes) {
+    const scenesNeedingVideo = scenes.filter(scene => scene.assetType !== 'video' || !scene.assetUrl);
+    for (const scene of scenesNeedingVideo) {
       const response = await fetch(`${basePath}/api/projects/${projectId}/scenes/${scene.id}/jobs/video`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ providerKeyId: videoKey.id, model: videoModel, mode: 'text', approvePotentialCharges: true }) });
       if (!response.ok && response.status !== 409) throw new Error((await response.json().catch(() => null))?.error || `Could not queue video for ${scene.title}.`);
     }
-    await waitFor(jobs => { const videos = jobs.filter(job => job.jobType === 'video'); return videos.length >= scenes.length && videos.every(job => job.status === 'completed'); }, tx(lang, 'توليد مقاطع الفيديو', 'Video generation'));
+    const videoSceneIds = new Set(scenesNeedingVideo.map(scene => scene.id));
+    if (videoSceneIds.size) await waitFor(jobs => [...videoSceneIds].every(sceneId => jobs.some(job => job.jobType === 'video' && job.sceneId === sceneId && job.status === 'completed')), tx(lang, 'توليد مقاطع الفيديو', 'Video generation'), job => job.jobType === 'video' && videoSceneIds.has(job.sceneId));
     if (voiceKey) {
       const voiceId = defaultVoiceId(voiceKey.provider);
-      for (const scene of scenes.filter(item => item.narration.trim())) {
+      const scenesNeedingVoice = scenes.filter(item => item.narration.trim() && !item.voiceUrl);
+      for (const scene of scenesNeedingVoice) {
         const response = await fetch(`${basePath}/api/projects/${projectId}/scenes/${scene.id}/jobs/voice`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ providerKeyId: voiceKey.id, voiceId, approvePotentialCharges: true }) });
         if (!response.ok && response.status !== 409) throw new Error((await response.json().catch(() => null))?.error || `Could not queue voice for ${scene.title}.`);
       }
-      const voiceScenes = scenes.filter(item => item.narration.trim());
-      if (voiceScenes.length) await waitFor(jobs => { const voices = jobs.filter(job => job.jobType === 'voice'); return voices.length >= voiceScenes.length && voices.every(job => job.status === 'completed'); }, tx(lang, 'التعليق الصوتي', 'Voice generation'));
+      const voiceSceneIds = new Set(scenesNeedingVoice.map(scene => scene.id));
+      if (voiceSceneIds.size) await waitFor(jobs => [...voiceSceneIds].every(sceneId => jobs.some(job => job.jobType === 'voice' && job.sceneId === sceneId && job.status === 'completed')), tx(lang, 'التعليق الصوتي', 'Voice generation'), job => job.jobType === 'voice' && voiceSceneIds.has(job.sceneId));
+    } else if (scenes.some(item => item.narration.trim() && !item.voiceUrl)) {
+      throw new Error(tx(lang, 'اكتملت مقاطع الفيديو، لكن لا يوجد مزوّد صوت جاهز. أضف Piper المحلي أو مزوّد صوت ثم استكمل الإنتاج؛ لن نحذف المقاطع المكتملة.', 'Video clips are ready, but no voice provider is configured. Add local Piper or another voice provider and resume; completed clips will be preserved.'));
     }
     const exportResponse = await fetch(`${basePath}/api/projects/${projectId}/jobs/export`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ resolution: 1080, fps: 30, includeSubtitles: true, format: 'mp4', codec: 'h264', subtitleStyle: 'classic' }) });
     if (!exportResponse.ok) throw new Error((await exportResponse.json().catch(() => null))?.error || 'Could not start final export.');
-    await waitFor(jobs => jobs.some(job => job.jobType === 'export' && job.status === 'completed'), tx(lang, 'تصدير الفيلم النهائي', 'Final film export'));
+    await waitFor(jobs => jobs.some(job => job.jobType === 'export' && job.status === 'completed'), tx(lang, 'تصدير الفيلم النهائي', 'Final film export'), job => job.jobType === 'export');
     afterChange();
     setAutoFilmRunning(false);
     setOpen(false);
@@ -1008,7 +1059,7 @@ function Projects({ homePage = false }: { homePage?: boolean }) {
     const result = await response.json().catch(() => ({})) as { error?: string };
     if (!response.ok) throw new Error(result.error || tx(lang, 'تعذر رفع صورة المشهد.', 'Could not upload the scene image.'));
   };
-  const saveProjectAndWriteStory = async (data: ProjectInput, approvePotentialCharges = false, templateId?: string, mode: 'auto' | 'manual' = 'auto', sceneCount = 5, sceneDurationSeconds = 8, allowExternalProviders?: boolean, manualScenes?: ManualSceneDraft[], manualFullStory?: string, splitManualStory = false) => {
+  const saveProjectAndWriteStory = async (data: ProjectInput, approvePotentialCharges = false, templateId?: string, mode: 'auto' | 'manual' = 'auto', sceneCount = 5, sceneDurationSeconds = 8, allowExternalProviders?: boolean, manualScenes?: ManualSceneDraft[], manualFullStory?: string, splitManualStory = false, reviewBeforeRendering = false) => {
     if (createdProjectId) {
       if (!approvePotentialCharges || allowExternalProviders !== true) throw new Error(tx(lang, 'أكّد السماح بالمزوّدات والموافقة على الرسوم المحتملة قبل إعادة المحاولة.', 'Confirm external providers and possible charges before retrying.'));
       startStory(createdProjectId, sceneCount, sceneDurationSeconds, data.visualStyle || 'Cinematic');
@@ -1070,7 +1121,7 @@ function Projects({ homePage = false }: { homePage?: boolean }) {
     const useTextProvider = !templateId && allowExternalProviders === true && textProviderReady && approvePotentialCharges;
     if (useTextProvider) {
       setCreatedProjectId(project.id);
-      void runAutoFilm(project.id, sceneCount, sceneDurationSeconds, data.visualStyle || 'Cinematic', true).catch(error => {
+      void runAutoFilm(project.id, sceneCount, sceneDurationSeconds, data.visualStyle || 'Cinematic', true, reviewBeforeRendering).catch(error => {
         setAutoFilmRunning(false);
         setCreatedProjectId(null);
         setOpen(false);
@@ -1085,7 +1136,7 @@ function Projects({ homePage = false }: { homePage?: boolean }) {
       afterChange();
       if (allowExternalProviders === true) {
         setCreatedProjectId(project.id);
-        void runAutoFilm(project.id, sceneCount, sceneDurationSeconds, data.visualStyle || 'Cinematic', false).catch(error => {
+        void runAutoFilm(project.id, sceneCount, sceneDurationSeconds, data.visualStyle || 'Cinematic', false, reviewBeforeRendering).catch(error => {
           setAutoFilmRunning(false);
           setCreatedProjectId(null);
           setOpen(false);
@@ -1410,6 +1461,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
   return <AppFrame title={project.title} crumb={tx(lang,'استوديو المشروع','PROJECT STUDIO')}>
     <div className="workspace-head"><div><Link href="/projects" className="back-link"><ArrowRight size={15}/>{tx(lang,'كل المشاريع','All projects')}</Link><h2>{project.title}</h2><p>{project.idea}</p></div><div className="workspace-actions"><Link href={`/media?projectId=${projectId}${activeScene ? `&sceneId=${activeScene.id}` : ''}`} className="btn btn-quiet"><ImagePlus size={16}/>{tx(lang,'إضافة وسائط','Add media')}</Link><button className="btn btn-quiet" onClick={downloadScript} disabled={!scenes.length}><Download size={16}/>{tx(lang,'تنزيل السيناريو','Download script')}</button><button className="btn btn-quiet" onClick={downloadSubtitles} disabled={!scenes.some(scene => (scene.subtitleText || scene.narration || '').trim())}><Download size={16}/>{tx(lang,'تنزيل SRT','Download SRT')}</button><button className="btn btn-quiet" onClick={()=>setEditProjectOpen(true)}><Settings2 size={16}/>{tx(lang,'تفاصيل','Details')}</button></div></div>
     <StudioStatusBoard lang={lang} stages={stages} scenes={scenes} jobs={projectJobsQuery.data || []} readyProviders={(keysQuery.data || []).filter(key => key.enabled && providerSupports(key.provider, key.serviceType) && providerKeyIsUsable(key.provider, key.status, key.cooldownUntil)).length} totalProviders={(keysQuery.data || []).length} externalOn={!freeMode} saving={updateScene.isPending || updateProject.isPending || createScene.isPending} updatedAt={project.updatedAt} onStage={next=>{setStage(next);setMobilePane('tools')}} onSelectScene={setSelected} onOpenJobs={() => navigate('/jobs')} />
+    <AutoProductionPanel projectId={projectId} scenes={scenes} keys={generationKeys} lang={lang} freeMode={freeMode} hasActiveJob={hasActiveProductionJob} exportSettings={exportSettings} onRefresh={refresh} />
     <div className="studio-mobile-tabs" role="tablist" aria-label={tx(lang,'أقسام الاستوديو','Studio sections')}>
       <button type="button" role="tab" aria-selected={mobilePane==='preview'} className={mobilePane==='preview'?'is-active':''} onClick={()=>setMobilePane('preview')}>{tx(lang,'المعاينة والـ Storyboard','Preview & storyboard')}</button>
       <button type="button" role="tab" aria-selected={mobilePane==='tools'} className={mobilePane==='tools'?'is-active':''} onClick={()=>setMobilePane('tools')}>{tx(lang,`أدوات ${currentStage.ar}`,`${currentStage.en} tools`)}</button>
@@ -1637,7 +1689,7 @@ function SceneFields({ projectId, scene, characters, lang, onSave, pending }: { 
       queueSave(key,value);
     }} onBlur={()=>void flushSave()} /></label>;
   };
-  return <div className="inspector-fields"><SceneTemplatePicker lang={lang} onApply={applyTemplate}/><section className="scene-checklist panel" aria-label={tx(lang,'قائمة تدقيق المشهد','Scene checklist')}><div className="scene-checklist-heading"><div><span className="eyebrow">SHOT CHECKLIST</span><b>{tx(lang,'مراجعة سريعة للمشهد','Quick scene review')}</b></div><span className="scene-checklist-count">{checklistDone}/{checklistItems.length}</span></div><div className="scene-checklist-items">{checklistItems.map(item=><button type="button" key={item.testId} className={item.done?'is-done':''} onClick={()=>{const target=document.querySelector<HTMLElement>(`[data-testid="${item.testId}"]`);target?.scrollIntoView({behavior:'smooth',block:'center'});window.setTimeout(()=>target?.focus({preventScroll:true}),120)}}><span>{item.done?<Check size={13}/>:<span className="scene-check-empty"/>}</span>{item.label}<small>{item.done?tx(lang,'جاهز','Ready'):tx(lang,'أكمل','Add')}</small></button>)}</div></section><div className="inspector-section-title"><span className="eyebrow">{tx(lang,'القصة والحركة','STORY & ACTION')}</span><b>{tx(lang,'ماذا يحدث في المشهد؟','What happens in the scene?')}</b></div>{field('title',tx(lang,'اسم المشهد','Scene title'))}{numberField('durationSeconds',tx(lang,'المدة بالثواني','Duration (seconds)'),1,600)}{field('description',tx(lang,'وصف الأحداث والحركة','Action and movement description'),true)}{field('imagePrompt',tx(lang,'موجّه الصورة والألوان والجو','Visual prompt, colors, and mood'),true)}{field('narration',tx(lang,'الحوار أو التعليق الصوتي','Dialogue or narration'),true)}<WritingAssistant lang={lang} values={{description:form.description,imagePrompt:form.imagePrompt,narration:form.narration,cameraMovement:form.cameraMovement}} onApply={(field,value)=>{setForm(v=>({...v,[field]:value}));queueSave(field as keyof Scene,value)}} />
+  return <div className="inspector-fields"><SceneTemplatePicker lang={lang} onApply={applyTemplate}/><section className="scene-checklist panel" aria-label={tx(lang,'قائمة تدقيق المشهد','Scene checklist')}><div className="scene-checklist-heading"><div><span className="eyebrow">SHOT CHECKLIST</span><b>{tx(lang,'مراجعة سريعة للمشهد','Quick scene review')}</b></div><span className="scene-checklist-count">{checklistDone}/{checklistItems.length}</span></div><div className="scene-checklist-items">{checklistItems.map(item=><button type="button" key={item.testId} className={item.done?'is-done':''} onClick={()=>{const target=document.querySelector<HTMLElement>(`[data-testid="${item.testId}"]`);target?.scrollIntoView({behavior:'smooth',block:'center'});window.setTimeout(()=>target?.focus({preventScroll:true}),120)}}><span>{item.done?<Check size={13}/>:<span className="scene-check-empty"/>}</span>{item.label}<small>{item.done?tx(lang,'جاهز','Ready'):tx(lang,'أكمل','Add')}</small></button>)}</div></section><div className="inspector-section-title"><span className="eyebrow">{tx(lang,'القصة والحركة','STORY & ACTION')}</span><b>{tx(lang,'ماذا يحدث في المشهد؟','What happens in the scene?')}</b></div>{field('title',tx(lang,'اسم المشهد','Scene title'))}{numberField('durationSeconds',tx(lang,'المدة بالثواني','Duration (seconds)'),1,600)}{field('description',tx(lang,'وصف الأحداث والحركة','Action and movement description'),true)}{field('imagePrompt',tx(lang,'موجّه الصورة والألوان والجو','Visual prompt, colors, and mood'),true)}<button type="button" className="btn btn-quiet w-full" onClick={()=>{const prompt=buildCinematicPrompt({title:form.title,description:form.description,shotType:form.shotType,cameraMovement:form.cameraMovement,location:form.location,lighting:form.lighting,visualStyle:undefined,characters:characters.filter(character=>characterIds.includes(character.id))},lang);setForm(current=>({...current,imagePrompt:prompt}));queueSave('imagePrompt',prompt)}} disabled={pending||!form.description.trim()}><WandSparkles size={15}/>{tx(lang,'المخرج السينمائي: بناء موجّه احترافي','Cinematic director: build pro prompt')}</button>{field('narration',tx(lang,'الحوار أو التعليق الصوتي','Dialogue or narration'),true)}<WritingAssistant lang={lang} values={{description:form.description,imagePrompt:form.imagePrompt,narration:form.narration,cameraMovement:form.cameraMovement}} onApply={(field,value)=>{setForm(v=>({...v,[field]:value}));queueSave(field as keyof Scene,value)}} />
     <label className="inspector-field"><span className="field-label">{tx(lang,'نص الترجمة (مستقل عن التعليق)','Subtitle text (independent from narration)')}</span><textarea className="studio-input" rows={3} value={form.subtitleText??form.narration} onChange={e=>{setForm(v=>({...v,subtitleText:e.target.value}));queueSave('subtitleText',e.target.value)}} onBlur={()=>void flushSave()} data-testid="input-scene-subtitleText"/><button type="button" className="text-link mt-2" onClick={()=>{setForm(v=>({...v,subtitleText:null}));queueSave('subtitleText',null)}}>{tx(lang,'استخدم نص التعليق بدلًا منه','Use narration as the subtitle')}</button></label>
     <div className="form-two">{captionTimeField('subtitleStartSeconds',tx(lang,'بداية الترجمة (ث)','Subtitle start (s)'))}{captionTimeField('subtitleEndSeconds',tx(lang,'نهاية الترجمة (ث) — فارغ = نهاية المشهد','Subtitle end (s) — blank = scene end'))}</div>{subtitleRangeError&&<p className="inline-error" role="alert">{tx(lang,'اجعل نهاية الترجمة بعد بدايتها وضمن مدة المشهد.','Set the subtitle end after its start and within the scene.')}</p>}
     <div className="inspector-section-title"><span className="eyebrow">{tx(lang,'المكان والزمن','SETTING & TIME')}</span><b>{tx(lang,'أين ومتى؟','Where and when?')}</b></div>{field('location',tx(lang,'الموقع والزمن','Location and time'))}{field('lighting',tx(lang,'الإضاءة والألوان','Lighting and color treatment'))}
@@ -1759,6 +1811,195 @@ function GenerationPanel({projectId,scene,keys,lang,onQueued,freeMode,services,c
     <div className="modal-actions"><button className="btn btn-quiet" onClick={close}>{tx(lang,'إلغاء','Cancel')}</button><button className="btn btn-primary" disabled={!readyKeys.length||busy||!approved||!modelValid||(aiHordeSelected&&!acceptedHordeSharing)} onClick={submit}>{busy?<LoaderCircle size={15} className="animate-spin"/>:<WandSparkles size={15}/ >}{tx(lang,'إرسال إلى قائمة المهام','Queue generation')}</button></div>
   </div></Modal>}
   </div>;
+}
+
+type AutoExportSettings = {
+  resolution: 480 | 720 | 1080 | 2160;
+  fps: 24 | 25 | 30 | 60;
+  includeSubtitles: boolean;
+  format: 'mp4' | 'webm';
+  codec: 'h264' | 'hevc';
+  subtitleStyle: 'classic' | 'outline' | 'pill';
+};
+
+function AutoProductionPanel({ projectId, scenes, keys, lang, freeMode, hasActiveJob, exportSettings, onRefresh }: {
+  projectId: string;
+  scenes: Scene[];
+  keys: ProviderKey[];
+  lang: Lang;
+  freeMode: boolean;
+  hasActiveJob: boolean;
+  exportSettings: AutoExportSettings;
+  onRefresh: () => void;
+}) {
+  const videoMutation = useQueueSceneVideoGeneration();
+  const voiceMutation = useQueueSceneVoiceGeneration();
+  const exportMutation = useQueueProjectExport();
+  const jobsQuery = useListStudioJobs({ projectId }, { query: {
+    queryKey: getListStudioJobsQueryKey({ projectId }),
+    refetchInterval: query => query.state.data?.some(job => job.status === 'queued' || job.status === 'running') ? 2500 : 5000,
+    staleTime: 1000,
+  } });
+  const eligible = (key: ProviderKey, service: 'video' | 'voice') => key.enabled
+    && key.serviceType === service
+    && providerSupports(key.provider, service)
+    && providerKeyIsUsable(key.provider, key.status, key.cooldownUntil)
+    && (!freeMode || (service === 'video' ? key.provider === 'local-video-worker' : key.provider === 'piper-local'));
+  const videoKeys = keys.filter(key => eligible(key, 'video')).sort((a,b) => Number(b.provider === 'local-video-worker') - Number(a.provider === 'local-video-worker'));
+  const voiceKeys = keys.filter(key => eligible(key, 'voice')).sort((a,b) => Number(b.provider === 'piper-local') - Number(a.provider === 'piper-local'));
+  const [videoKeyId, setVideoKeyId] = useState('');
+  const [voiceKeyId, setVoiceKeyId] = useState('');
+  const [videoModel, setVideoModel] = useState('');
+  const [voiceId, setVoiceId] = useState('');
+  const [approved, setApproved] = useState(false);
+  const [phase, setPhase] = useState<'idle'|'queueing'|'rendering'|'exporting'|'complete'|'failed'>('idle');
+  const [message, setMessage] = useState('');
+  const [pipelineJobIds, setPipelineJobIds] = useState<string[]>([]);
+  const [exportJobId, setExportJobId] = useState<string | null>(null);
+  const exportStarted = useRef(false);
+  const t = (ar: string, en: string) => tx(lang, ar, en);
+  const selectedVideoKey = videoKeys.find(key => key.id === videoKeyId) || videoKeys[0];
+  const selectedVoiceKey = voiceKeys.find(key => key.id === voiceKeyId) || voiceKeys[0];
+  const missingVideos = scenes.filter(scene => scene.assetType !== 'video' || !scene.assetUrl);
+  const missingVoices = scenes.filter(scene => scene.narration.trim() && !scene.voiceUrl);
+  const runningJobs = jobsQuery.data || [];
+  // Rehydrate the production pipeline from durable server-side jobs after a reload/navigation.
+  useEffect(() => {
+    if (phase !== 'idle' || !runningJobs.length) return;
+    const projectJobs = runningJobs as (StudioJob & { sceneId?: string })[];
+    const active = projectJobs.filter(job => ['video','voice'].includes(job.jobType) && (job.status === 'queued' || job.status === 'running'));
+    const activeExport = projectJobs.find(job => job.jobType === 'export' && (job.status === 'queued' || job.status === 'running'));
+    const failed = projectJobs.find(job => ['video','voice','export'].includes(job.jobType) && job.status === 'failed');
+    if (activeExport) {
+      setExportJobId(activeExport.id);
+      setPhase('exporting');
+      setMessage(t('استعدت مهمة التصدير بعد إعادة فتح المشروع.','Resumed the export job after reopening the project.'));
+      exportStarted.current = true;
+    } else if (active.length) {
+      setPipelineJobIds(active.map(job => job.id));
+      setPhase('rendering');
+      setMessage(t(`استُعيدت ${active.length} مهمة إنتاج قيد التنفيذ؛ لن نعيد إرسالها.`,`Recovered ${active.length} active production jobs; they will not be submitted again.`));
+    } else if (failed && (missingVideos.length || missingVoices.length)) {
+      setPhase('failed');
+      setMessage(failed.error || t('توقفت مهمة سابقة. يمكنك متابعة النواقص دون إعادة المشاهد المكتملة.','A previous job failed. Continue missing assets without regenerating completed scenes.'));
+    }
+  }, [runningJobs, phase, missingVideos.length, missingVoices.length, lang]);
+  useEffect(() => {
+    if (!videoKeyId && videoKeys[0]) setVideoKeyId(videoKeys[0].id);
+    if (!voiceKeyId && voiceKeys[0]) setVoiceKeyId(voiceKeys[0].id);
+  }, [videoKeys, voiceKeys, videoKeyId, voiceKeyId]);
+  useEffect(() => {
+    if (selectedVideoKey && !videoModel) setVideoModel(defaultVideoModel(selectedVideoKey.provider, 'text'));
+    if (selectedVoiceKey && !voiceId) setVoiceId(defaultVoiceId(selectedVoiceKey.provider));
+  }, [selectedVideoKey?.id, selectedVoiceKey?.id, videoModel, voiceId]);
+  useEffect(() => {
+    if (phase !== 'rendering' || !pipelineJobIds.length) return;
+    const matching = pipelineJobIds.map(id => runningJobs.find(job => job.id === id));
+    if (matching.some(job => !job)) return;
+    const failed = matching.find(job => job?.status === 'failed');
+    if (failed) {
+      setPhase('failed');
+      setMessage(failed.error || t('فشلت إحدى مهام الإنتاج. افتح قائمة المهام لمعرفة السبب.', 'A production task failed. Open Jobs to inspect the error.'));
+      return;
+    }
+    if (!matching.every(job => job?.status === 'completed')) return;
+    const videosReady = scenes.every(scene => scene.assetType === 'video' && Boolean(scene.assetUrl));
+    const voicesReady = scenes.filter(scene => scene.narration.trim()).every(scene => Boolean(scene.voiceUrl));
+    if (!videosReady || !voicesReady) return;
+    if (exportStarted.current) return;
+    exportStarted.current = true;
+    setPhase('exporting');
+    setMessage(t('اكتملت اللقطات والصوت. جارٍ تجميع الفيلم وتصديره…', 'Clips and narration are ready. Assembling and exporting the film…'));
+    exportMutation.mutate({ projectId, data: exportSettings }, {
+      onSuccess: job => { setExportJobId(job.id); onRefresh(); },
+      onError: error => { setPhase('failed'); setMessage(error instanceof Error ? error.message : t('تعذر بدء التصدير.', 'Could not start export.')); },
+    });
+  }, [phase, pipelineJobIds, runningJobs, scenes, projectId, exportSettings, exportMutation, onRefresh, lang]);
+  useEffect(() => {
+    if (phase !== 'exporting' || !exportJobId) return;
+    const job = runningJobs.find(item => item.id === exportJobId);
+    if (job?.status === 'completed') {
+      setPhase('complete');
+      setMessage(t('اكتمل الفيلم! أصبح ملف التصدير جاهزاً.', 'Film complete! The export is ready.'));
+      onRefresh();
+    } else if (job?.status === 'failed') {
+      setPhase('failed');
+      setMessage(job.error || t('فشل تصدير الفيلم.', 'Film export failed.'));
+    }
+  }, [phase, exportJobId, runningJobs, onRefresh, lang]);
+  const start = async () => {
+    if (!selectedVideoKey || !videoModel.trim() || !approved || !scenes.length || hasActiveJob || phase === 'queueing' || phase === 'rendering' || phase === 'exporting') return;
+    if (missingVoices.length && (!selectedVoiceKey || !voiceId.trim())) return;
+    setPhase('queueing');
+    setMessage(t('جارٍ تجهيز مهام الفيديو والصوت…', 'Preparing video and voice jobs…'));
+    setPipelineJobIds([]);
+    setExportJobId(null);
+    exportStarted.current = false;
+    const ids: string[] = [];
+    try {
+      for (const scene of missingVideos) {
+        const job = await videoMutation.mutateAsync({ projectId, sceneId: scene.id, data: {
+          providerKeyId: selectedVideoKey.id,
+          model: videoModel.trim(),
+          mode: 'text',
+          approvePotentialCharges: true,
+        } });
+        ids.push(job.id);
+      }
+      for (const scene of missingVoices) {
+        const job = await voiceMutation.mutateAsync({ projectId, sceneId: scene.id, data: {
+          providerKeyId: selectedVoiceKey.id,
+          voiceId: voiceId.trim(),
+          approvePotentialCharges: true,
+        } });
+        ids.push(job.id);
+      }
+      setPipelineJobIds(ids);
+      setApproved(false);
+      onRefresh();
+      if (ids.length) {
+        setPhase('rendering');
+        setMessage(t(`تم إرسال ${ids.length} مهمة. سيُصدّر الفيلم تلقائياً بعد اكتمالها.`, `${ids.length} jobs queued. The film will export automatically when they finish.`));
+      } else {
+        setPhase('exporting');
+        setMessage(t('كل الأصول جاهزة. جارٍ تصدير الفيلم…', 'All assets are ready. Exporting the film…'));
+        exportStarted.current = true;
+        exportMutation.mutate({ projectId, data: exportSettings }, {
+          onSuccess: job => { setExportJobId(job.id); onRefresh(); },
+          onError: error => { setPhase('failed'); setMessage(error instanceof Error ? error.message : t('تعذر بدء التصدير.', 'Could not start export.')); },
+        });
+      }
+    } catch (error) {
+      setPhase('failed');
+      setMessage(error instanceof Error ? error.message : t('تعذر إرسال كل مهام الإنتاج. افحص المزوّدات وحاول مجدداً.', 'Could not queue all production jobs. Check providers and retry.'));
+      setPipelineJobIds(ids);
+      onRefresh();
+    }
+  };
+  const busy = ['queueing','rendering','exporting'].includes(phase);
+  if (!scenes.length) return null;
+  return <section className="auto-production panel" data-testid="auto-production-panel">
+    <div className="auto-production-heading">
+      <div><span className="eyebrow">ELLA AUTO STUDIO</span><h3>{t('إنتاج الفيلم بضغطة واحدة', 'One-click film production')}</h3><p>{t('يولّد مقاطع الفيديو والتعليق الصوتي للمشاهد الناقصة، ثم يجمعها تلقائياً إلى MP4. لا يعيد توليد الأصول الموجودة.', 'Generates missing video clips and narration, then automatically assembles them into an MP4. Existing assets are preserved.')}</p></div>
+      <span className={`auto-production-state state-${phase}`}>{phase === 'complete' ? t('اكتمل', 'Complete') : busy ? t('قيد التنفيذ', 'Running') : phase === 'failed' ? t('يحتاج مراجعة', 'Needs attention') : t('جاهز', 'Ready')}</span>
+    </div>
+    <div className="auto-production-metrics">
+      <div><b>{missingVideos.length}</b><span>{t('مقاطع فيديو ناقصة', 'Video clips missing')}</span></div>
+      <div><b>{missingVoices.length}</b><span>{t('تعليقات صوتية ناقصة', 'Voice tracks missing')}</span></div>
+      <div><b>{scenes.length}</b><span>{t('إجمالي المشاهد', 'Total scenes')}</span></div>
+    </div>
+    <div className="auto-production-config">
+      <label><span className="field-label">{t('مزوّد الفيديو', 'Video provider')}</span><select className="studio-input" value={selectedVideoKey?.id || ''} onChange={event => { const key = videoKeys.find(item => item.id === event.target.value); setVideoKeyId(event.target.value); setVideoModel(defaultVideoModel(key?.provider, 'text')); }} disabled={busy || videoKeys.length < 2}><option value="">{t('لا يوجد مزوّد فيديو جاهز', 'No ready video provider')}</option>{videoKeys.map(key => <option key={key.id} value={key.id}>{key.label} · {key.provider}</option>)}</select></label>
+      <label><span className="field-label">{t('نموذج الفيديو', 'Video model')}</span><input className="studio-input" value={videoModel} onChange={event => setVideoModel(event.target.value)} disabled={busy || !selectedVideoKey} placeholder="wan2.2" /></label>
+      <label><span className="field-label">{t('مزوّد الصوت العربي', 'Arabic voice provider')}</span><select className="studio-input" value={selectedVoiceKey?.id || ''} onChange={event => { const key = voiceKeys.find(item => item.id === event.target.value); setVoiceKeyId(event.target.value); setVoiceId(defaultVoiceId(key?.provider)); }} disabled={busy || voiceKeys.length < 2}><option value="">{t('لا يوجد مزوّد صوت جاهز', 'No ready voice provider')}</option>{voiceKeys.map(key => <option key={key.id} value={key.id}>{key.label} · {key.provider}</option>)}</select></label>
+    </div>
+    {freeMode && <p className="auto-production-note">{t('وضع التوفير مفعّل: لن يظهر هنا إلا عامل GPU المحلي للصورة المتحركة وPiper للصوت. يجب أن يكون عامل GPU متصلاً فعلياً.', 'Zero-spend mode is on: only the local GPU worker and Piper voice are eligible. The GPU worker must actually be online.')}</p>}
+    {(!selectedVideoKey || (missingVoices.length > 0 && !selectedVoiceKey)) && <p className="inline-error">{t('أضف مزوّد فيديو صالحاً ومزوّد صوت إذا كانت المشاهد تحتوي على حوار. افتح إعدادات المزوّدات.', 'Add a valid video provider and a voice provider if scenes contain dialogue. Open provider settings.') } <Link href="/settings/providers" className="text-link">{t('إعداد المزوّدات', 'Configure providers')}</Link></p>}
+    <label className="auto-production-approval"><input type="checkbox" checked={approved} onChange={event => setApproved(event.target.checked)} disabled={busy}/><span>{t('أوافق على إرسال جميع المهام المحددة. قد تُحتسب رسوم من المزوّدات الخارجية؛ لن يبدأ أي طلب قبل موافقتي.', 'I approve submitting all selected jobs. External providers may charge; no request starts without my approval.')}</span></label>
+    {message && <div className={`auto-production-message ${phase === 'failed' ? 'is-error' : ''}`} role="status">{message} {phase === 'complete' && <Link href="/jobs" className="text-link">{t('عرض ملف التصدير والمهام', 'View export and jobs')}</Link>}</div>}
+    <div className="auto-production-actions"><button type="button" className="btn btn-primary" onClick={() => void start()} disabled={!selectedVideoKey || (missingVoices.length > 0 && !selectedVoiceKey) || !videoModel.trim() || !approved || hasActiveJob || busy || !scenes.length || (missingVideos.length === 0 && missingVoices.length === 0 && !scenes.every(scene => scene.assetUrl))}>{busy ? <LoaderCircle size={16} className="animate-spin"/> : <WandSparkles size={16}/ >}{phase === 'complete' ? t('إعادة فحص وإنتاج النواقص', 'Re-run missing production') : t('ابدأ الإنتاج التلقائي', 'Start automatic production')}</button>{phase === 'failed' && <button type="button" className="btn btn-quiet" onClick={() => { setPhase('idle'); setMessage(''); setPipelineJobIds([]); setExportJobId(null); exportStarted.current = false; }}>{t('إعادة المحاولة', 'Reset and retry')}</button>}</div>
+    <p className="auto-production-footnote">{t('يستعيد النظام المهام المحفوظة بعد انقطاع الصفحة، ويتجاوز المشاهد التي اكتمل فيديوها. يمكنك تعديل أي مشهد من المحرر ثم إعادة توليده وحده. ثبات الشخصية يعتمد على دعم المزوّد لصور المراجع/هوية الشخصية؛ اكتشاف حدود النموذج يحتاج أن يعلنها عامل GPU عبر capabilities.', 'The pipeline restores saved jobs after reload and skips scenes that already have video. Edit any scene in the editor and regenerate only that scene. Character consistency depends on provider reference support; model-limit discovery requires the GPU worker to publish capabilities.')}</p>
+  </section>;
 }
 
 function BatchVideoGeneration({projectId,scenes,keys,lang,hasActiveJob,onQueued,freeMode}:{projectId:string;scenes:Scene[];keys:ProviderKey[];lang:Lang;hasActiveJob:boolean;onQueued:()=>void;freeMode:boolean}) {

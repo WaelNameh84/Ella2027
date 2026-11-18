@@ -978,7 +978,7 @@ router.post("/projects/:projectId/generate-script", async (req, res): Promise<vo
 
   const prompt = [
     "Create a concise, production-ready video script and storyboard. Return only valid JSON with this exact shape:",
-    '{"scenes":[{"title":"...","description":"...","imagePrompt":"...","narration":"...","durationSeconds":8}]}',
+    '{"characters":[{"id":"character-1","name":"...","description":"fixed face, age, hair, build and identifying traits","costume":"fixed costume and color palette","voiceDescription":"voice identity"}],"scenes":[{"title":"...","description":"...","imagePrompt":"...","narration":"speaker-labelled dialogue and narration","durationSeconds":8,"shotType":"wide","cameraMovement":"slow push-in","location":"...","lighting":"...","characterIds":["character-1"]}] }',
     `Concept: ${project.idea}`,
     `Video type: ${project.videoType}`,
     `Language: ${project.language}`,
@@ -987,7 +987,7 @@ router.post("/projects/:projectId/generate-script", async (req, res): Promise<vo
     `Requested scene count: exactly ${parsed.data.sceneCount} scenes`,
     `Duration for every scene: exactly ${parsed.data.sceneDurationSeconds} seconds`,
     `Target duration: ${project.durationSeconds} seconds`,
-    `Return exactly ${parsed.data.sceneCount} scenes and use exactly ${parsed.data.sceneDurationSeconds} seconds for durationSeconds in every scene. Keep recurring characters, clothing, color palette, and environment consistent across scenes. Write narration in the selected language. Make image prompts concrete and visually specific.`,
+    `Return exactly ${parsed.data.sceneCount} scenes and use exactly ${parsed.data.sceneDurationSeconds} seconds for durationSeconds in every scene. Build a reusable character bible (1–8 recurring characters) with stable IDs, fixed facial identity, age, hair, build, costume, colors and voice identity. Assign characterIds to every scene. Keep identity, clothing, props, geography and timeline consistent. Every scene must include a specific shotType, cameraMovement, location and lighting. Divide each scene internally into a sequence of visual beats suitable for short model clips; describe continuity between beats in imagePrompt. Write complete speaker-labelled dialogue and narration in the selected language, paced to fit the scene duration. Include sound design suggestions in description. Make image prompts concrete and visually specific.`,
   ].join("\n");
 
   let generated: ReturnType<typeof parseGeneratedJson> | undefined;

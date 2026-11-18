@@ -190,6 +190,15 @@ export const providerDefinitions: Record<string, ProviderDefinition> = {
     testUrl: () => "https://api.magichour.ai/v1/account",
     testHeaders: (key) => ({ Authorization: `Bearer ${key}` }),
   },
+  "local-video-worker": {
+    label: "Ella Local GPU Worker",
+    officialUrl: "https://github.com/Wan-Video/Wan2.2",
+    testUrl: () => {
+      const base = process.env.LOCAL_VIDEO_WORKER_URL?.trim().replace(/\/$/, "");
+      return base ? `${base}/health` : "";
+    },
+    testHeaders: (key) => ({ Authorization: `Bearer ${key}` }),
+  },
   elevenlabs: {
     label: "ElevenLabs",
     officialUrl: "https://elevenlabs.io/app/settings/api-keys",
@@ -242,6 +251,7 @@ export const providerCatalog = [
   { id: "segmind", name: "Segmind", officialUrl: "https://www.segmind.com/console/api-keys", canGenerateScript: false },
   { id: "cartesia", name: "Cartesia", officialUrl: "https://play.cartesia.ai/keys", canGenerateScript: false },
   { id: "luma", name: "Luma AI", officialUrl: "https://lumalabs.ai/dream-machine/api", canGenerateScript: false },
+  { id: "local-video-worker", name: "Ella Local GPU Worker", officialUrl: "https://github.com/Wan-Video/Wan2.2", canGenerateScript: false },
   { id: "wan22", name: "Wan 2.2 (local GPU)", officialUrl: "https://github.com/Wan-Video/Wan2.2", canGenerateScript: false },
   { id: "cogvideox", name: "CogVideoX (local GPU)", officialUrl: "https://github.com/zai-org/CogVideo", canGenerateScript: false },
   { id: "ltx-video", name: "LTX-Video (local GPU)", officialUrl: "https://github.com/Lightricks/ltx-video", canGenerateScript: false },
@@ -252,7 +262,7 @@ export const providerCatalog = [
 ];
 
 const providersRequiringSuccessfulTest = new Set([
-  "huggingface", "colab-t5", "cloudflare", "stability", "groq", "llama-free", "assemblyai", "deepgram", "agnes", "magic-hour",
+  "huggingface", "colab-t5", "cloudflare", "stability", "groq", "llama-free", "assemblyai", "deepgram", "agnes", "magic-hour", "local-video-worker",
 ]);
 export function providerRequiresSuccessfulTest(provider: string): boolean {
   return providersRequiringSuccessfulTest.has(provider);
