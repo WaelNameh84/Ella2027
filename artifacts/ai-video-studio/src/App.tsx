@@ -1177,23 +1177,40 @@ function Projects({ homePage = false, manualPage = false }: { homePage?: boolean
             </div>
             <div className="ella-welcome-meta"><span className="ella-live-indicator"><i /> {tx(lang, 'مساحة العمل جاهزة', 'WORKSPACE READY')}</span><span>{recentProjects.length} {tx(lang, 'مشاريع حديثة', 'RECENT PROJECTS')}</span></div>
           </header>
-          <section className="ella-mode-picker">
-            <div className="ella-mode-picker-heading">
-              <div><span className="ella-overline">{tx(lang, '01 — اختر مساحة الإنتاج', '01 — CHOOSE YOUR WORKFLOW')}</span><h3>{tx(lang, 'كيف بدك تصنع فيلمك؟', 'How do you want to create?')}</h3><p>{tx(lang, 'ثلاث طرق واضحة، ومحرك إنتاج واحد مشترك. ابدأ بالطريقة التي تناسبك وغيّر أسلوب التحكم لاحقًا.', 'Three clear workflows, one shared production engine. Start your way and change how much control you want later.')}</p></div>
-              <span className="ella-mode-engine"><i/> {tx(lang, 'محرك الإنتاج موحّد', 'SHARED PRODUCTION ENGINE')}</span>
+          <section className="ella-workspace-entry">
+            <div className="ella-pro-feature">
+              <div className="ella-pro-copy">
+                <span className="ella-overline">{tx(lang, 'مساحة الإنتاج الرئيسية', 'THE MAIN PRODUCTION WORKSPACE')}</span>
+                <h3>{tx(lang, 'اصنع فيلمك باحتراف.', 'Create your next film.')}</h3>
+                <p>{tx(lang, 'تحكم بالسيناريو والشخصيات والمشاهد والإعدادات والمزوّدات، وراجع خطة الإنتاج قبل أن تبدأ.', 'Shape the screenplay, characters, scenes, settings, and providers. Review your production plan before generation.')}</p>
+                <div className="ella-pro-actions">
+                  <Link href="/projects?new=1&mode=pro" className="ella-pro-primary">{tx(lang, 'ابدأ مشروعًا احترافيًا', 'Start a Pro project')} <ArrowLeft size={16}/></Link>
+                  <span className="ella-pro-note"><ShieldCheck size={14}/>{tx(lang, 'التوليد المدفوع بموافقتك فقط', 'Paid generation only with your approval')}</span>
+                </div>
+              </div>
+              <div className="ella-pro-art" aria-hidden="true">
+                <div className="ella-pro-orbit orbit-one"/><div className="ella-pro-orbit orbit-two"/>
+                <div className="ella-pro-clapper"><Clapperboard size={43}/><span>ELLA <i>STUDIO</i></span></div>
+                <span className="ella-pro-art-label">PRODUCTION / 01</span>
+              </div>
             </div>
-            <div className="ella-mode-grid">
-              <Link href="/projects?new=1&mode=quick" className="ella-mode-card mode-quick">
-                <span className="ella-mode-number">01</span><span className="ella-mode-icon"><WandSparkles size={22}/></span><span className="ella-mode-tag">{tx(lang, 'ابدأ فورًا', 'FASTEST START')}</span><b>{tx(lang, 'السريع', 'QUICK AUTO')}</b><p>{tx(lang, 'اكتب فكرة الفيلم فقط. إيلا تتولى السيناريو والشخصيات وتقسيم المشاهد وتجهيز الإنتاج تلقائيًا.', 'Describe your idea. Ella plans the screenplay, characters, scenes, and production setup automatically.')}</p><span className="ella-mode-action">{tx(lang, 'ابدأ بفكرتك', 'Start with an idea')} <ArrowLeft size={16}/></span>
+            <div className="ella-alternate-heading">
+              <span>{tx(lang, 'طرق إنتاج أخرى', 'OTHER WORKFLOWS')}</span>
+              <i/>
+            </div>
+            <div className="ella-alternate-modes">
+              <Link href="/projects?new=1&mode=quick" className="ella-mode-mini mode-quick">
+                <span className="ella-mode-mini-icon"><WandSparkles size={17}/></span>
+                <span className="ella-mode-mini-copy"><b>{tx(lang, 'السريع', 'Quick Auto')}</b><small>{tx(lang, 'فكرة واحدة، والباقي تلقائي', 'One idea. The rest is automatic.')}</small></span>
+                <ArrowLeft size={15}/>
               </Link>
-              <Link href="/projects?new=1&mode=pro" className="ella-mode-card mode-pro">
-                <span className="ella-mode-number">02</span><span className="ella-mode-icon"><Clapperboard size={22}/></span><span className="ella-mode-tag">{tx(lang, 'تحكم متقدم', 'ADVANCED CONTROL')}</span><b>{tx(lang, 'الاحترافي', 'PRO STUDIO')}</b><p>{tx(lang, 'تحكم بتفاصيل الفيلم والمشاهد والأسلوب والإعدادات والمزوّدات قبل اعتماد خطة الإنتاج.', 'Control film details, scenes, visual direction, settings, and providers before approving the production plan.')}</p><span className="ella-mode-action">{tx(lang, 'افتح الاستوديو الاحترافي', 'Open Pro Studio')} <ArrowLeft size={16}/></span>
-              </Link>
-              <Link href="/manual-studio" className="ella-mode-card mode-manual">
-                <span className="ella-mode-number">03</span><span className="ella-mode-icon"><Settings2 size={22}/></span><span className="ella-mode-tag">{tx(lang, 'تحرير مباشر', 'HANDS-ON WORKSPACE')}</span><b>{tx(lang, 'اليدوي', 'MANUAL STUDIO')}</b><p>{tx(lang, 'ابدأ بمشروع فارغ، اكتب المشاهد بنفسك، وارفع مراجعك وتحكم بكل لقطة دون استدعاء AI لكتابة السيناريو.', 'Start with a blank project, write scenes yourself, add references, and control every shot without AI script writing.')}</p><span className="ella-mode-action">{tx(lang, 'افتح مساحة العمل اليدوية', 'Open Manual Studio')} <ArrowLeft size={16}/></span>
+              <Link href="/manual-studio" className="ella-mode-mini mode-manual">
+                <span className="ella-mode-mini-icon"><Settings2 size={17}/></span>
+                <span className="ella-mode-mini-copy"><b>{tx(lang, 'اليدوي', 'Manual Studio')}</b><small>{tx(lang, 'تحرير كل مشهد بنفسك', 'Control every scene yourself')}</small></span>
+                <ArrowLeft size={15}/>
               </Link>
             </div>
-            <div className="ella-mode-safety"><ShieldCheck size={15}/><span>{tx(lang, 'لا يتم تشغيل أي خدمة مدفوعة أو إرسال طلب توليد إلا بعد موافقتك الصريحة.', 'No paid service or generation request runs without your explicit approval.')}</span><Link href="/settings/providers">{tx(lang, 'إدارة المزوّدات', 'Manage providers')} <ArrowLeft size={13}/></Link></div>
+            <div className="ella-workspace-foot"><span><i/> {tx(lang, 'محرك إنتاج موحّد للأوضاع الثلاثة', 'One shared production engine for all three modes')}</span><Link href="/settings/providers">{tx(lang, 'إعداد المزوّدات', 'Provider settings')} <ArrowLeft size={12}/></Link></div>
           </section>
           <section className="ella-activity-bar">
             <div className="ella-activity-title"><Activity size={16}/><span>{tx(lang, 'نشاط الإنتاج', 'PRODUCTION ACTIVITY')}</span></div>
