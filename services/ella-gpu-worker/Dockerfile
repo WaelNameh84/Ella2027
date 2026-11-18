@@ -5,6 +5,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY app ./app
 COPY workflows ./workflows
-ENV PYTHONUNBUFFERED=1 COMFYUI_WORKFLOW=/app/workflows/video_api.json
+RUN mkdir -p /data /app/workflows
+ENV PYTHONUNBUFFERED=1 COMFYUI_WORKFLOW=/app/workflows/video_api.json ELLA_DATA_DIR=/data
 EXPOSE 8000
 CMD ["uvicorn", "app.main:APP", "--host", "0.0.0.0", "--port", "8000"]
