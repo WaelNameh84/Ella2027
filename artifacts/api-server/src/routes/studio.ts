@@ -1247,7 +1247,7 @@ router.get("/media/search", async (req, res): Promise<void> => {
   const { q, mediaType, source, page, orientation } = parsed.data;
   const userId = userIdOf(res);
   if ((await isZeroSpendMode(userId)) && ["pexels", "pixabay", "unsplash"].includes(source ?? "openverse")) {
-    res.status(403).json({ error: "Free mode permits public media catalogs only: Openverse, Wikimedia Commons, and Internet Archive." });
+    res.status(403).json({ error: "Free mode permits public media catalogs only: Openverse, Wikimedia Commons, Internet Archive, and NASA." });
     return;
   }
   try {
