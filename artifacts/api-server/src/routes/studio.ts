@@ -1118,8 +1118,9 @@ router.post("/projects/:projectId/scenes/:sceneId/assist", async (req, res): Pro
   const idea = typeof body?.idea === "string" ? body.idea.trim() : "";
   const task = typeof body?.task === "string" ? body.task : "write_scene";
   const providerKeyId = typeof body?.providerKeyId === "string" ? body.providerKeyId : "";
+  const supportedTasks: string[] = ["write_scene", "dialogue", "visual_prompt", "improve_scene"];
   if (!projectId || !sceneId || !idea || idea.length > 5000
-    || !["write_scene", "dialogue", "visual_prompt", "improve_scene"].includes(task)
+    || !supportedTasks.includes(task)
     || body?.approvePotentialCharges !== true) {
     res.status(400).json({ error: "Provide a scene idea, a supported assistant task, and explicit approval before sending the request." });
     return;
