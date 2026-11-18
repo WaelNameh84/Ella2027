@@ -2652,7 +2652,7 @@ function ProviderRow({item,onEdit,onToggle,onPriority,onTest,onDelete,testing,fr
   const testedAt=item.lastTestAt?new Date(item.lastTestAt).toLocaleString(lang==='ar'?'ar':'en') : tx(lang,'لم يُختبر بعد','Not tested yet');
   const purpose=providerServicePurpose(item.serviceType,lang,item.provider);
   const serviceConnected=providerServiceIsConnected(item.provider,item.serviceType);
-  const serviceReady=serviceConnected && item.status==='valid';
+  const serviceReady=serviceConnected && (item.status==='valid' || (item.provider==='google-speech' && item.status==='untested'));
   const plan=providerPlanInfo[item.provider];
   const statusLabel=item.status==='quota_limited'?tx(lang,'الحصة مستنفدة','quota limited'):item.status==='rate_limited'?tx(lang,'طلبات كثيرة مؤقتًا','rate limited'):item.status.replace('_',' ');
   return <div className="provider-row">
