@@ -252,6 +252,7 @@ test("Google Speech key status is explicitly untested rather than falsely verifi
   const result = await testProviderCredential("google-speech", "google-speech-key");
   assert.equal(result.status, "untested");
   assert.match(result.message, /no safe key-only verification endpoint/i);
+  assert.equal(providerCredentialUsable("google-speech", result.status), true);
   assert.equal(requestCount, 0);
 });
 
@@ -261,6 +262,9 @@ test("provider catalog does not advertise providers without a wired adapter", ()
     assert.equal(ids.includes(unsupported), false, unsupported);
   }
   assert.equal(ids.includes("local-video-worker"), true);
+  assert.equal(ids.includes("azure-speech"), true);
+  assert.equal(ids.includes("google-speech"), true);
+  assert.equal(ids.includes("google-tts"), true);
 });
 
 test("OpenAI image adapter converts a mocked base64 image response", async (t) => {
