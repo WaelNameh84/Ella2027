@@ -36,4 +36,6 @@ test("Scene image upload remains scoped to the selected scene", async () => {
   assert.match(app, /input-scene-reference-image/);
   assert.match(app, /\/api\/projects\/\$\{projectId\}\/scenes\/\$\{scene\.id\}\/assets\/upload/);
   assert.match(app, /Generate an image for this scene/);
+  assert.match(app, /storyboard-upload-label/);
+  assert.match(app, /onUploadImage=\{uploadSceneImage\}/);
 });
