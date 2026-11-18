@@ -357,6 +357,32 @@ test("OpenAI Whisper adapter sends audio and reads a mocked transcript", async (
   assert.equal(captured.body.get("model"), "whisper-1");
 });
 
+test("Google Speech-to-Text adapter accepts a valid transcript response", async (t) => {
+  let captured;
+  mockFetch(t, async (url, init) => {
+    captured = { url: String(url), body: JSON.parse(init.body) };
+    return jsonResponse({ results: [{ alternatives: [{ transcript: "مرحبا بالعالم" }] }] });
+  });
+  const result = await transcribeAudio("google-speech", "google-test-key", Buffer.from("mock-audio"), "audio/mpeg", "transcribe", "ar");
+  assert.equal(result.text, "مرحبا بالعالم");
+  assert.equal(result.model, "google-speech-v1");
+  assert.equal(captured.url, "https://speech.googleapis.com/v1/speech:recognize?key=google-test-key");
+  assert.equal(captured.body.config.languageCode, "ar");
+});
+
+test("Azure Speech adapter accepts a valid transcript response", async (t) => {
+  let captured;
+  mockFetch(t, async (url, init) => {
+    captured = { url: String(url), headers: new Headers(init.headers), body: init.body };
+    return jsonResponse({ DisplayText: "مرحبا بالعالم" });
+  });
+  const result = await transcribeAudio("azure-speech", "azure-test-key", Buffer.from("mock-audio"), "audio/mpeg", "transcribe", "ar");
+  assert.equal(result.text, "مرحبا بالعالم");
+  assert.equal(result.model, "azure-conversation");
+  assert.match(captured.url, /^https:\/\/eastus\.stt\.speech\.microsoft\.com\/speech\/recognition\/conversation/);
+  assert.equal(captured.headers.get("ocp-apim-subscription-key"), "azure-test-key");
+});
+
 test("Hugging Face translation is rejected without making a provider call", async (t) => {
   let requestCount = 0;
   mockFetch(t, async () => {
