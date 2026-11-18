@@ -41,7 +41,7 @@ function userIdOf(res: Response): string {
 function supportedProvider(provider: string, jobType: JobKind): boolean {
   if (jobType === "image") return ["openai", "stability", "replicate", "huggingface", "ai-horde"].includes(provider);
   if (jobType === "video") return ["replicate", "fal", "agnes", "magic-hour", "local-video-worker"].includes(provider);
-  return ["elevenlabs", "openai", "openai-audio"].includes(provider);
+  return ["elevenlabs", "openai", "openai-audio", "google-tts", "azure-speech"].includes(provider);
 }
 
 async function confirmUsableKeys(
@@ -330,7 +330,7 @@ router.post(
     const now = Date.now();
     const supportsMode = (provider: string) => mode === "translate"
       ? ["openai", "whisper"].includes(provider)
-      : ["openai", "whisper", "huggingface", "assemblyai", "deepgram"].includes(provider);
+      : ["openai", "whisper", "huggingface", "assemblyai", "deepgram", "google-speech", "azure-speech"].includes(provider);
     const usable = keys.filter((key) =>
       supportsMode(key.provider)
       && providerCredentialUsable(key.provider, key.status as import("../lib/providerRegistry").ProviderStatus)
