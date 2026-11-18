@@ -101,8 +101,8 @@ export const providerDefinitions: Record<string, ProviderDefinition> = {
     label: "Google Colab T5 (free)",
     officialUrl: "https://colab.research.google.com/",
     testUrl: (baseUrl) => {
-      const base = baseUrl.trim().replace(/\/$/, "");
-      return /^https?:\/\//i.test(base) ? `${base}/health` : "";
+      const base = getAllowedColabBaseUrl(baseUrl);
+      return base ? `${base}/health` : "";
     },
     chatUrl: "colab-t5://v1/chat/completions",
     chatModel: "google/flan-t5-base",
@@ -172,6 +172,7 @@ export const providerDefinitions: Record<string, ProviderDefinition> = {
   stability: {
     label: "Stability AI",
     officialUrl: "https://platform.stability.ai/dashboard/api-keys",
+    testUrl: () => "https://api.stability.ai/v1/user/balance",
   },
   replicate: {
     label: "Replicate",
@@ -222,6 +223,21 @@ export const providerDefinitions: Record<string, ProviderDefinition> = {
     officialUrl: "https://console.cloud.google.com/apis/credentials",
     testUrl: (key) => `https://texttospeech.googleapis.com/v1/voices?key=${encodeURIComponent(key)}`,
   },
+  "google-speech": {
+    label: "Google Cloud Speech-to-Text",
+    officialUrl: "https://console.cloud.google.com/apis/credentials",
+  },
+  "azure-speech": {
+    label: "Azure Speech",
+    officialUrl: "https://portal.azure.com/",
+    testUrl: () => {
+      const region = process.env.AZURE_SPEECH_REGION || "eastus";
+      return /^[a-z0-9-]+$/i.test(region)
+        ? `https://${region}.tts.speech.microsoft.com/cognitiveservices/voices/list`
+        : "";
+    },
+    testHeaders: (key) => ({ "Ocp-Apim-Subscription-Key": key }),
+  },
   pexels: {
     label: "Pexels",
     officialUrl: "https://www.pexels.com/api/",
@@ -247,22 +263,28 @@ export const providerCatalog = [
     officialUrl: provider.officialUrl,
     canGenerateScript: Boolean(provider.chatUrl),
   })),
-  { id: "runway", name: "Runway", officialUrl: "https://dev.runwayml.com/", canGenerateScript: false },
-  { id: "segmind", name: "Segmind", officialUrl: "https://www.segmind.com/console/api-keys", canGenerateScript: false },
-  { id: "cartesia", name: "Cartesia", officialUrl: "https://play.cartesia.ai/keys", canGenerateScript: false },
-  { id: "luma", name: "Luma AI", officialUrl: "https://lumalabs.ai/dream-machine/api", canGenerateScript: false },
-  { id: "local-video-worker", name: "Ella Local GPU Worker", officialUrl: "https://github.com/Wan-Video/Wan2.2", canGenerateScript: false },
-  { id: "wan22", name: "Wan 2.2 (local GPU)", officialUrl: "https://github.com/Wan-Video/Wan2.2", canGenerateScript: false },
-  { id: "cogvideox", name: "CogVideoX (local GPU)", officialUrl: "https://github.com/zai-org/CogVideo", canGenerateScript: false },
-  { id: "ltx-video", name: "LTX-Video (local GPU)", officialUrl: "https://github.com/Lightricks/ltx-video", canGenerateScript: false },
-  { id: "hunyuan-video", name: "HunyuanVideo 1.5 (local GPU)", officialUrl: "https://github.com/Tencent-Hunyuan/HunyuanVideo-1.5", canGenerateScript: false },
-  { id: "azure-speech", name: "Azure Speech", officialUrl: "https://portal.azure.com/", canGenerateScript: false },
-  { id: "google-speech", name: "Google Speech-to-Text", officialUrl: "https://console.cloud.google.com/apis/credentials", canGenerateScript: false },
-  { id: "musicgen", name: "MusicGen", officialUrl: "https://github.com/facebookresearch/audiocraft", canGenerateScript: false },
+ 
 ];
 
+const allowedColabTunnelSuffixes = [".trycloudflare.com", ".ngrok-free.app", ".ngrok.app", ".loca.lt"];
+
+export function getAllowedColabBaseUrl(value: string): string | null {
+  try {
+    const url = new URL(value.trim());
+    const hostname = url.hostname.toLowerCase();
+    if (url.protocol !== "https:" || url.username || url.password || (url.port && url.port !== "443")) return null;
+    if (!allowedColabTunnelSuffixes.some((suffix) => hostname.endsWith(suffix))) return null;
+    if (hostname === "trycloudflare.com" || hostname === "ngrok-free.app" || hostname === "ngrok.app" || hostname === "loca.lt") return null;
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return null;
+  }
+}
+
 const providersRequiringSuccessfulTest = new Set([
-  "huggingface", "colab-t5", "cloudflare", "stability", "groq", "llama-free", "assemblyai", "deepgram", "agnes", "magic-hour", "local-video-worker",
+  "huggingface", "colab-t5", "cloudflare", "stability", "groq", "llama-free",
+  "assemblyai", "deepgram", "agnes", "magic-hour", "local-video-worker",
+  "google-tts", "azure-speech",
 ]);
 export function providerRequiresSuccessfulTest(provider: string): boolean {
   return providersRequiringSuccessfulTest.has(provider);
@@ -339,11 +361,14 @@ export async function testProviderCredential(
   if (provider === "cloudflare" && !/^[a-f0-9]{32}$/i.test(process.env.CLOUDFLARE_ACCOUNT_ID ?? "")) {
     return { status: "untested", message: "Set the 32-character CLOUDFLARE_ACCOUNT_ID server setting before testing Workers AI access." };
   }
+  if (provider === "google-speech") {
+    return { status: "untested", message: "Google Speech-to-Text has no safe key-only verification endpoint. The key is saved, but API enablement and permissions are confirmed only by an approved transcription request." };
+  }
+  if (provider === "colab-t5" && !getAllowedColabBaseUrl(key)) {
+    return { status: "invalid", message: "Use an HTTPS public tunnel URL from trycloudflare.com, ngrok-free.app, ngrok.app, or loca.lt. Private and arbitrary URLs are blocked." };
+  }
   if (!definition?.testUrl) {
-    const message = provider === "stability"
-      ? "Stability AI does not document a read-only API key check. No generation request was sent; verify the key in the official dashboard."
-      : "This provider is saved securely, but an automatic verification endpoint is not configured yet.";
-    return { status: "untested", message };
+    return { status: "untested", message: "This provider is saved securely, but an automatic read-only verification endpoint is not configured yet." };
   }
   const url = definition.testUrl(key);
   if (!url) return { status: "untested", message: "The provider's safe verification endpoint is not configured." };
@@ -351,7 +376,7 @@ export async function testProviderCredential(
     const response = await fetch(url, {
       method: "GET",
       headers: {
-        Authorization: `Bearer ${key}`,
+        ...(provider === "colab-t5" ? {} : { Authorization: `Bearer ${key}` }),
         ...definition.testHeaders?.(key),
       },
       signal: AbortSignal.timeout(12_000),
@@ -365,7 +390,24 @@ export async function testProviderCredential(
         return { status: "unavailable", message: "Cloudflare returned an unexpected model-catalog response; Workers AI access was not verified." };
       }
     }
+    if (provider === "colab-t5" && response.ok) {
+      let health: { status?: string; available?: boolean } = {};
+      try { health = JSON.parse(text) as typeof health; } catch { /* health endpoint must return JSON */ }
+      if (health.status !== "ok" && health.available !== true) {
+        return { status: "unavailable", message: "The public tunnel responded, but its /health payload did not confirm a ready worker." };
+      }
+    }
+    if (provider === "stability" && response.ok) {
+      let balance: { credits?: number } = {};
+      try { balance = JSON.parse(text) as typeof balance; } catch { /* balance endpoint returned an unexpected payload */ }
+      if (typeof balance.credits === "number" && balance.credits <= 0) {
+        return { status: "quota_limited", message: "Stability AI accepted the key, but the account balance is zero. The key remains enabled; check the Stability AI billing dashboard." };
+      }
+    }
     const checked = classifyProviderResponse(response.status, text.slice(0, 4000));
+    if (checked.status === "valid" && provider === "colab-t5") {
+      return { ...checked, message: "Colab public worker health check passed. This confirms the tunnel and worker are reachable, not that a model is loaded or generation will succeed." };
+    }
     if (checked.status === "valid" && provider === "huggingface") {
       return { ...checked, message: "Hugging Face token identity verified. Inference-provider permissions and billing still depend on token scope, route, and plan." };
     }
@@ -389,9 +431,9 @@ export async function generateWithProvider(
   }
 
   const isColabT5 = provider === "colab-t5";
-  const colabBaseUrl = isColabT5 ? key.trim().replace(/\/$/, "") : "";
-  if (isColabT5 && !/^https?:\/\//i.test(colabBaseUrl)) {
-    throw new Error("Enter the public Colab URL, for example https://xxxx.trycloudflare.com.");
+  const colabBaseUrl = isColabT5 ? getAllowedColabBaseUrl(key) ?? "" : "";
+  if (isColabT5 && !colabBaseUrl) {
+    throw new Error("Use an HTTPS public tunnel URL from trycloudflare.com, ngrok-free.app, ngrok.app, or loca.lt. Private and arbitrary URLs are blocked.");
   }
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
