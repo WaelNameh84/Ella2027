@@ -263,7 +263,7 @@ export const providerCatalog = [
     officialUrl: provider.officialUrl,
     canGenerateScript: Boolean(provider.chatUrl),
   })),
-  { id: "musicgen", name: "MusicGen", officialUrl: "https://github.com/facebookresearch/audiocraft", canGenerateScript: false },
+ 
 ];
 
 const allowedColabTunnelSuffixes = [".trycloudflare.com", ".ngrok-free.app", ".ngrok.app", ".loca.lt"];
