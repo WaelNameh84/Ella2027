@@ -382,6 +382,42 @@ function parseGeneratedJson(text: string): Array<{
   });
 }
 
+
+function parseSceneSuggestionJson(text: string, fallbackDuration: number) {
+  const normalized = text.replace(/```(?:json)?/gi, "").trim();
+  const firstBrace = normalized.indexOf("{");
+  const lastBrace = normalized.lastIndexOf("}");
+  if (firstBrace < 0 || lastBrace <= firstBrace) {
+    throw new Error("The provider did not return a valid scene suggestion.");
+  }
+  let value: unknown;
+  try {
+    value = JSON.parse(normalized.slice(firstBrace, lastBrace + 1));
+  } catch {
+    throw new Error("The provider response was not valid JSON. Your scene was not changed.");
+  }
+  const item = value as Record<string, unknown>;
+  const stringField = (key: string, fallback = "") =>
+    typeof item[key] === "string" ? String(item[key]).trim().slice(0, 6000) : fallback;
+  const suggestion = {
+    title: stringField("title"),
+    description: stringField("description"),
+    imagePrompt: stringField("imagePrompt"),
+    narration: stringField("narration"),
+    shotType: stringField("shotType"),
+    cameraMovement: stringField("cameraMovement"),
+    location: stringField("location"),
+    lighting: stringField("lighting"),
+    durationSeconds: Number.isFinite(Number(item.durationSeconds))
+      ? Math.min(600, Math.max(1, Math.round(Number(item.durationSeconds))))
+      : fallbackDuration,
+  };
+  if (!suggestion.title || !suggestion.description || !suggestion.imagePrompt) {
+    throw new Error("The provider returned an incomplete scene. No changes were applied.");
+  }
+  return suggestion;
+}
+
 function isRotationEligible(status: string, settings: Awaited<ReturnType<typeof settingsForUser>>) {
   if (status === "invalid") return true;
   if (status === "rate_limited") return settings.rotateOnRateLimit;
@@ -1073,6 +1109,133 @@ router.post("/projects/:projectId/generate-script", async (req, res): Promise<vo
     ...projectDto(updatedProject, inserted.length),
     scenes: inserted.sort((a, b) => a.sortOrder - b.sortOrder).map(sceneDto),
   }));
+});
+
+
+router.post("/projects/:projectId/scenes/:sceneId/assist", async (req, res): Promise<void> => {
+  const { projectId, sceneId } = req.params;
+  const body = req.body as Record<string, unknown>;
+  const idea = typeof body?.idea === "string" ? body.idea.trim() : "";
+  const task = typeof body?.task === "string" ? body.task : "write_scene";
+  const providerKeyId = typeof body?.providerKeyId === "string" ? body.providerKeyId : "";
+  const supportedTasks: string[] = ["write_scene", "dialogue", "visual_prompt", "improve_scene"];
+  if (!projectId || !sceneId || !idea || idea.length > 5000
+    || !supportedTasks.includes(task)
+    || body?.approvePotentialCharges !== true) {
+    res.status(400).json({ error: "Provide a scene idea, a supported assistant task, and explicit approval before sending the request." });
+    return;
+  }
+  const userId = userIdOf(res);
+  if (await isZeroSpendMode(userId)) {
+    res.status(403).json({ error: ZERO_SPEND_ERROR });
+    return;
+  }
+  const project = await projectForUser(projectId, userId);
+  if (!project) {
+    res.status(404).json({ error: "Project not found." });
+    return;
+  }
+  const [scene] = await db.select().from(scenesTable).where(and(
+    eq(scenesTable.id, sceneId),
+    eq(scenesTable.projectId, projectId),
+    eq(scenesTable.userId, userId),
+  )).limit(1);
+  if (!scene) {
+    res.status(404).json({ error: "Scene not found." });
+    return;
+  }
+  const settings = await settingsForUser(userId);
+  const eligible = await db.select().from(providerKeysTable).where(and(
+    eq(providerKeysTable.userId, userId),
+    eq(providerKeysTable.serviceType, "text"),
+    eq(providerKeysTable.enabled, true),
+  )).orderBy(asc(providerKeysTable.priority), asc(providerKeysTable.createdAt));
+  const now = Date.now();
+  const candidates = eligible.filter((key) =>
+    providerCredentialUsable(key.provider, key.status as ProviderStatus)
+    && (!key.cooldownUntil || key.cooldownUntil.getTime() <= now),
+  );
+  let ordered = providerKeyId
+    ? (() => {
+        const selected = candidates.find((key) => key.id === providerKeyId);
+        return selected ? orderSelectedProvider(candidates, selected, settings?.fallbackProvider ?? null) : [];
+      })()
+    : orderProviderFallback(candidates, settings?.fallbackProvider ?? null);
+  if (providerKeyId && !ordered.length) {
+    res.status(409).json({ error: "The selected text provider is unavailable, disabled, or cooling down." });
+    return;
+  }
+  if (settings?.autoRotate === false) ordered = ordered.slice(0, 1);
+  if (!ordered.length) {
+    res.status(409).json({ error: "No usable text provider is configured. Add and verify a text provider in Settings." });
+    return;
+  }
+  const characters = (project.characters ?? []).filter((character) =>
+    (scene.characterIds ?? []).includes(character.id),
+  );
+  const taskInstruction = task === "dialogue"
+    ? "Focus on natural, character-specific dialogue and narration. Keep visual fields coherent with the existing scene."
+    : task === "visual_prompt"
+      ? "Focus on a detailed, model-ready visual image prompt and concrete camera/lighting direction. Preserve the scene story."
+      : task === "improve_scene"
+        ? "Improve the existing scene without changing its core story beat, characters, or continuity."
+        : "Write a complete production-ready scene from the user's idea.";
+  const prompt = [
+    "You are a professional film screenwriter and director. Return only one valid JSON object with exactly these fields:",
+    '{"title":"...","description":"...","imagePrompt":"...","narration":"...","shotType":"...","cameraMovement":"...","location":"...","lighting":"...","durationSeconds":8}',
+    taskInstruction,
+    "Do not include markdown fences or commentary. Use the project's selected language for dialogue and narration.",
+    `Project: ${project.title}`,
+    `Project idea: ${project.idea}`,
+    `Format: ${project.videoType}; style: ${project.visualStyle}; audience: ${project.audience}; language: ${project.language}; aspect ratio: ${project.aspectRatio}`,
+    `Current scene: ${JSON.stringify({ title: scene.title, description: scene.description, imagePrompt: scene.imagePrompt, narration: scene.narration, shotType: scene.shotType, cameraMovement: scene.cameraMovement, location: scene.location, lighting: scene.lighting, durationSeconds: scene.durationSeconds })}`,
+    `Characters assigned to this scene: ${JSON.stringify(characters.map((character) => ({ id: character.id, name: character.name, description: character.description, costume: character.costume, voiceDescription: character.voiceDescription }))) }`,
+    `User's direction: ${idea}`,
+    "Keep character identity, wardrobe, props, location geography, time of day, and story continuity consistent. Use concrete visual language, not vague adjectives. The imagePrompt must describe a single frame that can guide image generation. The description must describe visible action and blocking. Camera movement must be physically plausible.",
+  ].join("\n");
+  let finalMessage = "All configured text providers failed.";
+  for (const keyRow of ordered.slice(0, settings?.maxAttempts ?? 3)) {
+    try {
+      const key = decryptProviderKey(keyRow.encryptedKey);
+      const response = await generateWithProvider(keyRow.provider, key, prompt);
+      const suggestion = parseSceneSuggestionJson(response, scene.durationSeconds);
+      await db.update(providerKeysTable).set({
+        status: "valid",
+        usedCount: keyRow.usedCount + 1,
+        cooldownUntil: null,
+        testMessage: "Last scene assistant request succeeded.",
+      }).where(eq(providerKeysTable.id, keyRow.id));
+      res.json({ suggestion, provider: keyRow.provider });
+      return;
+    } catch (error) {
+      const details = error as Error & { providerStatus?: number; responseBody?: string };
+      finalMessage = details.providerStatus
+        ? `${keyRow.provider}: ${classifyProviderResponse(details.providerStatus, details.responseBody ?? "").message}`
+        : (details.message || "Scene assistant request failed.");
+      if (details.providerStatus) {
+        const classification = classifyProviderResponse(details.providerStatus, details.responseBody ?? "");
+        const cooldownUntil = ["rate_limited", "quota_limited"].includes(classification.status)
+          ? new Date(Date.now() + Math.max(60, settings?.retryDelaySeconds ?? 60) * 1000)
+          : null;
+        await db.update(providerKeysTable).set({
+          status: classification.status,
+          testMessage: classification.message,
+          cooldownUntil,
+        }).where(eq(providerKeysTable.id, keyRow.id));
+        if (!isRotationEligible(classification.status, settings)) break;
+      } else {
+        await db.update(providerKeysTable).set({
+          status: "unavailable",
+          testMessage: "The provider could not be reached for this scene assistant request.",
+        }).where(eq(providerKeysTable.id, keyRow.id));
+        if (!settings?.rotateOnConnectionFailure) break;
+      }
+      if (settings?.autoRotate === false) break;
+      const delay = Math.min(settings?.retryDelaySeconds ?? 0, 10);
+      if (delay > 0) await new Promise((resolvePromise) => setTimeout(resolvePromise, delay * 1000));
+    }
+  }
+  res.status(502).json({ error: finalMessage });
 });
 
 router.get("/media/search", async (req, res): Promise<void> => {
