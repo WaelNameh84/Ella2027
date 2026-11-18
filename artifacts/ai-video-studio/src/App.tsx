@@ -777,14 +777,14 @@ function ProjectForm({ onClose, initial, initialMode = 'auto', initialExperience
         {generationError && <div className="inline-error" role="alert">{tx(lang,'تعذّر بدء كتابة السيناريو. أعد الموافقة قبل أي محاولة جديدة أو افتح المشروع المحفوظ.','Story generation failed. Approve again before any retry or open the saved project.')}{onOpenCreated && <button type="button" className="text-link mt-2" onClick={onOpenCreated}>{tx(lang,'فتح المشروع','Open project')}<ArrowLeft size={14}/></button>}</div>}
               </details>
       </> : !editing ? <>
-        <div className="workflow-mode-grid" role="radiogroup" aria-label={tx(lang,'طريقة إنشاء الفيديو','Video creation mode')}>
+        {!inline && <div className="workflow-mode-grid" role="radiogroup" aria-label={tx(lang,'طريقة إنشاء الفيديو','Video creation mode')}>
           <button type="button" className={`workflow-mode-card ${mode === 'auto' ? 'is-selected' : ''}`} onClick={() => setMode('auto')} role="radio" aria-checked={mode === 'auto'}>
             <WandSparkles size={19}/><strong>{tx(lang,'تلقائي','Automatic')}</strong><span>{tx(lang,'أدخل فكرتك؛ ينشئ السيناريو والمشاهد والفيديو والصوت والتصدير تلقائيًا.','Enter your idea; the script, scenes, video, voice, and final export are handled automatically.')}</span>
           </button>
           <button type="button" className={`workflow-mode-card ${mode === 'manual' ? 'is-selected' : ''}`} onClick={() => setMode('manual')} role="radio" aria-checked={mode === 'manual'}>
             <Settings2 size={19}/><strong>{tx(lang,'يدوي','Manual')}</strong><span>{tx(lang,'أنشئ المشروع ثم أضف النصوص والوسائط وعدّل كل مشهد بنفسك.','Create the project, then add text, media, and edit every scene yourself.')}</span>
           </button>
-        </div>
+        </div>}
         {mode === 'manual' && <div className="service-purpose-hint"><b>{tx(lang,'تحكم كامل — بدون API','Full control — no API')}</b><span>{tx(lang,'سيُحفظ المشروع والمشاهد مباشرة دون استدعاء نموذج لغوي أو مزود كتابة.','The project and scenes are saved directly without calling a language model or writing provider.')}</span></div>}
         {mode === 'manual' && <>
           <label><span className="field-label">{tx(lang,'اسم الفيلم','Film title')}</span><input required maxLength={160} className="studio-input" value={form.title} onChange={e => update('title', e.target.value)} placeholder={tx(lang,'مثال: ليلة في المدينة','e.g. A night in the city')} data-testid="input-manual-film-title" autoFocus /></label>
@@ -859,7 +859,7 @@ function Modal({ title, subtitle, onClose, children, inline = false, className =
   return <div className="modal-backdrop" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}><section role="dialog" aria-modal="true" className={`modal panel ${className}`}>{content}</section></div>;
 }
 
-function Projects({ homePage = false, manualPage = false }: { homePage?: boolean; manualPage?: boolean }) {
+function Projects({ homePage = false, manualPage = false, createPage = false }: { homePage?: boolean; manualPage?: boolean; createPage?: boolean }) {
   const { lang } = useApp();
   const [location, setLocation] = useLocation();
   const q = useListProjects();
@@ -875,7 +875,7 @@ function Projects({ homePage = false, manualPage = false }: { homePage?: boolean
   const [open, setOpen] = useState(false);
   const [newTemplate, setNewTemplate] = useState<string | undefined>(undefined);
   const openNewProject = (templateId?: string) => { setNewTemplate(templateId); setOpen(true); };
-  useEffect(() => { const params = new URLSearchParams(location.split('?')[1] || ''); const requestedMode = params.get('mode'); if (!homePage && params.get('new') === '1') setOpen(true); if (!homePage && (requestedMode === 'manual' || requestedMode === 'auto' || requestedMode === 'quick' || requestedMode === 'pro')) setOpen(true); }, [location, homePage]);
+  useEffect(() => { const params = new URLSearchParams(location.split('?')[1] || ''); if (createPage && params.get('mode')) setOpen(true); }, [location, createPage]);
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<'updated' | 'name' | 'status'>('updated');
   const [createdProjectId, setCreatedProjectId] = useState<string | null>(null);
@@ -1162,7 +1162,7 @@ function Projects({ homePage = false, manualPage = false }: { homePage?: boolean
   };
   const readyProviderCount = (keysQuery.data ?? []).filter(key => key.enabled && providerSupports(key.provider, key.serviceType) && providerKeyIsUsable(key.provider, key.status, key.cooldownUntil)).length;
   const openCreatedProject = () => { if (createdProjectId) { setOpen(false); setCreatedProjectId(null); setProjectSaveError(false); setLocation(`/projects/${createdProjectId}`); } };
-  const projectForm = (inline = false, initialMode: 'auto' | 'manual' = 'auto', initialExperienceMode: 'quick' | 'pro' = 'pro') => <ProjectForm inline={inline} initialMode={initialMode} initialExperienceMode={initialExperienceMode} onClose={() => { setOpen(false); setCreatedProjectId(null); setProjectSaveError(false); }} pending={create.isPending || generate.isPending || createScene.isPending || updateProviderSettings.isPending || savingManualScenes || autoFilmRunning} freeMode={freeMode} textProviderReady={textProviderReady} checkingProvider={keysQuery.isLoading} generationError={projectSaveError || (generate.isError && Boolean(createdProjectId))} projectCreated={Boolean(createdProjectId)} onOpenCreated={createdProjectId ? openCreatedProject : undefined} onSave={saveProjectAndWriteStory} />;
+  const projectForm = (inline = false, initialMode: 'auto' | 'manual' = 'auto', initialExperienceMode: 'quick' | 'pro' = 'pro') => <ProjectForm inline={inline} initialMode={initialMode} initialExperienceMode={initialExperienceMode} onClose={() => { setOpen(false); setCreatedProjectId(null); setProjectSaveError(false); if (inline) setLocation('/dashboard'); }} pending={create.isPending || generate.isPending || createScene.isPending || updateProviderSettings.isPending || savingManualScenes || autoFilmRunning} freeMode={freeMode} textProviderReady={textProviderReady} checkingProvider={keysQuery.isLoading} generationError={projectSaveError || (generate.isError && Boolean(createdProjectId))} projectCreated={Boolean(createdProjectId)} onOpenCreated={createdProjectId ? openCreatedProject : undefined} onSave={saveProjectAndWriteStory} />;
   if (homePage) {
     const recentProjects = [...(q.data ?? [])].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()).slice(0, 5);
     const recentJobs = (jobsQuery.data ?? []).slice(0, 3);
@@ -1184,7 +1184,7 @@ function Projects({ homePage = false, manualPage = false }: { homePage?: boolean
                 <h3>{tx(lang, 'اصنع فيلمك باحتراف.', 'Create your next film.')}</h3>
                 <p>{tx(lang, 'تحكم بالسيناريو والشخصيات والمشاهد والإعدادات والمزوّدات، وراجع خطة الإنتاج قبل أن تبدأ.', 'Shape the screenplay, characters, scenes, settings, and providers. Review your production plan before generation.')}</p>
                 <div className="ella-pro-actions">
-                  <Link href="/projects?new=1&mode=pro" className="ella-pro-primary">{tx(lang, 'ابدأ مشروعًا احترافيًا', 'Start a Pro project')} <ArrowLeft size={16}/></Link>
+                  <Link href="/create?mode=pro" className="ella-pro-primary">{tx(lang, 'ابدأ مشروعًا احترافيًا', 'Start a Pro project')} <ArrowLeft size={16}/></Link>
                   <span className="ella-pro-note"><ShieldCheck size={14}/>{tx(lang, 'التوليد المدفوع بموافقتك فقط', 'Paid generation only with your approval')}</span>
                 </div>
               </div>
@@ -1199,7 +1199,7 @@ function Projects({ homePage = false, manualPage = false }: { homePage?: boolean
               <i/>
             </div>
             <div className="ella-alternate-modes">
-              <Link href="/projects?new=1&mode=quick" className="ella-mode-mini mode-quick">
+              <Link href="/create?mode=quick" className="ella-mode-mini mode-quick">
                 <span className="ella-mode-mini-icon"><WandSparkles size={17}/></span>
                 <span className="ella-mode-mini-copy"><b>{tx(lang, 'السريع', 'Quick Auto')}</b><small>{tx(lang, 'فكرة واحدة، والباقي تلقائي', 'One idea. The rest is automatic.')}</small></span>
                 <ArrowLeft size={15}/>
@@ -1239,6 +1239,16 @@ function Projects({ homePage = false, manualPage = false }: { homePage?: boolean
       </div>
     </AppFrame>;
   }
+  if (createPage) {
+    const params = new URLSearchParams(location.split('?')[1] || '');
+    const requestedMode = params.get('mode') === 'quick' ? 'quick' : 'pro';
+    return <AppFrame title={tx(lang, requestedMode === 'quick' ? 'الإنشاء السريع' : 'الاستوديو الاحترافي', requestedMode === 'quick' ? 'Quick creation' : 'Pro Studio')} crumb={requestedMode === 'quick' ? 'QUICK AUTO WORKFLOW' : 'PRO PRODUCTION WORKSPACE'}>
+      <div className="create-studio-entry" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+        <div className="create-studio-heading"><button type="button" className="btn btn-quiet" onClick={() => setLocation('/dashboard')}><ArrowLeft size={15}/>{tx(lang,'العودة للاستوديو','Back to studio')}</button><span className="ella-overline">{requestedMode === 'quick' ? 'QUICK AUTO' : 'PRO STUDIO'}</span></div>
+        {projectForm(true, 'auto', requestedMode)}
+      </div>
+    </AppFrame>;
+  }
   if (manualPage) {
     return <AppFrame title={tx(lang, 'الاستوديو اليدوي', 'Manual Studio')} crumb="MANUAL PRODUCTION WORKSPACE">
       <div className="manual-studio-entry" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
@@ -1247,10 +1257,10 @@ function Projects({ homePage = false, manualPage = false }: { homePage?: boolean
       </div>
     </AppFrame>;
   }
-  return <AppFrame title={tx(lang,'المشاريع','Projects')}><div className="page-toolbar"><div><span className="eyebrow">{tx(lang,'أرشيف الإنتاج','PRODUCTION ARCHIVE')}</span><h2>{tx(lang,'كل القصص التي بدأت.', 'Every story you started.')}</h2><p>{tx(lang,'مشاريعك وسيناريوهاتك محفوظة في مكان واحد.', 'Your projects and storyboards, kept in one place.')}</p></div><div className="flex flex-wrap gap-2"><input ref={importFileRef} className="sr-only" type="file" accept="application/json,.json" onChange={event=>{const file=event.target.files?.[0];event.target.value='';if(file)void importBackupFile(file)}}/><button onClick={()=>importFileRef.current?.click()} className="btn btn-quiet" disabled={backupImporting} data-testid="button-import-project-backup">{backupImporting?<LoaderCircle size={16} className="animate-spin"/>:<FileUp size={16}/ >}{tx(lang,'استيراد JSON','Import JSON')}</button><button onClick={() => setOpen(true)} className="btn btn-primary" data-testid="button-new-project"><Plus size={17}/>{tx(lang,'مشروع جديد','New project')}</button></div></div>
+  return <AppFrame title={tx(lang,'المشاريع','Projects')}><div className="page-toolbar"><div><span className="eyebrow">{tx(lang,'أرشيف الإنتاج','PRODUCTION ARCHIVE')}</span><h2>{tx(lang,'كل القصص التي بدأت.', 'Every story you started.')}</h2><p>{tx(lang,'مشاريعك وسيناريوهاتك محفوظة في مكان واحد.', 'Your projects and storyboards, kept in one place.')}</p></div><div className="flex flex-wrap gap-2"><input ref={importFileRef} className="sr-only" type="file" accept="application/json,.json" onChange={event=>{const file=event.target.files?.[0];event.target.value='';if(file)void importBackupFile(file)}}/><button onClick={()=>importFileRef.current?.click()} className="btn btn-quiet" disabled={backupImporting} data-testid="button-import-project-backup">{backupImporting?<LoaderCircle size={16} className="animate-spin"/>:<FileUp size={16}/ >}{tx(lang,'استيراد JSON','Import JSON')}</button></div></div>
     {backupProgress&&<p className="save-state mt-2" role="status">{backupProgress}</p>}
     <div className="list-controls"><label className="searchbox"><Search size={17}/><input value={search} onChange={e => setSearch(e.target.value)} placeholder={tx(lang,'ابحث في مشاريعك','Search projects')} data-testid="input-project-search" /></label><label className="project-sort"><span className="field-label">{tx(lang,'ترتيب','Sort')}</span><select className="studio-input" value={sort} onChange={e => setSort(e.target.value as typeof sort)} data-testid="select-project-sort"><option value="updated">{tx(lang,'آخر تعديل','Recently updated')}</option><option value="name">{tx(lang,'الاسم','Name')}</option><option value="status">{tx(lang,'الحالة','Status')}</option></select></label><span className="result-count">{list.length} {tx(lang,'مشروع','projects')}</span></div>
-    {q.isLoading ? <div className="project-grid">{[1,2,3].map(n=><SkeletonBlock key={n} className="h-52" />)}</div> : q.isError ? <StateError lang={lang} retry={() => q.refetch()} /> : list.length ? <div className="project-grid">{list.map(p=><ProjectCard key={p.id} project={p} onExport={exportBackup} exporting={backupExportingId===p.id} onDelete={id => { if (window.confirm(tx(lang,'هل تريد حذف المشروع وكل مشاهده؟','Delete this project and all its scenes?'))) remove.mutate({projectId:id},{onSuccess:()=>{afterChange();qc.invalidateQueries({queryKey:getGetProjectQueryKey(id)});}}); }} />)}</div> : <Empty title={search ? tx(lang,'لا توجد مطابقة','No matching projects') : tx(lang,'ابدأ بمشهد أول','Start with a first frame')} body={search ? tx(lang,'جرّب كلمات بحث أخرى.','Try another search term.') : tx(lang,'أنشئ مشروعًا ليصبح لديك مكان لصياغة الفكرة وبناء المشاهد.','Create a project to shape the idea and build your scenes.')} action={!search && <button className="btn btn-primary" onClick={() => setOpen(true)}><Plus size={16}/>{tx(lang,'إنشاء أول مشروع','Create your first project')}</button>} />}
+    {q.isLoading ? <div className="project-grid">{[1,2,3].map(n=><SkeletonBlock key={n} className="h-52" />)}</div> : q.isError ? <StateError lang={lang} retry={() => q.refetch()} /> : list.length ? <div className="project-grid">{list.map(p=><ProjectCard key={p.id} project={p} onExport={exportBackup} exporting={backupExportingId===p.id} onDelete={id => { if (window.confirm(tx(lang,'هل تريد حذف المشروع وكل مشاهده؟','Delete this project and all its scenes?'))) remove.mutate({projectId:id},{onSuccess:()=>{afterChange();qc.invalidateQueries({queryKey:getGetProjectQueryKey(id)});}}); }} />)}</div> : <Empty title={search ? tx(lang,'لا توجد مطابقة','No matching projects') : tx(lang,'ابدأ بمشهد أول','Start with a first frame')} body={search ? tx(lang,'جرّب كلمات بحث أخرى.','Try another search term.') : tx(lang,'أنشئ مشروعًا ليصبح لديك مكان لصياغة الفكرة وبناء المشاهد.','Create a project to shape the idea and build your scenes.')} />}
     {open && <ProjectForm initialTemplateId={newTemplate} initialMode={new URLSearchParams(location.split('?')[1] || '').get('mode') === 'manual' ? 'manual' : 'auto'} initialExperienceMode={new URLSearchParams(location.split('?')[1] || '').get('mode') === 'quick' ? 'quick' : 'pro'} onClose={() => { setOpen(false); setNewTemplate(undefined); setCreatedProjectId(null); setProjectSaveError(false); }} pending={create.isPending || generate.isPending || createScene.isPending || updateProviderSettings.isPending || savingManualScenes || autoFilmRunning} freeMode={freeMode} textProviderReady={textProviderReady} checkingProvider={keysQuery.isLoading} generationError={projectSaveError || (generate.isError && Boolean(createdProjectId))} projectCreated={Boolean(createdProjectId)} onOpenCreated={createdProjectId ? openCreatedProject : undefined} onSave={saveProjectAndWriteStory} />}
   </AppFrame>;
 }
@@ -2889,6 +2899,7 @@ function Router() {
         <Route path="/dashboard" component={Dashboard}/>
         <Route path="/dashboard/overview" component={DashboardOverview}/>
         <Route path="/manual-studio">{() => <Projects manualPage/>}</Route>
+        <Route path="/create">{() => <Projects createPage/>}</Route>
         <Route path="/projects">{() => <Projects/>}</Route>
         <Route path="/projects/:projectId">{params=><ProjectWorkspace projectId={params.projectId}/>}</Route>
         <Route path="/jobs" component={JobsPage}/>
