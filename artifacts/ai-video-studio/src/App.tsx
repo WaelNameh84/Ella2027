@@ -1635,6 +1635,94 @@ function SceneTemplatePicker({lang,onApply}:{lang:Lang;onApply:(template:SceneTe
  const [selected,setSelected]=useState(sceneTemplates[0].id); const template=sceneTemplates.find(item=>item.id===selected)||sceneTemplates[0];
  return <div className="scene-template-picker panel"><div><span className="eyebrow">{tx(lang,'قوالب جاهزة','READY TEMPLATES')}</span><p>{tx(lang,'اختر بنية سينمائية لتعبئة حقول المشهد بسرعة، ثم عدّل النص كما تريد.','Choose a cinematic structure to fill the scene quickly, then customize the text.')}</p></div><div className="form-two"><select className="studio-input" value={selected} onChange={e=>setSelected(e.target.value)}>{sceneTemplates.map(item=><option key={item.id} value={item.id}>{tx(lang,item.nameAr,item.name)}</option>)}</select><button className="btn btn-quiet" onClick={()=>onApply(template)}>{tx(lang,'تطبيق القالب','Apply template')}</button></div></div>;
 }
+function AiSceneAssistant({ projectId, scene, characters, lang, onApply }: {
+  projectId: string;
+  scene: Scene;
+  characters: CharacterProfile[];
+  lang: Lang;
+  onApply: (suggestion: Partial<SceneUpdate>) => void;
+}) {
+  const keysQuery = useListProviderKeys();
+  const settingsQuery = useGetProviderSettings();
+  const freeMode = settingsQuery.data?.freeMode ?? true;
+  const keys = (keysQuery.data ?? []).filter(key =>
+    key.serviceType === "text" && key.enabled && providerSupports(key.provider, "text")
+    && providerKeyIsUsable(key.provider, key.status, key.cooldownUntil),
+  );
+  const [providerId, setProviderId] = useState("");
+  const [task, setTask] = useState<"write_scene" | "dialogue" | "visual_prompt" | "improve_scene">("write_scene");
+  const [idea, setIdea] = useState("");
+  const [approved, setApproved] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [suggestion, setSuggestion] = useState<Partial<SceneUpdate> | null>(null);
+  const [provider, setProvider] = useState("");
+  const [error, setError] = useState("");
+  const t = (ar: string, en: string) => tx(lang, ar, en);
+  const activeKey = keys.find(key => key.id === providerId) ?? keys[0];
+  useEffect(() => {
+    if (!providerId && keys[0]) setProviderId(keys[0].id);
+  }, [providerId, keys]);
+  useEffect(() => {
+    setSuggestion(null);
+    setError("");
+    setApproved(false);
+  }, [scene.id]);
+  const generate = async () => {
+    if (!activeKey || !idea.trim() || !approved || busy || freeMode) return;
+    setBusy(true);
+    setError("");
+    setSuggestion(null);
+    try {
+      const response = await fetch(`${basePath}/api/projects/${projectId}/scenes/${scene.id}/assist`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idea: idea.trim(), task, providerKeyId: activeKey.id, approvePotentialCharges: true }),
+      });
+      const body = await response.json().catch(() => ({})) as { suggestion?: Partial<SceneUpdate>; provider?: string; error?: string };
+      if (!response.ok || !body.suggestion) throw new Error(body.error || t("تعذر إنشاء اقتراح للمشهد.", "Could not generate a scene suggestion."));
+      setSuggestion(body.suggestion);
+      setProvider(body.provider || activeKey.provider);
+      setApproved(false);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : t("حدث خطأ غير متوقع.", "An unexpected error occurred."));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return <section className="ai-scene-assistant panel" data-testid="ai-scene-assistant">
+    <div className="section-heading">
+      <div><span className="eyebrow">ELLA AI · SCENE WRITER</span><h4>{t("مساعد كتابة المشهد", "AI scene assistant")}</h4><p>{t("أعطه فكرتك وسيكتب اقتراحًا قابلًا للمراجعة دون تعديل المشهد تلقائيًا.", "Give it an idea. It returns a reviewable draft and never changes your scene automatically.")}</p></div>
+      <span className="scene-assistant-mark"><WandSparkles size={17}/></span>
+    </div>
+    {freeMode ? <div className="service-purpose-hint is-unavailable"><b>{t("وضع التوفير مفعّل", "Zero-spend mode is on")}</b><span>{t("المساعد الذكي يحتاج مزوّد كتابة خارجيًا. لن يتم إرسال أي طلب في وضع التوفير.", "AI writing needs an external text provider. No request is sent while zero-spend mode is enabled.")}</span><Link href="/settings/providers" className="text-link">{t("إعداد المزوّدات", "Configure providers")}<ArrowLeft size={13}/></Link></div> : <>
+      <label className="inspector-field"><span className="field-label">{t("شو بدك من المساعد؟", "What should the assistant do?")}</span><select className="studio-input" value={task} onChange={event => setTask(event.target.value as typeof task)}><option value="write_scene">{t("اكتب مشهدًا من فكرتي", "Write a scene from my idea")}</option><option value="dialogue">{t("اكتب الحوار فقط", "Write the dialogue")}</option><option value="visual_prompt">{t("اكتب وصفًا بصريًا للصورة", "Write a visual image prompt")}</option><option value="improve_scene">{t("حسّن المشهد الحالي", "Improve the current scene")}</option></select></label>
+      <label className="inspector-field"><span className="field-label">{t("فكرتك أو توجيهك", "Your idea or direction")}</span><textarea className="studio-input" rows={3} maxLength={5000} value={idea} onChange={event => setIdea(event.target.value)} placeholder={t("مثال: يدخل البطل إلى القصر ويكتشف أن أخاه خانه، أريد توترًا وتصاعدًا دراميًا...", "Example: The hero enters the palace and discovers his brother betrayed him. Build tension and a dramatic reveal...")}/></label>
+      <div className="form-two">
+        <label className="inspector-field"><span className="field-label">{t("مزوّد الكتابة", "Text provider")}</span><select className="studio-input" value={activeKey?.id || ""} onChange={event => setProviderId(event.target.value)} disabled={!keys.length}><option value="">{t("لا يوجد مزوّد جاهز", "No provider available")}</option>{keys.map(key => <option key={key.id} value={key.id}>{key.label} · {key.provider}</option>)}</select></label>
+        <div className="provider-purpose-description">{t("سيستخدم المساعد لغة المشروع وشخصياته وإعدادات المشهد للحفاظ على الاستمرارية.", "The assistant uses the project's language, cast, and scene settings to preserve continuity.")}</div>
+      </div>
+      {!keys.length && <p className="inline-error">{t("لا يوجد مفتاح كتابة صالح ومفعّل. أضف مزوّدًا من الإعدادات.", "No usable enabled text key. Add a provider in Settings.")} <Link href="/settings/providers" className="text-link">{t("فتح المزوّدات", "Open providers")}</Link></p>}
+      <label className="auto-production-approval"><input type="checkbox" checked={approved} onChange={event => setApproved(event.target.checked)} disabled={busy || !activeKey}/><span>{t("أوافق على إرسال فكرة هذا المشهد إلى مزوّد الكتابة. قد تُحتسب رسوم حسب حسابي.", "I approve sending this scene idea to the text provider. My provider account may charge for the request.")}</span></label>
+      <button type="button" className="btn btn-primary w-full" onClick={() => void generate()} disabled={!activeKey || !idea.trim() || !approved || busy}><WandSparkles size={15}/>{busy ? t("يكتب المشهد...", "Writing scene...") : t("اكتب لي المشهد", "Write this scene")}</button>
+    </>}
+    {error && <p className="inline-error" role="alert">{error}</p>}
+    {suggestion && <div className="ai-scene-suggestion">
+      <div className="flex items-center justify-between gap-2"><b>{t("اقتراح جاهز للمراجعة", "Draft ready for review")}</b><span className="small-mono">{provider}</span></div>
+      <p className="field-hint">{t("لم يتم حفظ أي تغيير بعد. راجع النص ثم اختر تطبيق.", "Nothing has been saved yet. Review the draft, then choose Apply.")}</p>
+      <div className="ai-scene-suggestion-grid">
+        <div><span>{t("عنوان المشهد", "Scene title")}</span><b>{suggestion.title || scene.title}</b></div>
+        <div><span>{t("وصف الأحداث", "Action")}</span><p>{suggestion.description}</p></div>
+        <div><span>{t("الوصف البصري", "Visual prompt")}</span><p>{suggestion.imagePrompt}</p></div>
+        <div><span>{t("الحوار والتعليق", "Dialogue & narration")}</span><p>{suggestion.narration || t("لا يوجد حوار مقترح", "No dialogue suggested")}</p></div>
+        <div><span>{t("الكاميرا والإضاءة", "Camera & lighting")}</span><p>{[suggestion.shotType, suggestion.cameraMovement, suggestion.lighting].filter(Boolean).join(" · ")}</p></div>
+        <div><span>{t("المكان والمدة", "Location & duration")}</span><p>{[suggestion.location, suggestion.durationSeconds ? `${suggestion.durationSeconds}s` : ""].filter(Boolean).join(" · ")}</p></div>
+      </div>
+      <div className="flex flex-wrap gap-2"><button type="button" className="btn btn-primary" onClick={() => { onApply(suggestion); setSuggestion(null); setIdea(""); }}>{t("اعتماد وتطبيق على المشهد", "Apply to scene")}</button><button type="button" className="btn btn-quiet" onClick={() => setSuggestion(null)}>{t("تجاهل", "Discard")}</button></div>
+    </div>}
+  </section>;
+}
+
 function SceneFields({ projectId, scene, characters, lang, onSave, pending }: { projectId: string; scene: Scene; characters:CharacterProfile[]; lang: Lang; onSave: (field: keyof Scene, value: string | number | string[] | null) => Promise<void>; pending: boolean }) {
   const [form,setForm] = useState({title:scene.title,description:scene.description,imagePrompt:scene.imagePrompt,narration:scene.narration,subtitleText:scene.subtitleText,subtitleStartSeconds:scene.subtitleStartSeconds,subtitleEndSeconds:scene.subtitleEndSeconds,durationSeconds:scene.durationSeconds,shotType:scene.shotType,cameraMovement:scene.cameraMovement,location:scene.location,lighting:scene.lighting,clipStartSeconds:scene.clipStartSeconds,clipEndSeconds:scene.clipEndSeconds,playbackSpeed:scene.playbackSpeed,transition:scene.transition,voiceUrl:scene.voiceUrl||'',voiceVolume:scene.voiceVolume});
   const [characterIds,setCharacterIds]=useState(scene.characterIds ?? []);
@@ -1729,7 +1817,7 @@ function SceneFields({ projectId, scene, characters, lang, onSave, pending }: { 
       queueSave(key,value);
     }} onBlur={()=>void flushSave()} /></label>;
   };
-  return <div className="inspector-fields"><SceneTemplatePicker lang={lang} onApply={applyTemplate}/><section className="scene-checklist panel" aria-label={tx(lang,'قائمة تدقيق المشهد','Scene checklist')}><div className="scene-checklist-heading"><div><span className="eyebrow">SHOT CHECKLIST</span><b>{tx(lang,'مراجعة سريعة للمشهد','Quick scene review')}</b></div><span className="scene-checklist-count">{checklistDone}/{checklistItems.length}</span></div><div className="scene-checklist-items">{checklistItems.map(item=><button type="button" key={item.testId} className={item.done?'is-done':''} onClick={()=>{const target=document.querySelector<HTMLElement>(`[data-testid="${item.testId}"]`);target?.scrollIntoView({behavior:'smooth',block:'center'});window.setTimeout(()=>target?.focus({preventScroll:true}),120)}}><span>{item.done?<Check size={13}/>:<span className="scene-check-empty"/>}</span>{item.label}<small>{item.done?tx(lang,'جاهز','Ready'):tx(lang,'أكمل','Add')}</small></button>)}</div></section><div className="inspector-section-title"><span className="eyebrow">{tx(lang,'القصة والحركة','STORY & ACTION')}</span><b>{tx(lang,'ماذا يحدث في المشهد؟','What happens in the scene?')}</b></div>{field('title',tx(lang,'اسم المشهد','Scene title'))}{numberField('durationSeconds',tx(lang,'المدة بالثواني','Duration (seconds)'),1,600)}{field('description',tx(lang,'وصف الأحداث والحركة','Action and movement description'),true)}{field('imagePrompt',tx(lang,'موجّه الصورة والألوان والجو','Visual prompt, colors, and mood'),true)}<button type="button" className="btn btn-quiet w-full" onClick={()=>{const prompt=buildCinematicPrompt({title:form.title,description:form.description,shotType:form.shotType,cameraMovement:form.cameraMovement,location:form.location,lighting:form.lighting,visualStyle:undefined,characters:characters.filter(character=>characterIds.includes(character.id))},lang);setForm(current=>({...current,imagePrompt:prompt}));queueSave('imagePrompt',prompt)}} disabled={pending||!form.description.trim()}><WandSparkles size={15}/>{tx(lang,'المخرج السينمائي: بناء موجّه احترافي','Cinematic director: build pro prompt')}</button>{field('narration',tx(lang,'الحوار أو التعليق الصوتي','Dialogue or narration'),true)}<WritingAssistant lang={lang} values={{description:form.description,imagePrompt:form.imagePrompt,narration:form.narration,cameraMovement:form.cameraMovement}} onApply={(field,value)=>{setForm(v=>({...v,[field]:value}));queueSave(field as keyof Scene,value)}} />
+  return <div className="inspector-fields"><SceneTemplatePicker lang={lang} onApply={applyTemplate}/><section className="scene-checklist panel" aria-label={tx(lang,'قائمة تدقيق المشهد','Scene checklist')}><div className="scene-checklist-heading"><div><span className="eyebrow">SHOT CHECKLIST</span><b>{tx(lang,'مراجعة سريعة للمشهد','Quick scene review')}</b></div><span className="scene-checklist-count">{checklistDone}/{checklistItems.length}</span></div><div className="scene-checklist-items">{checklistItems.map(item=><button type="button" key={item.testId} className={item.done?'is-done':''} onClick={()=>{const target=document.querySelector<HTMLElement>(`[data-testid="${item.testId}"]`);target?.scrollIntoView({behavior:'smooth',block:'center'});window.setTimeout(()=>target?.focus({preventScroll:true}),120)}}><span>{item.done?<Check size={13}/>:<span className="scene-check-empty"/>}</span>{item.label}<small>{item.done?tx(lang,'جاهز','Ready'):tx(lang,'أكمل','Add')}</small></button>)}</div></section><div className="inspector-section-title"><span className="eyebrow">{tx(lang,'القصة والحركة','STORY & ACTION')}</span><b>{tx(lang,'ماذا يحدث في المشهد؟','What happens in the scene?')}</b></div>{field('title',tx(lang,'اسم المشهد','Scene title'))}{numberField('durationSeconds',tx(lang,'المدة بالثواني','Duration (seconds)'),1,600)}{field('description',tx(lang,'وصف الأحداث والحركة','Action and movement description'),true)}{field('imagePrompt',tx(lang,'موجّه الصورة والألوان والجو','Visual prompt, colors, and mood'),true)}<button type="button" className="btn btn-quiet w-full" onClick={()=>{const prompt=buildCinematicPrompt({title:form.title,description:form.description,shotType:form.shotType,cameraMovement:form.cameraMovement,location:form.location,lighting:form.lighting,visualStyle:undefined,characters:characters.filter(character=>characterIds.includes(character.id))},lang);setForm(current=>({...current,imagePrompt:prompt}));queueSave('imagePrompt',prompt)}} disabled={pending||!form.description.trim()}><WandSparkles size={15}/>{tx(lang,'المخرج السينمائي: بناء موجّه احترافي','Cinematic director: build pro prompt')}</button>{field('narration',tx(lang,'الحوار أو التعليق الصوتي','Dialogue or narration'),true)}<AiSceneAssistant projectId={projectId} scene={scene} characters={characters} lang={lang} onApply={suggestion=>{setForm(current=>({...current,...suggestion}));for(const [key,value] of Object.entries(suggestion))if(value!==undefined)queueSave(key as keyof Scene,value as string|number)}}/><WritingAssistant lang={lang} values={{description:form.description,imagePrompt:form.imagePrompt,narration:form.narration,cameraMovement:form.cameraMovement}} onApply={(field,value)=>{setForm(v=>({...v,[field]:value}));queueSave(field as keyof Scene,value)}} />
     <label className="inspector-field"><span className="field-label">{tx(lang,'نص الترجمة (مستقل عن التعليق)','Subtitle text (independent from narration)')}</span><textarea className="studio-input" rows={3} value={form.subtitleText??form.narration} onChange={e=>{setForm(v=>({...v,subtitleText:e.target.value}));queueSave('subtitleText',e.target.value)}} onBlur={()=>void flushSave()} data-testid="input-scene-subtitleText"/><button type="button" className="text-link mt-2" onClick={()=>{setForm(v=>({...v,subtitleText:null}));queueSave('subtitleText',null)}}>{tx(lang,'استخدم نص التعليق بدلًا منه','Use narration as the subtitle')}</button></label>
     <div className="form-two">{captionTimeField('subtitleStartSeconds',tx(lang,'بداية الترجمة (ث)','Subtitle start (s)'))}{captionTimeField('subtitleEndSeconds',tx(lang,'نهاية الترجمة (ث) — فارغ = نهاية المشهد','Subtitle end (s) — blank = scene end'))}</div>{subtitleRangeError&&<p className="inline-error" role="alert">{tx(lang,'اجعل نهاية الترجمة بعد بدايتها وضمن مدة المشهد.','Set the subtitle end after its start and within the scene.')}</p>}
     <div className="inspector-section-title"><span className="eyebrow">{tx(lang,'المكان والزمن','SETTING & TIME')}</span><b>{tx(lang,'أين ومتى؟','Where and when?')}</b></div>{field('location',tx(lang,'الموقع والزمن','Location and time'))}{field('lighting',tx(lang,'الإضاءة والألوان','Lighting and color treatment'))}
