@@ -749,7 +749,7 @@ function ProjectForm({ onClose, initial, initialMode = 'auto', initialTemplateId
   const submitButton = <button type="submit" disabled={pending || !canSubmit} className="btn btn-primary" data-testid="button-create-project">{pending ? <LoaderCircle className="animate-spin" size={16}/> : editing ? <Check size={16}/> : <WandSparkles size={16}/ >}{submitLabel}</button>;
   return <Modal inline={inline} className="idea-entry-card" onClose={onClose} title={editing ? tx(lang,'تعديل تفاصيل المشروع','Edit project details') : tx(lang, 'فكرتك إلى قصة', 'Turn your idea into a story')} subtitle={editing ? tx(lang, 'عدّل تفاصيل المشروع ومشاهده.', 'Update the project details.') : tx(lang, 'اكتب فكرة قصيرة، ثم اختر المسار السريع أو تحكم بالمشاهد في الوضع الاحترافي.', 'Describe your idea, then choose the quick path or control each scene in Professional mode.')}>
     <form onSubmit={e => { e.preventDefault(); void submit(); }} className="form-stack">
-      {!editing && inline && <div className="experience-mode-switch" role="tablist" aria-label={tx(lang,'مستوى التحكم','Experience mode')}>
+      {!editing && inline && mode !== 'manual' && <div className="experience-mode-switch" role="tablist" aria-label={tx(lang,'مستوى التحكم','Experience mode')}>
         <button type="button" role="tab" aria-selected={experienceMode==='quick'} className={experienceMode==='quick'?'is-selected':''} onClick={()=>chooseExperienceMode('quick')} disabled={projectCreated}>{tx(lang,'سريع','Quick')}</button>
         <button type="button" role="tab" aria-selected={experienceMode==='pro'} className={experienceMode==='pro'?'is-selected':''} onClick={()=>chooseExperienceMode('pro')} disabled={projectCreated}>{tx(lang,'احترافي','Professional')}</button>
       </div>}
@@ -859,7 +859,7 @@ function Modal({ title, subtitle, onClose, children, inline = false, className =
   return <div className="modal-backdrop" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}><section role="dialog" aria-modal="true" className={`modal panel ${className}`}>{content}</section></div>;
 }
 
-function Projects({ homePage = false }: { homePage?: boolean }) {
+function Projects({ homePage = false, manualPage = false }: { homePage?: boolean; manualPage?: boolean }) {
   const { lang } = useApp();
   const [location, setLocation] = useLocation();
   const q = useListProjects();
@@ -1162,7 +1162,7 @@ function Projects({ homePage = false }: { homePage?: boolean }) {
   };
   const readyProviderCount = (keysQuery.data ?? []).filter(key => key.enabled && providerSupports(key.provider, key.serviceType) && providerKeyIsUsable(key.provider, key.status, key.cooldownUntil)).length;
   const openCreatedProject = () => { if (createdProjectId) { setOpen(false); setCreatedProjectId(null); setProjectSaveError(false); setLocation(`/projects/${createdProjectId}`); } };
-  const projectForm = (inline = false) => <ProjectForm inline={inline} onClose={() => { setOpen(false); setCreatedProjectId(null); setProjectSaveError(false); }} pending={create.isPending || generate.isPending || createScene.isPending || updateProviderSettings.isPending || savingManualScenes || autoFilmRunning} freeMode={freeMode} textProviderReady={textProviderReady} checkingProvider={keysQuery.isLoading} generationError={projectSaveError || (generate.isError && Boolean(createdProjectId))} projectCreated={Boolean(createdProjectId)} onOpenCreated={createdProjectId ? openCreatedProject : undefined} onSave={saveProjectAndWriteStory} />;
+  const projectForm = (inline = false, initialMode: 'auto' | 'manual' = 'auto', initialExperienceMode: 'quick' | 'pro' = 'pro') => <ProjectForm inline={inline} initialMode={initialMode} initialExperienceMode={initialExperienceMode} onClose={() => { setOpen(false); setCreatedProjectId(null); setProjectSaveError(false); }} pending={create.isPending || generate.isPending || createScene.isPending || updateProviderSettings.isPending || savingManualScenes || autoFilmRunning} freeMode={freeMode} textProviderReady={textProviderReady} checkingProvider={keysQuery.isLoading} generationError={projectSaveError || (generate.isError && Boolean(createdProjectId))} projectCreated={Boolean(createdProjectId)} onOpenCreated={createdProjectId ? openCreatedProject : undefined} onSave={saveProjectAndWriteStory} />;
   if (homePage) {
     const recentProjects = [...(q.data ?? [])].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()).slice(0, 5);
     const recentJobs = (jobsQuery.data ?? []).slice(0, 3);
@@ -1189,7 +1189,7 @@ function Projects({ homePage = false }: { homePage?: boolean }) {
               <Link href="/projects?new=1&mode=pro" className="ella-mode-card mode-pro">
                 <span className="ella-mode-number">02</span><span className="ella-mode-icon"><Clapperboard size={22}/></span><span className="ella-mode-tag">{tx(lang, 'تحكم متقدم', 'ADVANCED CONTROL')}</span><b>{tx(lang, 'الاحترافي', 'PRO STUDIO')}</b><p>{tx(lang, 'تحكم بتفاصيل الفيلم والمشاهد والأسلوب والإعدادات والمزوّدات قبل اعتماد خطة الإنتاج.', 'Control film details, scenes, visual direction, settings, and providers before approving the production plan.')}</p><span className="ella-mode-action">{tx(lang, 'افتح الاستوديو الاحترافي', 'Open Pro Studio')} <ArrowLeft size={16}/></span>
               </Link>
-              <Link href="/projects?new=1&mode=manual" className="ella-mode-card mode-manual">
+              <Link href="/manual-studio" className="ella-mode-card mode-manual">
                 <span className="ella-mode-number">03</span><span className="ella-mode-icon"><Settings2 size={22}/></span><span className="ella-mode-tag">{tx(lang, 'تحرير مباشر', 'HANDS-ON WORKSPACE')}</span><b>{tx(lang, 'اليدوي', 'MANUAL STUDIO')}</b><p>{tx(lang, 'ابدأ بمشروع فارغ، اكتب المشاهد بنفسك، وارفع مراجعك وتحكم بكل لقطة دون استدعاء AI لكتابة السيناريو.', 'Start with a blank project, write scenes yourself, add references, and control every shot without AI script writing.')}</p><span className="ella-mode-action">{tx(lang, 'افتح مساحة العمل اليدوية', 'Open Manual Studio')} <ArrowLeft size={16}/></span>
               </Link>
             </div>
@@ -1219,6 +1219,14 @@ function Projects({ homePage = false }: { homePage?: boolean }) {
             <div className="ella-flow-steps"><span><i>01</i>{tx(lang, 'الفكرة والسيناريو', 'Idea & screenplay')}</span><span><i>02</i>{tx(lang, 'الشخصيات والمشاهد', 'Characters & scenes')}</span><span><i>03</i>{tx(lang, 'الصورة والصوت', 'Visuals & sound')}</span><span><i>04</i>{tx(lang, 'المعاينة والتصدير', 'Preview & export')}</span></div>
           </section>
         </aside>
+      </div>
+    </AppFrame>;
+  }
+  if (manualPage) {
+    return <AppFrame title={tx(lang, 'الاستوديو اليدوي', 'Manual Studio')} crumb="MANUAL PRODUCTION WORKSPACE">
+      <div className="manual-studio-entry" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+        <header><span className="ella-overline">{tx(lang, 'تحكم كامل بالمشهد', 'FULL SCENE CONTROL')}</span><h2>{tx(lang, 'أنت المخرج هنا.', 'You are the director.')}</h2><p>{tx(lang, 'ابدأ مشروعًا يدويًا واكتب المشاهد بالتفصيل. لا يتم استدعاء AI لكتابة السيناريو، ويمكنك إضافة المراجع والتحكم بكل مشهد قبل الإنتاج.', 'Start a manual project and write every scene in detail. No AI script-writing request is made; add references and control each scene before production.')}</p></header>
+        <div className="manual-studio-form">{projectForm(true, 'manual', 'pro')}</div>
       </div>
     </AppFrame>;
   }
@@ -2863,6 +2871,7 @@ function Router() {
         <Route path="/sign-up/*?" component={SignUpPage}/>
         <Route path="/dashboard" component={Dashboard}/>
         <Route path="/dashboard/overview" component={DashboardOverview}/>
+        <Route path="/manual-studio">{() => <Projects manualPage/>}</Route>
         <Route path="/projects">{() => <Projects/>}</Route>
         <Route path="/projects/:projectId">{params=><ProjectWorkspace projectId={params.projectId}/>}</Route>
         <Route path="/jobs" component={JobsPage}/>
