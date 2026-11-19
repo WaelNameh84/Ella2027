@@ -77,7 +77,7 @@ import {
   type ProviderStatus,
 } from "../lib/providerRegistry";
 import { renderMp4 } from "../lib/videoExport";
-import { readGeneratedAsset } from "../lib/studioAssets";
+import { isCloudinaryStorageEnabled, readGeneratedAsset, saveGeneratedAsset } from "../lib/studioAssets";
 import { searchMediaCatalog } from "../lib/mediaCatalog";
 import { isZeroSpendMode, ZERO_SPEND_ERROR } from "../lib/spendingGuard";
 
@@ -235,7 +235,7 @@ function projectDto(project: typeof projectsTable.$inferSelect, sceneCount: numb
     status: project.status,
     progress: project.progress,
     sceneCount,
-    exportUrl: project.exportPath ? `/api/projects/${project.id}/export/file` : null,
+    exportUrl: project.exportUrl?.startsWith("https://") ? project.exportUrl : project.exportPath ? `/api/projects/${project.id}/export/file` : null,
     createdAt: project.createdAt,
     updatedAt: project.updatedAt,
   };
@@ -1417,16 +1417,20 @@ router.post("/projects/:projectId/export", async (req, res): Promise<void> => {
       project.brandKit,
     );
     const downloadUrl = `/api/projects/${project.id}/export/file`;
+    const cloudExport = isCloudinaryStorageEnabled()
+      ? await saveGeneratedAsset(project.id, randomUUID(), "video", await readFile(outputPath))
+      : null;
+    const finalDownloadUrl = cloudExport?.url ?? downloadUrl;
     await db.update(projectsTable).set({
       exportPath: outputPath,
-      exportUrl: downloadUrl,
+      exportUrl: finalDownloadUrl,
       exportContentType: parsed.data.format === "webm" ? "video/webm" : "video/mp4",
       status: "completed",
       progress: 100,
     }).where(eq(projectsTable.id, project.id));
     res.json(ExportProjectResponse.parse({
       status: "completed",
-      downloadUrl,
+      downloadUrl: finalDownloadUrl,
       message: parsed.data.includeSubtitles
         ? `${parsed.data.format === "webm" ? "WebM" : "MP4"} export finished with scene narration subtitles and the selected audio tracks.`
         : `${parsed.data.format === "webm" ? "WebM" : "MP4"} export finished with the selected scene voice and soundtrack tracks.`,
@@ -1485,6 +1489,10 @@ router.get("/projects/:projectId/export/file", async (req, res): Promise<void> =
   const project = await projectForUser(params.data.projectId, userId);
   if (!project?.exportPath) {
     res.status(404).json({ error: "No completed export is available." });
+    return;
+  }
+  if (project.exportUrl?.startsWith("https://")) {
+    res.redirect(302, project.exportUrl);
     return;
   }
   const base = resolve("generated-artifacts/ai-video-studio/exports");
