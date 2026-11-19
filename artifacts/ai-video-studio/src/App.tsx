@@ -1693,7 +1693,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
       {finalFilmUrl ? <div className="final-film-player-wrap">
         <video key={finalFilmUrl} className="final-film-player" src={finalFilmUrl} controls playsInline preload="metadata" aria-label={tx(lang,'مشغل الفيلم النهائي','Final film player')}/>
         <div className="final-film-ready"><CheckCircle2 size={16}/><span>{tx(lang,'الفيلم المجمّع جاهز للمشاهدة','Your assembled film is ready to watch')}</span></div>
-        <ExportActions projectId={projectId} lang={lang}/>
+        <div className="final-film-actions"><ExportActions projectId={projectId} lang={lang}/><button type="button" className="btn btn-quiet" onClick={queueFilmAssembly} disabled={!scenesReadyForExport||exportProject.isPending||exportJobActive}><RefreshCw size={15}/>{tx(lang,'إعادة تجميع بعد التعديلات','Rebuild after edits')}</button></div>
       </div> : <div className="final-film-empty">
         <div className="final-film-empty-icon"><Clapperboard size={26}/></div>
         <div><b>{tx(lang,'لم يتم تجميع الفيلم بعد','Your film has not been assembled yet')}</b><p>{tx(lang,'بعد اكتمال فيديوهات المشاهد، اضغط زر التجميع لتحويلها إلى ملف MP4 واحد مرتب حسب تسلسل المشاهد.','Once the scene clips are ready, assemble them into one MP4 in storyboard order.')}</p></div>
