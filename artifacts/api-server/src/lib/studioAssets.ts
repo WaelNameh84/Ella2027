@@ -136,7 +136,7 @@ export async function saveUploadedImageAsset(
 }
 
 function filenameFromAssetUrl(assetUrl: string, projectId: string, sceneId: string): string | null {
-  const match = /^\/api\/projects\/([a-f0-9-]+)\/assets\/([a-f0-9-]+)\/([a-f0-9-]+\\.(?:svg|png|jpe?g|webp|mp4|wav|mp3))$/i.exec(assetUrl);
+  const match = /^\/api\/projects\/([a-f0-9-]+)\/assets\/([a-f0-9-]+)\/([a-f0-9-]+\.(?:svg|png|jpe?g|webp|mp4|wav|mp3))$/i.exec(assetUrl);
   if (!match || match[1] !== projectId || match[2] !== sceneId) return null;
   return match[3];
 }
