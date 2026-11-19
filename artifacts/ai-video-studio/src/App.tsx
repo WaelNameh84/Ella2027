@@ -1509,6 +1509,13 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
   const duration = scenes.reduce((sum,s)=>sum+s.durationSeconds,0);
   const exportPreflight=buildExportPreflight(scenes,project?.durationSeconds??0,exportSettings.includeSubtitles,lang);
   const scenesReadyForExport=exportPreflight.errors.length===0;
+  const exportJobActive=(projectJobsQuery.data??[]).some(job=>job.jobType==='export'&&(job.status==='queued'||job.status==='running'));
+  const finalFilmUrl=project?.exportUrl ? `${basePath}${project.exportUrl}${project.exportUrl.includes('?')?'&':'?'}v=${encodeURIComponent(project.updatedAt)}` : null;
+  const queueFilmAssembly=()=>{
+    if(!scenesReadyForExport||exportProject.isPending||exportJobActive)return;
+    setPreviewError('');
+    exportProject.mutate({projectId,data:exportSettings},{onSuccess:()=>{refresh();setStage('export');},onError:error=>setPreviewError(error instanceof Error?error.message:tx(lang,'تعذر تجميع الفيلم.','Could not assemble the film.'))});
+  };
   if (projectQuery.isLoading) return <AppFrame title={tx(lang,'تحميل المشروع','Loading project')}><div className="workspace-skeleton"><SkeletonBlock className="h-20"/><SkeletonBlock className="h-72"/><SkeletonBlock className="h-48"/></div></AppFrame>;
   if (projectQuery.isError || !project) return <AppFrame title={tx(lang,'المشروع','Project')}><StateError lang={lang} retry={()=>projectQuery.refetch()} /></AppFrame>;
   const updateCurrent = async (field: keyof Scene, value: string | number | string[] | null) => {
@@ -1678,8 +1685,31 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
   };
   return <AppFrame title={project.title} crumb={tx(lang,'استوديو المشروع','PROJECT STUDIO')}>
     <div className="workspace-head"><div><Link href="/projects" className="back-link"><ArrowRight size={15}/>{tx(lang,'كل المشاريع','All projects')}</Link><h2>{project.title}</h2><p>{project.idea}</p></div><div className="workspace-actions"><Link href={`/media?projectId=${projectId}${activeScene ? `&sceneId=${activeScene.id}` : ''}`} className="btn btn-quiet"><ImagePlus size={16}/>{tx(lang,'إضافة وسائط','Add media')}</Link><button className="btn btn-quiet" onClick={downloadScript} disabled={!scenes.length}><Download size={16}/>{tx(lang,'تنزيل السيناريو','Download script')}</button><button className="btn btn-quiet" onClick={downloadSubtitles} disabled={!scenes.some(scene => (scene.subtitleText || scene.narration || '').trim())}><Download size={16}/>{tx(lang,'تنزيل SRT','Download SRT')}</button><button className="btn btn-quiet" onClick={()=>setEditProjectOpen(true)}><Settings2 size={16}/>{tx(lang,'تفاصيل','Details')}</button></div></div>
-    <StudioStatusBoard lang={lang} stages={stages} scenes={scenes} jobs={projectJobsQuery.data || []} readyProviders={(keysQuery.data || []).filter(key => key.enabled && providerSupports(key.provider, key.serviceType) && providerKeyIsUsable(key.provider, key.status, key.cooldownUntil)).length} totalProviders={(keysQuery.data || []).length} externalOn={!freeMode} saving={updateScene.isPending || updateProject.isPending || createScene.isPending} updatedAt={project.updatedAt} onStage={next=>{setStage(next);setMobilePane('tools')}} onSelectScene={setSelected} onOpenJobs={() => navigate('/jobs')} />
-    <AutoProductionPanel projectId={projectId} scenes={scenes} keys={generationKeys} lang={lang} freeMode={freeMode} hasActiveJob={hasActiveProductionJob} exportSettings={exportSettings} onRefresh={refresh} />
+    <section className="final-film-card panel" data-testid="final-film-workspace">
+      <div className="final-film-head">
+        <div><span className="eyebrow">ELLA · FINAL CUT</span><h3>{tx(lang,'الفيلم النهائي','Final film')}</h3><p>{tx(lang,'كل مشاهدك في مكان واحد. اجمع المقاطع وشاهد الفيلم أو نزّله مباشرة.','All your scenes in one place. Assemble the clips, watch the film, or download it directly.')}</p></div>
+        <div className="final-film-count"><b>{videoReadyCount}/{scenes.length}</b><span>{tx(lang,'مقاطع فيديو جاهزة','video clips ready')}</span></div>
+      </div>
+      {finalFilmUrl ? <div className="final-film-player-wrap">
+        <video key={finalFilmUrl} className="final-film-player" src={finalFilmUrl} controls playsInline preload="metadata" aria-label={tx(lang,'مشغل الفيلم النهائي','Final film player')}/>
+        <div className="final-film-ready"><CheckCircle2 size={16}/><span>{tx(lang,'الفيلم المجمّع جاهز للمشاهدة','Your assembled film is ready to watch')}</span></div>
+        <div className="final-film-actions"><ExportActions projectId={projectId} lang={lang}/><button type="button" className="btn btn-quiet" onClick={queueFilmAssembly} disabled={!scenesReadyForExport||exportProject.isPending||exportJobActive}><RefreshCw size={15}/>{tx(lang,'إعادة تجميع بعد التعديلات','Rebuild after edits')}</button></div>
+      </div> : <div className="final-film-empty">
+        <div className="final-film-empty-icon"><Clapperboard size={26}/></div>
+        <div><b>{tx(lang,'لم يتم تجميع الفيلم بعد','Your film has not been assembled yet')}</b><p>{tx(lang,'بعد اكتمال فيديوهات المشاهد، اضغط زر التجميع لتحويلها إلى ملف MP4 واحد مرتب حسب تسلسل المشاهد.','Once the scene clips are ready, assemble them into one MP4 in storyboard order.')}</p></div>
+        <button type="button" className="btn btn-primary final-film-assemble" onClick={queueFilmAssembly} disabled={!scenesReadyForExport||exportProject.isPending||exportJobActive||!scenes.length} data-testid="button-assemble-film">{exportProject.isPending||exportJobActive?<LoaderCircle size={16} className="animate-spin"/>:<Clapperboard size={16}/ >}{exportJobActive?tx(lang,'جارٍ تجميع الفيلم…','Assembling film…'):exportProject.isPending?tx(lang,'جارٍ إرسال التجميع…','Starting assembly…'):tx(lang,'اجمع المشاهد في فيديو واحد','Assemble scenes into one video')}</button>
+      </div>}
+      {previewError&&<p className="inline-error" role="alert">{previewError}</p>}
+      {exportJobActive&&<div className="final-film-progress" role="status"><LoaderCircle size={15} className="animate-spin"/>{tx(lang,'يتم الآن دمج المقاطع وترميز الفيلم النهائي…','Merging clips and encoding the final film…')}<Link href="/jobs" className="text-link">{tx(lang,'تفاصيل المهمة','Job details')}</Link></div>}
+    </section>
+    <details className="studio-secondary-disclosure">
+      <summary>{tx(lang,'حالة مراحل الإنتاج','Production status')}</summary>
+      <StudioStatusBoard lang={lang} stages={stages} scenes={scenes} jobs={projectJobsQuery.data || []} readyProviders={(keysQuery.data || []).filter(key => key.enabled && providerSupports(key.provider, key.serviceType) && providerKeyIsUsable(key.provider, key.status, key.cooldownUntil)).length} totalProviders={(keysQuery.data || []).length} externalOn={!freeMode} saving={updateScene.isPending || updateProject.isPending || createScene.isPending} updatedAt={project.updatedAt} onStage={next=>{setStage(next);setMobilePane('tools')}} onSelectScene={setSelected} onOpenJobs={() => navigate('/jobs')} />
+    </details>
+    <details className="studio-secondary-disclosure">
+      <summary>{tx(lang,'الإنتاج التلقائي وإعداداته','Automatic production and settings')}</summary>
+      <AutoProductionPanel projectId={projectId} scenes={scenes} keys={generationKeys} lang={lang} freeMode={freeMode} hasActiveJob={hasActiveProductionJob} exportSettings={exportSettings} onRefresh={refresh} />
+    </details>
     <div className="studio-mobile-tabs" role="tablist" aria-label={tx(lang,'أقسام الاستوديو','Studio sections')}>
       <button type="button" role="tab" aria-selected={mobilePane==='preview'} className={mobilePane==='preview'?'is-active':''} onClick={()=>setMobilePane('preview')}>{tx(lang,'المعاينة والـ Storyboard','Preview & storyboard')}</button>
       <button type="button" role="tab" aria-selected={mobilePane==='tools'} className={mobilePane==='tools'?'is-active':''} onClick={()=>setMobilePane('tools')}>{tx(lang,`أدوات ${currentStage.ar}`,`${currentStage.en} tools`)}</button>
@@ -1706,7 +1736,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
         {stage==='script'&&<div className="stage-tool-stack">{scriptGeneration}{scenes.length>0&&sceneListTools}</div>}
         {stage==='storyboard'&&<div className="stage-tool-stack">{activeScene?<><SceneFields key={activeScene.id} projectId={projectId} scene={activeScene} characters={project.characters||[]} lang={lang} onSave={(field,value)=>updateCurrent(field,value)} pending={updateScene.isPending}/>{sceneListTools}</>:<><div className="inspector-blank"><Film size={22}/><span>{tx(lang,'اختر مشهدًا من الخط الزمني أو أنشئ واحدًا.','Select a scene from the timeline or create one.')}</span></div>{sceneListTools}</>}</div>}
         {stage==='images'&&<div className="stage-tool-stack">{activeScene?<><GenerationPanel projectId={projectId} scene={activeScene} keys={generationKeys} characters={project.characters||[]} lang={lang} freeMode={freeMode} onQueued={refresh} services={['image']}/><AssetVersionCompare projectId={projectId} scene={activeScene} keys={generationKeys} lang={lang} onQueued={refresh}/><Link href={`/media?projectId=${projectId}&sceneId=${activeScene.id}`} className="btn btn-quiet w-full"><ImagePlus size={16}/>{tx(lang,'اختيار صورة مرخّصة','Choose licensed media')}</Link></>:<div className="inspector-blank"><ImagePlus size={22}/><span>{tx(lang,'اختر مشهدًا لتوليد صورته.','Select a scene to generate its image.')}</span></div>}</div>}
-        {stage==='video'&&<div className="stage-tool-stack">{!activeScene?<div className="inspector-blank"><Film size={22}/><span>{tx(lang,'اختر مشهدًا لتوليد الفيديو.','Select a scene to generate video.')}</span></div>:!activeScene.assetUrl&&!activeScene.description.trim()&&!activeScene.imagePrompt.trim()?<div className="service-purpose-hint is-unavailable"><b>{tx(lang,'مدخلات الفيديو غير متوفرة','Video inputs are missing')}</b><span>{tx(lang,'أضف وصفًا أو صورة للمشهد أولًا، ثم ستظهر أدوات توليد الفيديو.','Add a scene description or image first; video tools will appear after that.')}</span><button className="btn btn-quiet" onClick={()=>setStage('storyboard')}>{tx(lang,'فتح محرر المشهد','Open scene editor')}</button></div>:<><GenerationPanel projectId={projectId} scene={activeScene} keys={generationKeys} characters={project.characters||[]} lang={lang} freeMode={freeMode} onQueued={refresh} services={['video']}/><BatchVideoGeneration projectId={projectId} scenes={scenes} keys={generationKeys} lang={lang} freeMode={freeMode} hasActiveJob={Boolean(currentJob && (currentJob.status === 'queued' || currentJob.status === 'running'))} onQueued={refresh}/></>}</div>}
+        {stage==='video'&&<div className="stage-tool-stack">{!activeScene?<div className="inspector-blank"><Film size={22}/><span>{tx(lang,'اختر مشهدًا لتوليد الفيديو.','Select a scene to generate video.')}</span></div>:!activeScene.assetUrl&&!activeScene.description.trim()&&!activeScene.imagePrompt.trim()?<div className="service-purpose-hint is-unavailable"><b>{tx(lang,'مدخلات الفيديو غير متوفرة','Video inputs are missing')}</b><span>{tx(lang,'أضف وصفًا أو صورة للمشهد أولًا، ثم ستظهر أدوات توليد الفيديو.','Add a scene description or image first; video tools will appear after that.')}</span><button className="btn btn-quiet" onClick={()=>setStage('storyboard')}>{tx(lang,'فتح محرر المشهد','Open scene editor')}</button></div>:<><GenerationPanel projectId={projectId} scene={activeScene} keys={generationKeys} characters={project.characters||[]} lang={lang} freeMode={freeMode} onQueued={refresh} services={['video']}/><BatchVideoGeneration projectId={projectId} scenes={scenes} keys={generationKeys} lang={lang} freeMode={freeMode} hasActiveJob={Boolean(currentJob && (currentJob.status === 'queued' || currentJob.status === 'running'))} exportSettings={exportSettings} onQueued={refresh}/></>}</div>}
         {stage==='voice'&&<div className="stage-tool-stack">{!narratedScenes.length?<div className="service-purpose-hint is-unavailable"><b>{tx(lang,'لا يوجد نص تعليق بعد','No narration text yet')}</b><span>{tx(lang,'اكتب الحوار أو التعليق في محرر المشهد، ثم ستظهر أدوات الصوت.','Write dialogue or narration in the scene editor; voice tools will appear after that.')}</span><button className="btn btn-quiet" onClick={()=>setStage('storyboard')}>{tx(lang,'فتح محرر المشهد','Open scene editor')}</button></div>:<>{activeScene&&activeScene.narration.trim()&&<GenerationPanel projectId={projectId} scene={activeScene} keys={generationKeys} characters={project.characters||[]} lang={lang} freeMode={freeMode} onQueued={refresh} services={['voice']}/>}<BatchVoiceGeneration projectId={projectId} scenes={scenes} keys={generationKeys} lang={lang} freeMode={freeMode} hasActiveJob={Boolean(currentJob && (currentJob.status === 'queued' || currentJob.status === 'running'))} onQueued={refresh}/>{activeScene&&<TranscriptionPanel projectId={projectId} sceneId={activeScene.id} language={project.language} keys={keysQuery.data || []} lang={lang} freeMode={freeMode}/>}</>}</div>}
         {stage==='export'&&exportTools}
       </StageTools>
@@ -2362,8 +2392,11 @@ function AutoProductionPanel({ projectId, scenes, keys, lang, freeMode, hasActiv
   </section>;
 }
 
-function BatchVideoGeneration({projectId,scenes,keys,lang,hasActiveJob,onQueued,freeMode}:{projectId:string;scenes:Scene[];keys:ProviderKey[];lang:Lang;hasActiveJob:boolean;onQueued:()=>void;freeMode:boolean}) {
+function BatchVideoGeneration({projectId,scenes,keys,lang,hasActiveJob,onQueued,freeMode,exportSettings}:{projectId:string;scenes:Scene[];keys:ProviderKey[];lang:Lang;hasActiveJob:boolean;onQueued:()=>void;freeMode:boolean;exportSettings:AutoExportSettings}) {
+  const t=(ar:string,en:string)=>tx(lang,ar,en);
   const videoJob=useQueueSceneVideoGeneration();
+  const exportMutation=useQueueProjectExport();
+  const jobsQuery=useListStudioJobs({projectId},{query:{queryKey:getListStudioJobsQueryKey({projectId}),refetchInterval:query=>query.state.data?.some(job=>job.status==='queued'||job.status==='running')?2500:5000,staleTime:1000}});
   const videoKeys=keys.filter(key=>key.enabled&&key.serviceType==='video'&&providerSupports(key.provider,'video')&&providerKeyIsUsable(key.provider,key.status,key.cooldownUntil));
   const firstVideoProvider=videoKeys[0]?.provider;
   const scenesWithoutVideo=scenes.filter(scene=>scene.assetType!=='video'||!scene.assetUrl);
@@ -2375,6 +2408,11 @@ function BatchVideoGeneration({projectId,scenes,keys,lang,hasActiveJob,onQueued,
   const [queueing,setQueueing]=useState(false);
   const [progress,setProgress]=useState<{queued:number;failed:number;total:number;processed:number}|null>(null);
   const [summary,setSummary]=useState<{queued:number;failed:number;total:number}|null>(null);
+  const [batchJobIds,setBatchJobIds]=useState<string[]>([]);
+  const [batchExportJobId,setBatchExportJobId]=useState<string|null>(null);
+  const [batchPhase,setBatchPhase]=useState<'idle'|'generating'|'assembling'|'complete'|'failed'>('idle');
+  const [batchMessage,setBatchMessage]=useState('');
+  const batchExportStarted=useRef(false);
   const activeKey=videoKeys.find(key=>key.id===providerId)||videoKeys[0];
   useEffect(()=>{if(!providerId)setModel(defaultVideoModel(firstVideoProvider,mode));},[providerId,firstVideoProvider,mode]);
   const scenesToQueue=mode==='image'?scenesWithoutVideo.filter(scene=>scene.assetType==='image'&&Boolean(scene.assetUrl)):scenesWithoutVideo;
@@ -2383,11 +2421,18 @@ function BatchVideoGeneration({projectId,scenes,keys,lang,hasActiveJob,onQueued,
   const begin=async()=>{
     if(!activeKey||!model.trim()||!approved||!scenesToQueue.length||queueing||hasActiveJob)return;
     setQueueing(true);
+    setBatchPhase('generating');
+    setBatchMessage('');
+    setBatchJobIds([]);
+    setBatchExportJobId(null);
+    batchExportStarted.current=false;
     setProgress({queued:0,failed:0,total:scenesToQueue.length,processed:0});
     let queued=0,failed=0;
+    const queuedIds:string[]=[];
     for(const scene of scenesToQueue){
       try{
-        await videoJob.mutateAsync({projectId,sceneId:scene.id,data:{providerKeyId:activeKey.id,model:model.trim(),mode,approvePotentialCharges:true}});
+        const job=await videoJob.mutateAsync({projectId,sceneId:scene.id,data:{providerKeyId:activeKey.id,model:model.trim(),mode,approvePotentialCharges:true}});
+        queuedIds.push(job.id);
         queued++;
       }catch{
         failed++;
@@ -2399,9 +2444,50 @@ function BatchVideoGeneration({projectId,scenes,keys,lang,hasActiveJob,onQueued,
     if(queued){
       setSummary({queued,failed,total:scenesToQueue.length});
       setOpen(false);
+      if(failed===0){
+        setBatchJobIds(queuedIds);
+        setBatchMessage(t('سيتم تجميع الفيلم تلقائياً بعد اكتمال جميع المقاطع.','The film will assemble automatically when every clip is complete.'));
+      }else{
+        setBatchPhase('failed');
+        setBatchMessage(t('بعض الطلبات لم تُرسل. لن نبدأ التجميع حتى تكتمل كل المشاهد؛ يمكنك إعادة المحاولة للنواقص فقط.','Some requests could not be queued. Assembly waits until every scene is ready; retry only the missing clips.'));
+      }
       onQueued();
+    }else{
+      setBatchPhase('failed');
+      setBatchMessage(t('لم يتم إرسال أي طلب فيديو. تحقق من المزوّد والنموذج.','No video jobs were queued. Check the provider and model.'));
     }
   };
+  useEffect(()=>{
+    if(batchPhase!=='generating'||!batchJobIds.length||batchExportStarted.current)return;
+    const matching=batchJobIds.map(id=>jobsQuery.data?.find(job=>job.id===id));
+    if(matching.some(job=>!job))return;
+    const failed=matching.find(job=>job?.status==='failed');
+    if(failed){
+      setBatchPhase('failed');
+      setBatchMessage(failed.error||t('فشل توليد أحد المقاطع؛ لن يتم تصدير فيلم ناقص.','A clip failed; the studio will not export an incomplete film.'));
+      return;
+    }
+    if(!matching.every(job=>job?.status==='completed'))return;
+    batchExportStarted.current=true;
+    setBatchPhase('assembling');
+    setBatchMessage(t('اكتملت المقاطع. جارٍ دمجها حسب ترتيب المشاهد في فيديو واحد…','All clips are ready. Merging them into one video in scene order…'));
+    exportMutation.mutate({projectId,data:exportSettings},{
+      onSuccess:job=>{setBatchExportJobId(job.id);onQueued();},
+      onError:error=>{setBatchPhase('failed');setBatchMessage(error instanceof Error?error.message:t('تعذر تجميع الفيلم.','Could not assemble the film.'));},
+    });
+  },[batchPhase,batchJobIds,jobsQuery.data,exportMutation.mutate,projectId,exportSettings,onQueued,lang]);
+  useEffect(()=>{
+    if(batchPhase!=='assembling'||!batchExportJobId)return;
+    const job=jobsQuery.data?.find(item=>item.id===batchExportJobId);
+    if(job?.status==='completed'){
+      setBatchPhase('complete');
+      setBatchMessage(t('اكتمل الفيلم! تم جمع كل المشاهد في فيديو واحد.','Film complete! All scenes have been assembled into one video.'));
+      onQueued();
+    }else if(job?.status==='failed'){
+      setBatchPhase('failed');
+      setBatchMessage(job.error||t('فشل تجميع الفيلم. يمكنك فتح التصدير وإعادة المحاولة دون توليد المشاهد مجدداً.','Film assembly failed. Retry export without regenerating the clips.'));
+    }
+  },[batchPhase,batchExportJobId,jobsQuery.data,onQueued,lang]);
   if(!scenes.length)return null;
   if(freeMode)return <div className="script-bar panel mt-4"><div className="script-symbol"><ShieldCheck size={18}/></div><div className="script-copy"><b>{tx(lang,'المزوّدات الخارجية متوقفة','External providers are off')}</b><p>{tx(lang,'شغّل السماح بالمزوّدات من الإعدادات لإرسال مقاطع المشاهد. ستحتاج موافقة واحدة على الدفعة، وقد تُحتسب رسوم لكل مشهد.','Enable external providers in Settings to send scene clips. One approval is required for the batch; each scene may incur a charge.')} <Link href="/settings/providers" className="text-link">{tx(lang,'فتح الإعدادات','Open settings')}<ArrowLeft size={14}/></Link></p></div></div>;
   return <>
@@ -2411,6 +2497,7 @@ function BatchVideoGeneration({projectId,scenes,keys,lang,hasActiveJob,onQueued,
         {videoKeys.length===0&&scenesWithoutVideo.length>0&&<Link href="/settings/providers" className="text-link" data-testid="link-batch-video-provider-settings">{tx(lang,'أضف مفتاح Magic Hour أو Agnes AI أو Replicate أو fal.ai لخدمة الفيديو','Add a Magic Hour, Agnes AI, Replicate, or fal.ai video key')}<ArrowLeft size={14}/></Link>}
         {hasActiveJob&&<small className="provider-purpose-description">{tx(lang,'انتظر انتهاء المهمة الحالية قبل بدء دفعة فيديو جديدة.','Wait for the current job to finish before starting a video batch.')}</small>}
         {summary&&<p role="status" data-testid="batch-video-result">{summary.failed?tx(lang,`أُرسل ${summary.queued} من ${summary.total} طلبات الفيديو؛ تعذّر إرسال ${summary.failed}.`,`${summary.queued} of ${summary.total} video requests were queued; ${summary.failed} could not be queued.`):tx(lang,`تم إرسال ${summary.queued} طلبات فيديو إلى قائمة المهام.`,`Queued ${summary.queued} video requests.`)} <Link href="/jobs" className="text-link">{tx(lang,'عرض المهام','View jobs')}<ArrowLeft size={13}/></Link></p>}
+        {batchMessage&&<p className={batchPhase==='failed'?'inline-error':'provider-purpose-description'} role="status" data-testid="batch-video-assembly-status">{batchPhase==='assembling'?<LoaderCircle size={13} className="inline animate-spin"/>:batchPhase==='complete'?<CheckCircle2 size={13} className="inline"/>:null} {batchMessage} {batchPhase==='complete'&&<Link href={`/projects/${projectId}`} className="text-link">{tx(lang,'مشاهدة الفيلم','Watch final film')}</Link>} {batchPhase==='failed'&&<Link href={`/projects/${projectId}`} className="text-link">{tx(lang,'فتح التصدير','Open export')}</Link>}</p>}
       </div>
       {scenesWithoutVideo.length>0&&<button className="btn btn-primary" disabled={!videoKeys.length||hasActiveJob} onClick={()=>{setProgress(null);setSummary(null);setApproved(false);setProviderId('');setMode('text');setModel(defaultVideoModel(firstVideoProvider,'text'));setOpen(true)}} data-testid="button-batch-video">{tx(lang,'توليد فيديو لكل المشاهد','Generate all scene videos')}</button>}
     </section>

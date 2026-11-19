@@ -76,3 +76,20 @@ test("Quick and Professional converge on the same scene production engine", asyn
   assert.match(generationRoutes, /\/projects\/:projectId\/scenes\/:sceneId\/jobs\/video/);
   assert.match(generationRoutes, /\/projects\/:projectId\/scenes\/:sceneId\/jobs\/voice/);
 });
+
+test("batch video generation automatically assembles completed scene clips into one final film", async () => {
+  const fs = await import("node:fs/promises");
+  const app = await fs.readFile(new URL("../../ai-video-studio/src/App.tsx", import.meta.url), "utf8");
+  const exporter = await fs.readFile(new URL("../src/lib/videoExport.ts", import.meta.url), "utf8");
+  assert.match(app, /batchJobIds/);
+  assert.match(app, /batchExportStarted\.current=true/);
+  assert.match(app, /batchPhase!=='generating'/);
+  assert.match(app, /exportMutation\.mutate\(\{projectId,data:exportSettings\}/);
+  assert.match(app, /batch-video-assembly-status/);
+  assert.match(app, /final-film-workspace/);
+  assert.match(app, /final-film-player/);
+  assert.match(app, /button-assemble-film/);
+  assert.match(app, /studio-secondary-disclosure/);
+  assert.match(exporter, /-f", "concat"/);
+  assert.match(exporter, /concat=n=2/);
+});
