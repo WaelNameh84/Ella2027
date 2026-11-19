@@ -2393,6 +2393,7 @@ function AutoProductionPanel({ projectId, scenes, keys, lang, freeMode, hasActiv
 }
 
 function BatchVideoGeneration({projectId,scenes,keys,lang,hasActiveJob,onQueued,freeMode,exportSettings}:{projectId:string;scenes:Scene[];keys:ProviderKey[];lang:Lang;hasActiveJob:boolean;onQueued:()=>void;freeMode:boolean;exportSettings:AutoExportSettings}) {
+  const t=(ar:string,en:string)=>tx(lang,ar,en);
   const videoJob=useQueueSceneVideoGeneration();
   const exportMutation=useQueueProjectExport();
   const jobsQuery=useListStudioJobs({projectId},{query:{queryKey:getListStudioJobsQueryKey({projectId}),refetchInterval:query=>query.state.data?.some(job=>job.status==='queued'||job.status==='running')?2500:5000,staleTime:1000}});
