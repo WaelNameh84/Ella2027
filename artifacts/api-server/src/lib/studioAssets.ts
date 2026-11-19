@@ -31,7 +31,14 @@ function imageFileType(bytes: Buffer): { extension: string; contentType: string 
 }
 
 function assetDirectory(projectId: string, sceneId: string): string {
-  return resolve("generated-artifacts/ai-video-studio/assets", projectId, sceneId);
+  // Render persistent disks expose their mount path through RENDER_DISK_PATH.
+  // STUDIO_ASSETS_DIR can override it for other persistent-volume providers.
+  // Keep the repository-local path only as a development fallback.
+  const configuredRoot = process.env.STUDIO_ASSETS_DIR || process.env.RENDER_DISK_PATH;
+  const root = configuredRoot
+    ? resolve(configuredRoot, "ella-video-assets")
+    : resolve("generated-artifacts/ai-video-studio/assets");
+  return resolve(root, projectId, sceneId);
 }
 
 export async function saveGeneratedAsset(
