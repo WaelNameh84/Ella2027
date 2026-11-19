@@ -2952,3 +2952,10 @@ a[href]:active,
   .final-film-assemble { grid-column: 1 / -1; width: 100%; }
   .final-film-progress .text-link { margin-inline-start: 0; }
 }
+
+.final-film-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.final-film-actions > div { margin-top: 0; }
+@media (max-width: 767px) {
+  .final-film-actions { align-items: stretch; flex-direction: column; }
+  .final-film-actions > div, .final-film-actions > button { width: 100%; }
+}
