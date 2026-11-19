@@ -2392,8 +2392,10 @@ function AutoProductionPanel({ projectId, scenes, keys, lang, freeMode, hasActiv
   </section>;
 }
 
-function BatchVideoGeneration({projectId,scenes,keys,lang,hasActiveJob,onQueued,freeMode}:{projectId:string;scenes:Scene[];keys:ProviderKey[];lang:Lang;hasActiveJob:boolean;onQueued:()=>void;freeMode:boolean}) {
+function BatchVideoGeneration({projectId,scenes,keys,lang,hasActiveJob,onQueued,freeMode,exportSettings}:{projectId:string;scenes:Scene[];keys:ProviderKey[];lang:Lang;hasActiveJob:boolean;onQueued:()=>void;freeMode:boolean;exportSettings:AutoExportSettings}) {
   const videoJob=useQueueSceneVideoGeneration();
+  const exportMutation=useQueueProjectExport();
+  const jobsQuery=useListStudioJobs({projectId},{query:{queryKey:getListStudioJobsQueryKey({projectId}),refetchInterval:query=>query.state.data?.some(job=>job.status==='queued'||job.status==='running')?2500:5000,staleTime:1000}});
   const videoKeys=keys.filter(key=>key.enabled&&key.serviceType==='video'&&providerSupports(key.provider,'video')&&providerKeyIsUsable(key.provider,key.status,key.cooldownUntil));
   const firstVideoProvider=videoKeys[0]?.provider;
   const scenesWithoutVideo=scenes.filter(scene=>scene.assetType!=='video'||!scene.assetUrl);
@@ -2405,6 +2407,11 @@ function BatchVideoGeneration({projectId,scenes,keys,lang,hasActiveJob,onQueued,
   const [queueing,setQueueing]=useState(false);
   const [progress,setProgress]=useState<{queued:number;failed:number;total:number;processed:number}|null>(null);
   const [summary,setSummary]=useState<{queued:number;failed:number;total:number}|null>(null);
+  const [batchJobIds,setBatchJobIds]=useState<string[]>([]);
+  const [batchExportJobId,setBatchExportJobId]=useState<string|null>(null);
+  const [batchPhase,setBatchPhase]=useState<'idle'|'generating'|'assembling'|'complete'|'failed'>('idle');
+  const [batchMessage,setBatchMessage]=useState('');
+  const batchExportStarted=useRef(false);
   const activeKey=videoKeys.find(key=>key.id===providerId)||videoKeys[0];
   useEffect(()=>{if(!providerId)setModel(defaultVideoModel(firstVideoProvider,mode));},[providerId,firstVideoProvider,mode]);
   const scenesToQueue=mode==='image'?scenesWithoutVideo.filter(scene=>scene.assetType==='image'&&Boolean(scene.assetUrl)):scenesWithoutVideo;
@@ -2413,11 +2420,18 @@ function BatchVideoGeneration({projectId,scenes,keys,lang,hasActiveJob,onQueued,
   const begin=async()=>{
     if(!activeKey||!model.trim()||!approved||!scenesToQueue.length||queueing||hasActiveJob)return;
     setQueueing(true);
+    setBatchPhase('generating');
+    setBatchMessage('');
+    setBatchJobIds([]);
+    setBatchExportJobId(null);
+    batchExportStarted.current=false;
     setProgress({queued:0,failed:0,total:scenesToQueue.length,processed:0});
     let queued=0,failed=0;
+    const queuedIds:string[]=[];
     for(const scene of scenesToQueue){
       try{
-        await videoJob.mutateAsync({projectId,sceneId:scene.id,data:{providerKeyId:activeKey.id,model:model.trim(),mode,approvePotentialCharges:true}});
+        const job=await videoJob.mutateAsync({projectId,sceneId:scene.id,data:{providerKeyId:activeKey.id,model:model.trim(),mode,approvePotentialCharges:true}});
+        queuedIds.push(job.id);
         queued++;
       }catch{
         failed++;
@@ -2429,9 +2443,50 @@ function BatchVideoGeneration({projectId,scenes,keys,lang,hasActiveJob,onQueued,
     if(queued){
       setSummary({queued,failed,total:scenesToQueue.length});
       setOpen(false);
+      if(failed===0){
+        setBatchJobIds(queuedIds);
+        setBatchMessage(t('سيتم تجميع الفيلم تلقائياً بعد اكتمال جميع المقاطع.','The film will assemble automatically when every clip is complete.'));
+      }else{
+        setBatchPhase('failed');
+        setBatchMessage(t('بعض الطلبات لم تُرسل. لن نبدأ التجميع حتى تكتمل كل المشاهد؛ يمكنك إعادة المحاولة للنواقص فقط.','Some requests could not be queued. Assembly waits until every scene is ready; retry only the missing clips.'));
+      }
       onQueued();
+    }else{
+      setBatchPhase('failed');
+      setBatchMessage(t('لم يتم إرسال أي طلب فيديو. تحقق من المزوّد والنموذج.','No video jobs were queued. Check the provider and model.'));
     }
   };
+  useEffect(()=>{
+    if(batchPhase!=='generating'||!batchJobIds.length||batchExportStarted.current)return;
+    const matching=batchJobIds.map(id=>jobsQuery.data?.find(job=>job.id===id));
+    if(matching.some(job=>!job))return;
+    const failed=matching.find(job=>job?.status==='failed');
+    if(failed){
+      setBatchPhase('failed');
+      setBatchMessage(failed.error||t('فشل توليد أحد المقاطع؛ لن يتم تصدير فيلم ناقص.','A clip failed; the studio will not export an incomplete film.'));
+      return;
+    }
+    if(!matching.every(job=>job?.status==='completed'))return;
+    batchExportStarted.current=true;
+    setBatchPhase('assembling');
+    setBatchMessage(t('اكتملت المقاطع. جارٍ دمجها حسب ترتيب المشاهد في فيديو واحد…','All clips are ready. Merging them into one video in scene order…'));
+    exportMutation.mutate({projectId,data:exportSettings},{
+      onSuccess:job=>{setBatchExportJobId(job.id);onQueued();},
+      onError:error=>{setBatchPhase('failed');setBatchMessage(error instanceof Error?error.message:t('تعذر تجميع الفيلم.','Could not assemble the film.'));},
+    });
+  },[batchPhase,batchJobIds,jobsQuery.data,exportMutation.mutate,projectId,exportSettings,onQueued,lang]);
+  useEffect(()=>{
+    if(batchPhase!=='assembling'||!batchExportJobId)return;
+    const job=jobsQuery.data?.find(item=>item.id===batchExportJobId);
+    if(job?.status==='completed'){
+      setBatchPhase('complete');
+      setBatchMessage(t('اكتمل الفيلم! تم جمع كل المشاهد في فيديو واحد.','Film complete! All scenes have been assembled into one video.'));
+      onQueued();
+    }else if(job?.status==='failed'){
+      setBatchPhase('failed');
+      setBatchMessage(job.error||t('فشل تجميع الفيلم. يمكنك فتح التصدير وإعادة المحاولة دون توليد المشاهد مجدداً.','Film assembly failed. Retry export without regenerating the clips.'));
+    }
+  },[batchPhase,batchExportJobId,jobsQuery.data,onQueued,lang]);
   if(!scenes.length)return null;
   if(freeMode)return <div className="script-bar panel mt-4"><div className="script-symbol"><ShieldCheck size={18}/></div><div className="script-copy"><b>{tx(lang,'المزوّدات الخارجية متوقفة','External providers are off')}</b><p>{tx(lang,'شغّل السماح بالمزوّدات من الإعدادات لإرسال مقاطع المشاهد. ستحتاج موافقة واحدة على الدفعة، وقد تُحتسب رسوم لكل مشهد.','Enable external providers in Settings to send scene clips. One approval is required for the batch; each scene may incur a charge.')} <Link href="/settings/providers" className="text-link">{tx(lang,'فتح الإعدادات','Open settings')}<ArrowLeft size={14}/></Link></p></div></div>;
   return <>
@@ -2441,6 +2496,7 @@ function BatchVideoGeneration({projectId,scenes,keys,lang,hasActiveJob,onQueued,
         {videoKeys.length===0&&scenesWithoutVideo.length>0&&<Link href="/settings/providers" className="text-link" data-testid="link-batch-video-provider-settings">{tx(lang,'أضف مفتاح Magic Hour أو Agnes AI أو Replicate أو fal.ai لخدمة الفيديو','Add a Magic Hour, Agnes AI, Replicate, or fal.ai video key')}<ArrowLeft size={14}/></Link>}
         {hasActiveJob&&<small className="provider-purpose-description">{tx(lang,'انتظر انتهاء المهمة الحالية قبل بدء دفعة فيديو جديدة.','Wait for the current job to finish before starting a video batch.')}</small>}
         {summary&&<p role="status" data-testid="batch-video-result">{summary.failed?tx(lang,`أُرسل ${summary.queued} من ${summary.total} طلبات الفيديو؛ تعذّر إرسال ${summary.failed}.`,`${summary.queued} of ${summary.total} video requests were queued; ${summary.failed} could not be queued.`):tx(lang,`تم إرسال ${summary.queued} طلبات فيديو إلى قائمة المهام.`,`Queued ${summary.queued} video requests.`)} <Link href="/jobs" className="text-link">{tx(lang,'عرض المهام','View jobs')}<ArrowLeft size={13}/></Link></p>}
+        {batchMessage&&<p className={batchPhase==='failed'?'inline-error':'provider-purpose-description'} role="status" data-testid="batch-video-assembly-status">{batchPhase==='assembling'?<LoaderCircle size={13} className="inline animate-spin"/>:batchPhase==='complete'?<CheckCircle2 size={13} className="inline"/>:null} {batchMessage} {batchPhase==='complete'&&<Link href={`/projects/${projectId}`} className="text-link">{tx(lang,'مشاهدة الفيلم','Watch final film')}</Link>} {batchPhase==='failed'&&<Link href={`/projects/${projectId}`} className="text-link">{tx(lang,'فتح التصدير','Open export')}</Link>}</p>}
       </div>
       {scenesWithoutVideo.length>0&&<button className="btn btn-primary" disabled={!videoKeys.length||hasActiveJob} onClick={()=>{setProgress(null);setSummary(null);setApproved(false);setProviderId('');setMode('text');setModel(defaultVideoModel(firstVideoProvider,'text'));setOpen(true)}} data-testid="button-batch-video">{tx(lang,'توليد فيديو لكل المشاهد','Generate all scene videos')}</button>}
     </section>
