@@ -1,5 +1,6 @@
 import { and, asc, eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import {
   db,
   projectsTable,
@@ -20,7 +21,7 @@ import {
 } from "./providerRegistry";
 import { renderMp4 } from "./videoExport";
 import { convertImageToWebp, downloadPublicHttps, generateNarration, generateStill, generateVideo, isProviderCallError } from "./mediaGeneration";
-import { readGeneratedAsset, saveGeneratedAsset, validateUploadedImage } from "./studioAssets";
+import { isCloudinaryStorageEnabled, readGeneratedAsset, saveGeneratedAsset, validateUploadedImage } from "./studioAssets";
 import { isZeroSpendMode, ZERO_SPEND_ERROR } from "./spendingGuard";
 import { createTestImage, createTestWav } from "./freeTestProvider";
 import { generatePiperNarration, PIPER_LOCAL_PROVIDER_KEY } from "./piperTts";
@@ -918,10 +919,14 @@ async function processExportJob(job: typeof studioJobsTable.$inferSelect): Promi
     project.brandKit,
   );
   const downloadUrl = `/api/projects/${project.id}/export/file`;
+  const cloudExport = isCloudinaryStorageEnabled()
+    ? await saveGeneratedAsset(project.id, randomUUID(), "video", await readFile(outputPath))
+    : null;
+  const finalDownloadUrl = cloudExport?.url ?? downloadUrl;
   await db.transaction(async (tx) => {
     await tx.update(projectsTable).set({
       exportPath: outputPath,
-      exportUrl: downloadUrl,
+      exportUrl: finalDownloadUrl,
       exportContentType: input.format === "webm" ? "video/webm" : "video/mp4",
       status: "completed",
       progress: 100,
@@ -931,7 +936,7 @@ async function processExportJob(job: typeof studioJobsTable.$inferSelect): Promi
       stage: "completed",
       progress: 100,
       message: input.format === "webm" ? "WebM export is ready to download." : "MP4 export is ready to download.",
-      result: { downloadUrl },
+      result: { downloadUrl: finalDownloadUrl },
       error: null,
       completedAt: new Date(),
       updatedAt: new Date(),
