@@ -9,7 +9,7 @@ const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
 
 function workerAuthorized(req: Request, res: Response, next: NextFunction) {
   const expected = process.env.KAGGLE_LTX_WORKER_TOKEN?.trim() ?? "";
-  const supplied = (req.headers.authorization ?? "").replace(/^Bearer\\s+/i, "").trim();
+  const supplied = (req.headers.authorization ?? "").replace(/^Bearer\s+/i, "").trim();
   if (!expected || !supplied) {
     res.status(503).json({ error: "Kaggle LTX worker authentication is not configured." });
     return;
@@ -75,7 +75,7 @@ router.post("/claim", async (_req, res): Promise<void> => {
       job: {
         id: claimed.id, leaseToken: input.kaggleLeaseToken,
         prompt: [project.visualStyle || project.videoType, `Scene: ${scene.title}.`, scene.description, `Shot: ${scene.shotType}; camera: ${scene.cameraMovement}; location: ${scene.location}; lighting: ${scene.lighting}.`,
-          ...(project.characters ?? []).filter((character) => scene.characterIds.includes(character.id)).map((character) => `${character.name}: ${character.description}. Clothing: ${character.costume}.`)].join("\\n"),
+          ...(project.characters ?? []).filter((character) => scene.characterIds.includes(character.id)).map((character) => `${character.name}: ${character.description}. Clothing: ${character.costume}.`)].join("\n"),
         durationSeconds: scene.durationSeconds, aspectRatio: project.aspectRatio,
         fps: Number(input.fps) || 8, resolution: Number(input.resolution) || 768,
         mode: input.mode === "image" ? "image" : "text",
