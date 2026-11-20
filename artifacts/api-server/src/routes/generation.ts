@@ -94,12 +94,15 @@ async function enqueueSceneJob(
   )) {
     return null;
   }
+  const requestedModel = String((input as Record<string, unknown>).model ?? "").trim();
+  const isKaggleLtx = jobType === "video" && Boolean(input.providerKeyId) && (await db.select({ provider: providerKeysTable.provider }).from(providerKeysTable).where(and(eq(providerKeysTable.id, String(input.providerKeyId)), eq(providerKeysTable.userId, userId), eq(providerKeysTable.serviceType, "video"), eq(providerKeysTable.enabled, true))).limit(1))[0]?.provider === "local-video-worker" && (!requestedModel || /ltx/i.test(requestedModel));
   const [job] = await db.insert(studioJobsTable).values({
     userId,
     projectId,
     jobType,
-    input: { ...input, sceneId },
-    message: "Waiting in the queue.",
+    stage: isKaggleLtx ? "kaggle_waiting" : "queued",
+    input: { ...input, sceneId, ...(isKaggleLtx ? { worker: "kaggle-ltx" } : {}) },
+    message: isKaggleLtx ? "Waiting for the Kaggle LTX worker." : "Waiting in the queue.",
   }).returning();
   return job;
 }

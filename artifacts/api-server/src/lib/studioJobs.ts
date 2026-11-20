@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, notInArray } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import {
@@ -276,7 +276,7 @@ async function claimNextJob() {
     const [candidate] = await tx
       .select()
       .from(studioJobsTable)
-      .where(eq(studioJobsTable.status, "queued"))
+      .where(and(eq(studioJobsTable.status, "queued"), notInArray(studioJobsTable.stage, ["kaggle_waiting", "kaggle_generating"])))
       .orderBy(asc(studioJobsTable.createdAt))
       .limit(1)
       .for("update", { skipLocked: true });
