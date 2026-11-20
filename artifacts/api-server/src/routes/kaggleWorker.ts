@@ -5,7 +5,7 @@ import { db, projectsTable, providerKeysTable, scenesTable, studioJobsTable } fr
 
 const router: IRouter = Router();
 const LEASE_MS = 5 * 60 * 1000;
-const MAX_VIDEO_BYTES = 250 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
 
 function workerAuthorized(req: Request, res: Response, next: NextFunction) {
   const expected = process.env.KAGGLE_LTX_WORKER_TOKEN?.trim() ?? "";
@@ -131,7 +131,10 @@ router.post("/:jobId/fail", async (req, res): Promise<void> => {
   const [job] = await db.select().from(studioJobsTable).where(and(eq(studioJobsTable.id, jobId), eq(studioJobsTable.status, "running"))).limit(1);
   const input = job?.input as Record<string, unknown> | undefined;
   if (!job || input?.worker !== "kaggle-ltx" || input.kaggleLeaseToken !== leaseToken) { res.status(409).json({ error: "Job lease is no longer valid." }); return; }
-  await db.update(studioJobsTable).set({ status: "failed", stage: "failed", progress: 0, message: "Kaggle LTX worker could not complete this video.", error: message, completedAt: new Date(), updatedAt: new Date() }).where(eq(studioJobsTable.id, jobId));
+  await db.transaction(async (tx) => {
+    await tx.update(studioJobsTable).set({ status: "failed", stage: "failed", progress: 0, message: "Kaggle LTX worker could not complete this video.", error: message, completedAt: new Date(), updatedAt: new Date() }).where(eq(studioJobsTable.id, jobId));
+    await tx.update(projectsTable).set({ status: "editing", progress: 45 }).where(and(eq(projectsTable.id, job.projectId), eq(projectsTable.userId, job.userId)));
+  });
   res.json({ ok: true });
 });
 
