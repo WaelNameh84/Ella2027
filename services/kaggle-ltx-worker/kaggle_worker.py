@@ -60,8 +60,8 @@ def process_one_ltx_job(base_url: str, token: str,
         video_path = Path(generate_fn(job))
         if not video_path.is_file() or video_path.stat().st_size == 0:
             raise RuntimeError("LTX callback did not return a non-empty MP4 file.")
-        if video_path.stat().st_size > 250 * 1024 * 1024:
-            raise RuntimeError("The generated MP4 exceeds the 250 MiB worker upload limit.")
+        if video_path.stat().st_size > 100 * 1024 * 1024:
+            raise RuntimeError("The generated MP4 exceeds the 100 MiB worker upload limit.")
         if state["lost"]:
             raise RuntimeError("The worker lease expired while generating; refusing to publish a stale result.")
 
@@ -75,7 +75,6 @@ def process_one_ltx_job(base_url: str, token: str,
                     "folder": upload["folder"],
                     "public_id": upload["publicId"],
                     "signature": upload["signature"],
-                    "resource_type": "video",
                 },
                 files={"file": (video_path.name, video_file, "video/mp4")},
                 timeout=(30, 600),
