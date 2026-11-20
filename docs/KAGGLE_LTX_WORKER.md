@@ -47,7 +47,7 @@ def generate_with_loaded_ltx(job):
     return existing_ltx_generation_function(job)
 
 run_kaggle_ltx_worker(
-    base_url="https://workforce-7hlm.onrender.com",
+    base_url="https://<your-ella2027-render-service>.onrender.com",
     token=worker_token,
     generate_fn=generate_with_loaded_ltx,
     idle_seconds=15,
@@ -64,5 +64,5 @@ Choose the existing `local-video-worker` video provider and an LTX model name co
 
 - MP4 uploads go directly from Kaggle to Cloudinary using a server-generated signed upload.
 - The API accepts only Cloudinary HTTPS video URLs containing the unique job public ID.
-- Maximum generated file size is 250 MiB.
+- Maximum generated file size is 100 MiB.
 - Keep the Kaggle notebook session running while it polls. Kaggle sessions are not permanent workers; a stopped session leaves the job reclaimable after its lease expires.
