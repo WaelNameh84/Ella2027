@@ -50,7 +50,7 @@ router.post("/claim", async (_req, res): Promise<void> => {
     const claimed = await db.transaction(async (tx) => {
       const [candidate] = await tx.select().from(studioJobsTable).where(and(
         eq(studioJobsTable.jobType, "video"),
-        eq(studioJobsTable.stage, "kaggle_waiting"),
+        or(eq(studioJobsTable.stage, "kaggle_waiting"), eq(studioJobsTable.stage, "kaggle_generating")),
         or(eq(studioJobsTable.status, "queued"), and(eq(studioJobsTable.status, "running"), lt(studioJobsTable.updatedAt, expiredBefore))),
       )).orderBy(asc(studioJobsTable.createdAt)).limit(1).for("update", { skipLocked: true });
       if (!candidate) return null;
