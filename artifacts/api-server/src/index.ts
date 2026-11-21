@@ -2,6 +2,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { runDatabaseMigrations } from "./lib/runDatabaseMigrations";
 import { pool } from "@workspace/db";
+import { startStudioJobWorker } from "./lib/studioJobs";
 
 const rawPort = process.env["PORT"];
 
@@ -26,6 +27,7 @@ async function startServer(): Promise<void> {
     }
 
     logger.info({ port }, "Server listening");
+    void startStudioJobWorker();
   });
 }
 
