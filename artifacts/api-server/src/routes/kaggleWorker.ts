@@ -56,7 +56,7 @@ router.post("/claim", async (_req, res): Promise<void> => {
       if (!candidate) return null;
       const leaseToken = randomUUID();
       const leaseExpiresAt = new Date(now.getTime() + LEASE_MS).toISOString();
-      const input = { ...candidate.input, kaggleLeaseToken: leaseToken, kaggleLeaseExpiresAt: leaseExpiresAt };
+      const input = { ...candidate.input, worker: "kaggle-ltx", kaggleLeaseToken: leaseToken, kaggleLeaseExpiresAt: leaseExpiresAt };
       const [updated] = await tx.update(studioJobsTable).set({
         status: "running", stage: "kaggle_generating", progress: 5,
         message: "Kaggle LTX worker claimed this video job.",
