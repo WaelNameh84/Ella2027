@@ -5,11 +5,9 @@ import studioRouter from "./studio";
 import generationRouter from "./generation";
 import kaggleWorkerRouter from "./kaggleWorker";
 import { requireUser } from "../middlewares/requireUser";
-import { startStudioJobWorker } from "../lib/studioJobs";
 
 const router: IRouter = Router();
 
-void startStudioJobWorker();
 
 router.use(healthRouter);
 router.use("/kaggle-worker", kaggleWorkerRouter);
