@@ -3001,3 +3001,39 @@ a[href]:active,
   .preview-metadata { gap: 6px 12px; }
   .job-progress-label { align-items: flex-start; flex-direction: column; gap: 3px; }
 }
+
+
+/* Unified card glow: same animated edge light as the Jobs cards, excluding API keys. */
+.app-shell:not([data-route="provider-keys"]) :is(.panel:not(.generation-modal), .card, [class*="card"]) {
+  position: relative;
+  isolation: isolate;
+  border-color: hsl(var(--accent) / .22);
+  box-shadow: var(--shadow-sm), 0 0 18px hsl(var(--accent) / .07), inset 0 1px hsl(var(--foreground) / .035);
+}
+.app-shell:not([data-route="provider-keys"]) :is(.panel:not(.generation-modal), .card, [class*="card"])::before {
+  content: '';
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  padding: 1.4px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: conic-gradient(from var(--all-card-orbit-angle), transparent 0deg, transparent 205deg, hsl(var(--accent) / .16) 236deg, hsl(var(--accent) / .86) 270deg, hsl(var(--primary) / .95) 296deg, hsl(var(--accent) / .82) 321deg, transparent 354deg, transparent 360deg);
+  filter: drop-shadow(0 0 3px hsl(var(--accent) / .48));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: all-card-edge-orbit 11s linear infinite;
+}
+@media (hover: hover) and (pointer: fine) {
+  .app-shell:not([data-route="provider-keys"]) :is(.panel:not(.generation-modal), .card, [class*="card"]):hover {
+    border-color: hsl(var(--accent) / .48);
+    box-shadow: var(--shadow), 0 0 28px hsl(var(--accent) / .14), inset 0 1px hsl(var(--foreground) / .05);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-shell:not([data-route="provider-keys"]) :is(.panel:not(.generation-modal), .card, [class*="card"])::before {
+    animation: none;
+  }
+}
