@@ -16,11 +16,20 @@ from pathlib import Path
 from typing import Any
 
 import requests
+
+# The current upstream project is named WanGP (the legacy Wan2GP checkout
+# does not contain the supported shared.api package).
+WANGP_ROOT = Path("/kaggle/working/WanGP")
+if not (WANGP_ROOT / "shared" / "api.py").is_file():
+    raise FileNotFoundError(f"WanGP Python API not found under {WANGP_ROOT}; expected shared/api.py")
+if str(WANGP_ROOT) not in __import__("sys").path:
+    __import__("sys").path.insert(0, str(WANGP_ROOT))
+os.chdir(WANGP_ROOT)
 from shared.api import init
 
 BASE_URL = os.environ.get("ELLA_API_BASE_URL", "https://ella2027.onrender.com").rstrip("/")
 TOKEN = os.environ.get("ELLA_KAGGLE_WORKER_TOKEN", "").strip()
-WANGP_ROOT = Path("/kaggle/working/Wan2GP")
+WANGP_ROOT = Path("/kaggle/working/WanGP")
 OUTPUT_DIR = Path("/kaggle/working/ella2027-output")
 MODEL_TYPE = os.environ.get("ELLA_WANGP_MODEL_TYPE", "ltx2_25_22B_distilled")
 MODEL_MAX_SECONDS = 5
