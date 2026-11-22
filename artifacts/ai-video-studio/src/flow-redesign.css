@@ -376,3 +376,57 @@ html.dark .app-shell[data-route="project-workspace"] .storyboard-upload-label>in
   html.dark .app-shell[data-route="project-workspace"] .storyboard-thumb>img,
   html.dark .app-shell[data-route="project-workspace"] .storyboard-thumb>video{transition:none}
 }
+
+
+/* Batch video scene selection: scoped to the project workspace only. */
+html.dark .app-shell[data-route="project-workspace"] .batch-scene-picker{
+  width:100%;margin-top:13px;padding:11px;border:1px solid rgba(145,169,205,.16);
+  border-radius:12px;background:rgba(4,10,18,.38)
+}
+html.dark .app-shell[data-route="project-workspace"] .batch-scene-picker-head{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px
+}
+html.dark .app-shell[data-route="project-workspace"] .batch-scene-picker-head>b{
+  color:#e8effa;font-size:11px
+}
+html.dark .app-shell[data-route="project-workspace"] .batch-scene-picker-head>b span{
+  margin-inline-start:6px;color:#8fb8ef;font:600 10px var(--app-font-mono)
+}
+html.dark .app-shell[data-route="project-workspace"] .batch-scene-picker-head>div{
+  display:flex;gap:6px
+}
+html.dark .app-shell[data-route="project-workspace"] .batch-scene-picker-head button{
+  min-height:29px;padding:4px 8px;border:1px solid rgba(145,169,205,.2);
+  border-radius:7px;background:rgba(255,255,255,.04);color:#b9c8da;font-size:10px
+}
+html.dark .app-shell[data-route="project-workspace"] .batch-scene-picker-head button:disabled{
+  opacity:.45;cursor:not-allowed
+}
+html.dark .app-shell[data-route="project-workspace"] .batch-scene-picker-list{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));gap:6px
+}
+html.dark .app-shell[data-route="project-workspace"] .batch-scene-picker-list>label{
+  display:flex;align-items:center;gap:8px;min-width:0;min-height:38px;padding:6px 8px;
+  border:1px solid rgba(145,169,205,.13);border-radius:8px;
+  background:rgba(255,255,255,.025);cursor:pointer
+}
+html.dark .app-shell[data-route="project-workspace"] .batch-scene-picker-list>label.is-checked{
+  border-color:rgba(111,190,239,.48);background:rgba(69,137,201,.12)
+}
+html.dark .app-shell[data-route="project-workspace"] .batch-scene-picker-list input{
+  width:15px;height:15px;margin:0;accent-color:#83b9ff;flex:0 0 auto
+}
+html.dark .app-shell[data-route="project-workspace"] .batch-scene-picker-list label>span{
+  color:#8ea8c8;font:700 9px var(--app-font-mono)
+}
+html.dark .app-shell[data-route="project-workspace"] .batch-scene-picker-list label>b{
+  overflow:hidden;flex:1;color:#dce6f4;font-size:10px;text-overflow:ellipsis;white-space:nowrap
+}
+html.dark .app-shell[data-route="project-workspace"] .batch-scene-picker-list label>small{
+  color:#8ea0b8;font:10px var(--app-font-mono);white-space:nowrap
+}
+@media(max-width:767px){
+  html.dark .app-shell[data-route="project-workspace"] .batch-scene-picker{padding:9px}
+  html.dark .app-shell[data-route="project-workspace"] .batch-scene-picker-list{grid-template-columns:1fr}
+  html.dark .app-shell[data-route="project-workspace"] .batch-scene-picker-list>label{min-height:42px}
+}
