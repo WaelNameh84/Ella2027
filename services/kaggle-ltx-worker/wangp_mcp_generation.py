@@ -157,7 +157,10 @@ async def _generate_async(job: dict[str, Any], mcp_url: str, wangp_root: str) ->
         ]
         exact_25 = [
             item for item in video_models
-            if "2.5" in (str(item.get("model_type", "")) + " " + str(item.get("name", ""))).lower()
+            if (
+                "2.5" in (str(item.get("model_type", "")) + " " + str(item.get("name", ""))).lower()
+                or "ltx2_25" in str(item.get("model_type", "")).lower()
+            )
         ]
         exact_25.sort(
             key=lambda item: (
