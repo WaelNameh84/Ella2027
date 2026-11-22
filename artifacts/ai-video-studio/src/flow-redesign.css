@@ -231,3 +231,60 @@ html.dark .app-shell[data-route="project-workspace"] .job-progress-track span{bo
   html.dark .app-shell:not([data-route="provider-keys"]) *::before,
   html.dark .app-shell:not([data-route="provider-keys"]) *::after{scroll-behavior:auto;transition-duration:.01ms}
 }
+
+
+/* Quick creation: let the creator choose any scene count and exact seconds. */
+html.dark .app-shell:not([data-route="provider-keys"]) .quick-toolbar{
+  grid-template-columns:minmax(0,1.35fr) minmax(100px,.65fr) minmax(120px,.75fr);
+  gap:11px;
+}
+html.dark .app-shell:not([data-route="provider-keys"]) .quick-toolbar label{min-width:0}
+html.dark .app-shell:not([data-route="provider-keys"]) .quick-toolbar .studio-input{
+  min-height:48px;border:1px solid rgba(145,169,205,.2);border-radius:12px;
+  background:rgba(5,12,22,.72);color:#edf3fc;padding-inline:12px
+}
+html.dark .app-shell:not([data-route="provider-keys"]) .quick-duration-hint{
+  margin-top:0;padding:11px 13px;border:1px solid rgba(99,214,232,.18);
+  border-radius:12px;background:linear-gradient(100deg,rgba(99,214,232,.07),rgba(120,137,255,.07));
+  color:#b8c8dc;font-size:11px
+}
+/* Finished video: cinematic, centered, aspect-ratio-aware player with safe contain fit. */
+html.dark .app-shell:not([data-route="provider-keys"]) .final-film-player-wrap{gap:12px}
+html.dark .app-shell:not([data-route="provider-keys"]) .final-film-screen{
+  position:relative;display:grid;place-items:center;width:100%;max-height:min(76vh,820px);
+  overflow:hidden;border:1px solid rgba(139,162,202,.22);border-radius:18px;
+  background:radial-gradient(ellipse at 50% 0%,rgba(81,112,190,.14),transparent 48%),#02050a;
+  box-shadow:0 22px 65px rgba(0,0,0,.32),inset 0 0 0 1px rgba(255,255,255,.025)
+}
+html.dark .app-shell:not([data-route="provider-keys"]) .final-film-player{
+  display:block;width:100%;height:100%;max-height:min(76vh,820px);aspect-ratio:inherit;
+  border:0;border-radius:0;background:transparent;object-fit:contain;
+  accent-color:#8b9aff
+}
+html.dark .app-shell:not([data-route="provider-keys"]) .final-film-screen-label{
+  position:absolute;top:13px;inset-inline-start:14px;display:inline-flex;align-items:center;gap:6px;
+  padding:6px 9px;border:1px solid rgba(255,255,255,.13);border-radius:8px;
+  background:rgba(4,9,16,.62);color:rgba(239,245,255,.82);
+  font:600 9px var(--app-font-mono);letter-spacing:.1em;pointer-events:none;backdrop-filter:blur(12px)
+}
+html.dark .app-shell:not([data-route="provider-keys"]) .final-film-ready{
+  padding:9px 11px;border:1px solid rgba(73,194,151,.18);border-radius:10px;
+  background:rgba(42,158,117,.07);color:#83d9b8
+}
+html.dark .app-shell:not([data-route="provider-keys"]) .final-film-actions{
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:9px
+}
+@media(max-width:767px){
+  html.dark .app-shell:not([data-route="provider-keys"]) .quick-toolbar{
+    grid-template-columns:repeat(2,minmax(0,1fr));gap:8px
+  }
+  html.dark .app-shell:not([data-route="provider-keys"]) .quick-toolbar label:first-child{grid-column:1/-1}
+  html.dark .app-shell:not([data-route="provider-keys"]) .quick-toolbar .studio-input{min-height:46px;padding-inline:9px}
+  html.dark .app-shell:not([data-route="provider-keys"]) .final-film-screen{
+    border-radius:13px;max-height:70vh
+  }
+  html.dark .app-shell:not([data-route="provider-keys"]) .final-film-player{max-height:70vh}
+  html.dark .app-shell:not([data-route="provider-keys"]) .final-film-screen-label{top:8px;inset-inline-start:8px;font-size:8px}
+  html.dark .app-shell:not([data-route="provider-keys"]) .final-film-actions{align-items:stretch;flex-direction:column}
+  html.dark .app-shell:not([data-route="provider-keys"]) .final-film-actions>.btn{width:100%;justify-content:center}
+}
