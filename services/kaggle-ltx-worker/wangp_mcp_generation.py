@@ -215,7 +215,7 @@ async def _generate_async(job: dict[str, Any], mcp_url: str, wangp_root: str) ->
             settings["fps"] = fps
 
         ratio = str(job.get("aspectRatio") or "16:9")
-        adjusted_resolution = _resolution_for_ratio(settings.get("resolution"), ratio)
+        adjusted_resolution = _resolution_for_ratio(settings.get("resolution") or "768x512", ratio)
         if adjusted_resolution:
             settings["resolution"] = adjusted_resolution
 
