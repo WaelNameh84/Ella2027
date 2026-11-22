@@ -144,20 +144,25 @@ async def _generate_async(job: dict[str, Any], mcp_url: str, wangp_root: str) ->
         models = search.get("models", []) if isinstance(search, dict) else []
         if not models and isinstance(search, dict):
             models = search.get("matches", [])
+        def output_types(item):
+            value = item.get("main_output") or []
+            return [str(value).lower()] if isinstance(value, str) else [str(x).lower() for x in value]
+
         video_models = [
             item for item in models
             if isinstance(item, dict)
-            and "video" in [str(x).lower() for x in (item.get("main_output") or [])]
+            and "video" in output_types(item)
             and "ltx" in (str(item.get("model_type", "")) + " " + str(item.get("name", ""))).lower()
         ]
         exact_25 = [
             item for item in video_models
             if "2.5" in (str(item.get("model_type", "")) + " " + str(item.get("name", ""))).lower()
         ]
-        chosen = (exact_25 or video_models or [None])[0]
+        chosen = exact_25[0] if exact_25 else None
         if not chosen:
             raise RuntimeError(
-                "WanGP MCP could not find an installed/catalogued LTX video model. "
+                "WanGP MCP could not find the LTX-2.5 video model. "
+                "It will not silently fall back to an older LTX checkpoint. "
                 "Model search returned: " + json.dumps(search, ensure_ascii=False, default=str)[:4000]
             )
         model_type = str(chosen.get("model_type") or "").strip()
@@ -167,7 +172,8 @@ async def _generate_async(job: dict[str, Any], mcp_url: str, wangp_root: str) ->
         schema = await _call(session, "wangp_model", {"model_type": model_type, "view": "schema"})
         metadata = schema.get("metadata", {}) if isinstance(schema, dict) else {}
         capabilities = [str(x).lower() for x in (metadata.get("capabilities") or [])]
-        outputs = [str(x).lower() for x in (metadata.get("main_output") or chosen.get("main_output") or [])]
+        output_value = metadata.get("main_output") or chosen.get("main_output") or []
+        outputs = [str(output_value).lower()] if isinstance(output_value, str) else [str(x).lower() for x in output_value]
         if "video" not in outputs:
             raise RuntimeError(f"Selected WanGP model {model_type} does not advertise video output.")
         if "audio" not in outputs and "audio" not in capabilities:
@@ -227,7 +233,11 @@ async def _generate_async(job: dict[str, Any], mcp_url: str, wangp_root: str) ->
             await asyncio.sleep(8)
             latest = await _call(session, "wangp_get_job", {"job_id": job_id, "event_limit": 5})
             status = str(latest.get("status") or latest.get("state") or "").lower() if isinstance(latest, dict) else ""
-            if latest.get("done") is True or status in {"completed", "complete", "succeeded", "success"}:
+            if latest.get("done") is True or status in {"completed", "complete", "succeeded", "success", "done"}:
+                result_data = latest.get("result") if isinstance(latest, dict) else None
+                if isinstance(result_data, dict):
+                    if result_data.get("success") is False or result_data.get("error") or result_data.get("errors"):
+                        raise RuntimeError("WanGP generation failed: " + json.dumps(result_data, ensure_ascii=False, default=str)[:5000])
                 break
             if status in {"failed", "error", "cancelled", "canceled"}:
                 raise RuntimeError("WanGP generation failed: " + json.dumps(latest, ensure_ascii=False, default=str)[:5000])
