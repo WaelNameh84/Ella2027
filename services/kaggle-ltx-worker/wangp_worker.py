@@ -78,12 +78,19 @@ def _heartbeat(base_url: str, token: str, job_id: str, lease: str,
 
 
 def _resolution(aspect_ratio: str) -> str:
+    """High-quality first-pass output profile for the Kaggle T4 worker.
+
+    Dimensions are aligned to 32 pixels for the LTX-2.5 pipeline.
+    This increases pixel area over the original 768x448 profile while
+    keeping a conservative 576p-class target for the current low-VRAM
+    offload configuration.
+    """
     value = (aspect_ratio or "16:9").strip()
     if value in ("9:16", "portrait"):
-        return "448x768"
+        return "576x1024"
     if value in ("1:1", "square"):
-        return "640x640"
-    return "768x448"
+        return "768x768"
+    return "1024x576"
 
 
 def _make_settings(session, task: dict[str, Any], output_dir: Path) -> dict[str, Any]:
