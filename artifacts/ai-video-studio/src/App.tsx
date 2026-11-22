@@ -379,7 +379,7 @@ function Shell({ children, title, crumb }: { children: ReactNode; title: string;
   const [path] = useLocation();
   const { signOut } = useClerk();
   const current = (href: string) => path === href || (href === '/projects' && path.startsWith('/projects/'));
-  return <div className="app-shell">
+  return <div className="app-shell" data-route={path === '/settings/providers' ? 'provider-keys' : path.startsWith('/projects/') ? 'project-workspace' : path === '/dashboard' ? 'studio-home' : 'workspace'}>
     <aside className="sidebar hidden md:flex">
       <div className="sidebar-brand"><Brand /></div>
       <div className="sidebar-caption">{tx(lang, 'مساحة العمل', 'WORKSPACE')}</div>
