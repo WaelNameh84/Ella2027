@@ -2471,6 +2471,7 @@ function BatchVideoGeneration({projectId,scenes,keys,lang,hasActiveJob,onQueued,
   const [progress,setProgress]=useState<{queued:number;failed:number;total:number;processed:number}|null>(null);
   const [summary,setSummary]=useState<{queued:number;failed:number;total:number}|null>(null);
   const [batchJobIds,setBatchJobIds]=useState<string[]>([]);
+  const [batchSceneIds,setBatchSceneIds]=useState<string[]>([]);
   const [batchExportJobId,setBatchExportJobId]=useState<string|null>(null);
   const [batchPhase,setBatchPhase]=useState<'idle'|'generating'|'assembling'|'complete'|'failed'>('idle');
   const [batchMessage,setBatchMessage]=useState('');
@@ -2486,6 +2487,7 @@ function BatchVideoGeneration({projectId,scenes,keys,lang,hasActiveJob,onQueued,
     setBatchPhase('generating');
     setBatchMessage('');
     setBatchJobIds([]);
+    setBatchSceneIds(scenesToQueue.map(scene=>scene.id));
     setBatchExportJobId(null);
     batchExportStarted.current=false;
     setProgress({queued:0,failed:0,total:scenesToQueue.length,processed:0});
@@ -2530,6 +2532,11 @@ function BatchVideoGeneration({projectId,scenes,keys,lang,hasActiveJob,onQueued,
       return;
     }
     if(!matching.every(job=>job?.status==='completed'))return;
+    if(scenesWithoutVideo.some(scene=>!batchSceneIds.includes(scene.id))){
+      setBatchPhase('complete');
+      setBatchMessage(t('تم توليد المشاهد المحددة بنجاح. أكمل المشاهد المتبقية قبل تجميع الفيلم النهائي.','Selected scenes are ready. Generate the remaining scenes before assembling the final film.'));
+      return;
+    }
     batchExportStarted.current=true;
     setBatchPhase('assembling');
     setBatchMessage(t('اكتملت المقاطع. جارٍ دمجها حسب ترتيب المشاهد في فيديو واحد…','All clips are ready. Merging them into one video in scene order…'));
@@ -2537,7 +2544,7 @@ function BatchVideoGeneration({projectId,scenes,keys,lang,hasActiveJob,onQueued,
       onSuccess:job=>{setBatchExportJobId(job.id);onQueued();},
       onError:error=>{setBatchPhase('failed');setBatchMessage(error instanceof Error?error.message:t('تعذر تجميع الفيلم.','Could not assemble the film.'));},
     });
-  },[batchPhase,batchJobIds,jobsQuery.data,exportMutation.mutate,projectId,exportSettings,onQueued,lang]);
+  },[batchPhase,batchJobIds,batchSceneIds,scenesWithoutVideo,jobsQuery.data,exportMutation.mutate,projectId,exportSettings,onQueued,lang]);
   useEffect(()=>{
     if(batchPhase!=='assembling'||!batchExportJobId)return;
     const job=jobsQuery.data?.find(item=>item.id===batchExportJobId);
