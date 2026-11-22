@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import os
 import shutil
+import subprocess
+import json
 import threading
 import time
 from pathlib import Path
@@ -134,6 +136,22 @@ def _generate_one(session, task: dict[str, Any], output_dir: Path) -> Path:
             "WanGP reported success but did not return a saved video file. "
             f"Reported outputs: {[str(path) for path in candidates]}"
         )
+    probe = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "stream=codec_type", "-of", "json", str(video)],
+        capture_output=True, text=True, timeout=30,
+    )
+    if probe.returncode != 0:
+        raise RuntimeError(f"FFprobe could not validate the generated MP4: {probe.stderr[-500:]}")
+    streams = json.loads(probe.stdout).get("streams", [])
+    stream_types = {item.get("codec_type") for item in streams}
+    if "video" not in stream_types:
+        raise RuntimeError("The generated file does not contain a video stream.")
+    if "audio" not in stream_types:
+        raise RuntimeError(
+            "LTX-2.5 returned a video without an audio stream. The worker will not publish a silent clip; "
+            "check that the local finetune and prompt-generated audio settings loaded correctly."
+        )
+    print("[ELLA] Verified MP4 contains both video and audio streams.", flush=True)
     if video.stat().st_size > MAX_UPLOAD_BYTES:
         raise RuntimeError(
             f"Generated video is {video.stat().st_size / 1024 / 1024:.1f} MiB; "
@@ -251,7 +269,13 @@ def run_worker() -> None:
             "WanGP reports the selected LTX model as missing. The checkpoint files may exist in /tmp, "
             "but the local LTX-2.5 finetune definition must be installed before jobs can run."
         )
-    print(f"[ELLA] Connected to {BASE_URL}. Waiting for Ella2027 video jobs...", flush=True)
+    health = requests.get(api_url("/health"), headers={"Authorization": f"Bearer {TOKEN}"}, timeout=30)
+    health.raise_for_status()
+    health_data = health.json()
+    if health_data.get("status") != "ok" or not health_data.get("storage"):
+        raise RuntimeError(f"Ella2027 worker API or Cloudinary storage is not ready: {health_data}")
+    print(f"[ELLA] Connected to {BASE_URL}. API auth and Cloudinary storage verified.", flush=True)
+    print("[ELLA] Waiting for Ella2027 video jobs...", flush=True)
 
     while True:
         try:
