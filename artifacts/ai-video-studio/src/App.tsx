@@ -786,7 +786,7 @@ function ProjectForm({ onClose, initial, initialMode = 'auto', initialExperience
   useEffect(() => { setPlan(null); }, [sceneCount, sceneDurationSeconds, allowExternalProviders]);
   const totalDurationSeconds = sceneCount * sceneDurationSeconds;
   const minSceneDuration = Math.ceil(5 / sceneCount);
-  const maxSceneDuration = Math.floor(3600 / sceneCount);
+  const maxSceneDuration = Math.min(10, Math.floor(3600 / sceneCount));
   const manualScenesReady = manualScenes.length === sceneCount && manualScenes.every(scene => Boolean(scene.description.trim()));
   const manualStoryReady = manualFullStory.trim().length >= 20 && allowExternalProviders && textProviderReady && approvePotentialCharges;
   const retryingStory = projectCreated && mode === 'auto' && useTextProvider && generationError;
