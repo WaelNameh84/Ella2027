@@ -450,6 +450,10 @@ def run_worker() -> None:
         raise FileNotFoundError(f"WanGP source not found at {WANGP_ROOT}.")
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    if UPSCALE_PYTHON.is_file() and UPSCALE_WEIGHTS.is_file():
+        print("[ELLA] Automatic Real-ESRGAN x2 video enhancement: READY.", flush=True)
+    else:
+        print("[ELLA] WARNING: Real-ESRGAN runtime/weights are missing; generated videos will use the original resolution.", flush=True)
     print("[ELLA] Initializing WanGP's supported Python API; model files are reused.", flush=True)
     session = init(
         root=WANGP_ROOT,
