@@ -551,9 +551,10 @@ async function processScriptJob(job: typeof studioJobsTable.$inferSelect): Promi
       const localWorker = videoKey.provider === "local-video-worker";
       const orderedScenes = [...insertedScenes].sort((a, b) => a.sortOrder - b.sortOrder);
       let queuedVideoJobs = 0;
+      const queueTime = Date.now();
       // Insert each scene as its own durable job in storyboard order.
       // Keeping this explicit also lets the transaction verify that no scene was skipped.
-      for (const scene of orderedScenes) {
+      for (const [index, scene] of orderedScenes.entries()) {
         const [queuedJob] = await tx.insert(studioJobsTable).values({
           userId: job.userId,
           projectId: project.id,
@@ -568,6 +569,8 @@ async function processScriptJob(job: typeof studioJobsTable.$inferSelect): Promi
             ...(localWorker ? { worker: "kaggle-ltx" } : {}),
           },
           message: localWorker ? "Queued automatically; waiting for the Kaggle LTX worker." : "Queued automatically from the storyboard.",
+          createdAt: new Date(queueTime + index),
+          updatedAt: new Date(queueTime + index),
         }).returning({ id: studioJobsTable.id });
         if (!queuedJob?.id) {
           throw new Error(`Could not queue video generation for scene ${scene.sortOrder + 1}.`);
