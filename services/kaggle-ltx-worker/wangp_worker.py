@@ -25,6 +25,22 @@ if not (WANGP_ROOT / "shared" / "api.py").is_file():
 if str(WANGP_ROOT) not in __import__("sys").path:
     __import__("sys").path.insert(0, str(WANGP_ROOT))
 os.chdir(WANGP_ROOT)
+
+# Kaggle's IPython OutStream does not implement TextIOBase.reconfigure().
+# Patch WanGP's optional UTF-8 console setup before shared.api imports wgp.py.
+_WGP_ENTRY = WANGP_ROOT / "wgp.py"
+_WGP_UTF8_LINE = 'for _stream in (sys.stdout, sys.stderr): _stream.reconfigure(encoding="utf-8", errors="replace")'
+_WGP_UTF8_SAFE = 'for _stream in (sys.stdout, sys.stderr):\n    if hasattr(_stream, "reconfigure"):\n        _stream.reconfigure(encoding="utf-8", errors="replace")'
+_wgp_source = _WGP_ENTRY.read_text(encoding="utf-8")
+if _WGP_UTF8_LINE in _wgp_source:
+    _WGP_ENTRY.with_suffix(".py.ella-backup").write_text(_wgp_source, encoding="utf-8")
+    _WGP_ENTRY.write_text(_wgp_source.replace(_WGP_UTF8_LINE, _WGP_UTF8_SAFE, 1), encoding="utf-8")
+    print("[ELLA] Applied Kaggle-safe UTF-8 stream patch to WanGP.", flush=True)
+elif _WGP_UTF8_SAFE in _wgp_source:
+    print("[ELLA] WanGP UTF-8 stream patch is already applied.", flush=True)
+else:
+    raise RuntimeError("WanGP wgp.py UTF-8 setup changed upstream; refusing an unverified compatibility patch.")
+
 from shared.api import init
 
 BASE_URL = os.environ.get("ELLA_API_BASE_URL", "https://ella2027.onrender.com").rstrip("/")
