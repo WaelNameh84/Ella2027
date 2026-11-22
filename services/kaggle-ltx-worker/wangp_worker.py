@@ -48,7 +48,7 @@ TOKEN = os.environ.get("ELLA_KAGGLE_WORKER_TOKEN", "").strip()
 WANGP_ROOT = Path("/kaggle/working/WanGP")
 OUTPUT_DIR = Path("/kaggle/working/ella2027-output")
 MODEL_TYPE = os.environ.get("ELLA_WANGP_MODEL_TYPE", "ltx2_25_22B_distilled")
-MODEL_MAX_SECONDS = 5
+MODEL_MAX_SECONDS = 10
 MAX_UPLOAD_BYTES = 100 * 1024 * 1024
 FPS = 24
 IDLE_SECONDS = 12
@@ -98,7 +98,7 @@ def _make_settings(session, task: dict[str, Any], output_dir: Path) -> dict[str,
     if duration < 1 or duration > MODEL_MAX_SECONDS:
         raise RuntimeError(
             f"This Kaggle T4 profile is configured for clips up to {MODEL_MAX_SECONDS} seconds. "
-            f"The scene requests {duration} seconds; shorten the scene to 5 seconds before retrying. "
+            f"The scene requests {duration} seconds; reduce it to {MODEL_MAX_SECONDS} seconds or less before retrying. "
             "The worker will not silently truncate a scene."
         )
 
