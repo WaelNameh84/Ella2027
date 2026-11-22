@@ -1079,3 +1079,103 @@ html.dark .app-shell[data-route="project-workspace"] .studio-rail-note{color:#92
     font-size: 10px;
   }
 }
+
+
+/* Provider keys page: color-only match with the Ella dark glass theme.
+   Preserve its existing layout, controls, fields, and behavior. */
+html.dark .app-shell[data-route="provider-keys"]{
+  --ella-line:rgba(151,177,205,.16);
+  --ella-muted:#9aa9ba;
+  color:#eaf0f7;
+  background:radial-gradient(ellipse at 72% -15%,rgba(81,112,190,.2),transparent 42%),radial-gradient(ellipse at 8% 75%,rgba(39,160,177,.08),transparent 35%),#080d16;
+}
+html.dark .app-shell[data-route="provider-keys"] .main-area{background:transparent}
+html.dark .app-shell[data-route="provider-keys"] .sidebar{
+  background:rgba(9,15,26,.94);border-inline-end:1px solid var(--ella-line);backdrop-filter:blur(24px)
+}
+html.dark .app-shell[data-route="provider-keys"] .sidebar-brand{border-bottom-color:var(--ella-line)}
+html.dark .app-shell[data-route="provider-keys"] .sidebar-caption{color:#8fa1b9}
+html.dark .app-shell[data-route="provider-keys"] .side-link{color:#a9b6c7}
+html.dark .app-shell[data-route="provider-keys"] .side-link:hover,
+html.dark .app-shell[data-route="provider-keys"] .side-link.active{
+  background:linear-gradient(100deg,rgba(113,135,255,.18),rgba(99,214,232,.06));color:#f4f7ff
+}
+html.dark .app-shell[data-route="provider-keys"] .side-link.active .nav-indicator{
+  background:#63d6e8;box-shadow:0 0 14px rgba(99,214,232,.7)
+}
+html.dark .app-shell[data-route="provider-keys"] .topbar{
+  background:rgba(8,13,22,.72);border-bottom-color:var(--ella-line);backdrop-filter:blur(22px)
+}
+html.dark .app-shell[data-route="provider-keys"] .topbar h1,
+html.dark .app-shell[data-route="provider-keys"] .page-toolbar h2,
+html.dark .app-shell[data-route="provider-keys"] .section-heading h3,
+html.dark .app-shell[data-route="provider-keys"] .provider-ident b{
+  color:#f2f5fb
+}
+html.dark .app-shell[data-route="provider-keys"] .page-content{background:transparent;color:#eaf0f7}
+html.dark .app-shell[data-route="provider-keys"] .page-toolbar p,
+html.dark .app-shell[data-route="provider-keys"] .provider-ident span,
+html.dark .app-shell[data-route="provider-keys"] .provider-purpose-description,
+html.dark .app-shell[data-route="provider-keys"] .provider-purpose-warning,
+html.dark .app-shell[data-route="provider-keys"] .provider-message,
+html.dark .app-shell[data-route="provider-keys"] .priority-control,
+html.dark .app-shell[data-route="provider-keys"] .provider-purpose-description,
+html.dark .app-shell[data-route="provider-keys"] .provider-purpose-warning{
+  color:#9eafc3
+}
+html.dark .app-shell[data-route="provider-keys"] .panel,
+html.dark .app-shell[data-route="provider-keys"] .provider-list,
+html.dark .app-shell[data-route="provider-keys"] .rotation-panel{
+  background:linear-gradient(145deg,rgba(22,33,51,.94),rgba(13,21,34,.96));
+  border-color:var(--ella-line);color:#eaf0f7
+}
+html.dark .app-shell[data-route="provider-keys"] .resource-notice{
+  background:linear-gradient(120deg,rgba(40,55,92,.48),rgba(14,26,42,.72));
+  border-color:rgba(130,154,255,.2);color:#9eacff
+}
+html.dark .app-shell[data-route="provider-keys"] .provider-row{border-top-color:var(--ella-line)}
+html.dark .app-shell[data-route="provider-keys"] .provider-avatar{
+  background:rgba(120,137,255,.13);color:#9eacff
+}
+html.dark .app-shell[data-route="provider-keys"] .provider-ident .provider-purpose{
+  background:rgba(120,137,255,.13);color:#aebaff
+}
+html.dark .app-shell[data-route="provider-keys"] .provider-ident .provider-purpose.is-unavailable,
+html.dark .app-shell[data-route="provider-keys"] .provider-ident .provider-purpose-warning{
+  color:#ff9a9a
+}
+html.dark .app-shell[data-route="provider-keys"] .key-status{
+  background:rgba(151,177,205,.12);color:#b8c6d8
+}
+html.dark .app-shell[data-route="provider-keys"] .key-status.valid{
+  background:rgba(99,214,232,.12);color:#72dce9
+}
+html.dark .app-shell[data-route="provider-keys"] .key-status.invalid,
+html.dark .app-shell[data-route="provider-keys"] .key-status.rate_limited,
+html.dark .app-shell[data-route="provider-keys"] .key-status.quota_limited{
+  background:rgba(255,112,112,.12);color:#ff9a9a
+}
+html.dark .app-shell[data-route="provider-keys"] .studio-input,
+html.dark .app-shell[data-route="provider-keys"] .priority-control input{
+  background:#0c1523;color:#eaf0f7;border-color:var(--ella-line)
+}
+html.dark .app-shell[data-route="provider-keys"] .studio-input::placeholder{color:#8192a8}
+html.dark .app-shell[data-route="provider-keys"] .btn-quiet{
+  background:rgba(255,255,255,.045);color:#dce6f3;border-color:var(--ella-line)
+}
+html.dark .app-shell[data-route="provider-keys"] .btn-quiet:hover{background:rgba(120,137,255,.13)}
+html.dark .app-shell[data-route="provider-keys"] .btn-ghost{color:#aab8ca}
+html.dark .app-shell[data-route="provider-keys"] .btn-ghost:hover{background:rgba(120,137,255,.12);color:#f2f5fb}
+html.dark .app-shell[data-route="provider-keys"] .eyebrow,
+html.dark .app-shell[data-route="provider-keys"] .field-label,
+html.dark .app-shell[data-route="provider-keys"] .result-count{color:#91a3ba}
+html.dark .app-shell[data-route="provider-keys"] .mobile-nav{
+  background:rgba(8,13,22,.94);border-top-color:var(--ella-line);backdrop-filter:blur(24px)
+}
+html.dark .app-shell[data-route="provider-keys"] .mobile-nav a{color:#91a2b8}
+html.dark .app-shell[data-route="provider-keys"] .mobile-nav a.active{color:#9eacff}
+html.dark .app-shell[data-route="provider-keys"] .modal-content,
+html.dark .app-shell[data-route="provider-keys"] .provider-key-modal{
+  background:#101a29;color:#eaf0f7;border-color:var(--ella-line)
+}
+html.dark .app-shell[data-route="provider-keys"] .modal-head{border-bottom-color:var(--ella-line)}
