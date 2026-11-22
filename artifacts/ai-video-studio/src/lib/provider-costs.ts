@@ -4,6 +4,7 @@ export const providerCostRanges: Record<string, Record<CostService, [number, num
   'free-test': { image: [0, 0], video: [0, 0], voice: [0, 0] },
   'ai-horde': { image: [0, 0], video: [0, 0], voice: [0, 0] },
   'piper-local': { image: [0, 0], video: [0, 0], voice: [0, 0] },
+  'local-video-worker': { image: [0, 0], video: [0, 0], voice: [0, 0] },
   openai: { image: [0.02, 0.12], video: [0.05, 2], voice: [0.01, 0.3] },
   stability: { image: [0.02, 0.08], video: [0.05, 2], voice: [0.01, 0.3] },
   replicate: { image: [0.01, 0.2], video: [0.08, 3], voice: [0.01, 0.3] },
