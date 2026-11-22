@@ -969,3 +969,59 @@ html.dark .app-shell[data-route="project-workspace"] .studio-rail-note{color:#92
   .app-shell[data-route="workspace"] .create-studio-entry .quick-idea-entry.is-inline{padding:9px}
   .app-shell[data-route="workspace"] .create-studio-entry .quick-idea-input{min-height:78px;height:78px}
 }
+
+
+/* Restore text labels on the three experience tabs; icon-only controls belong to scene/time settings below. */
+.app-shell[data-route="workspace"] .create-studio-entry .experience-mode-switch{
+  display:grid;
+  width:100%;
+  max-width:100%;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:6px;
+  padding:4px;
+  margin:0;
+  border-radius:12px;
+}
+.app-shell[data-route="workspace"] .create-studio-entry .experience-mode-switch button{
+  width:100%;
+  min-width:0;
+  min-height:34px;
+  height:34px;
+  padding:6px 8px;
+  font-size:11px;
+  white-space:nowrap;
+}
+.app-shell[data-route="workspace"] .create-studio-entry .quick-icon-setting{
+  flex:0 0 78px;
+  width:78px;
+}
+.app-shell[data-route="workspace"] .create-studio-entry .quick-icon-setting>summary{
+  min-height:38px;
+  height:38px;
+  justify-content:center;
+  gap:7px;
+  padding:5px 7px;
+}
+.app-shell[data-route="workspace"] .create-studio-entry .quick-icon-setting>summary svg{
+  flex:none;
+  opacity:.9;
+}
+.app-shell[data-route="workspace"] .create-studio-entry .quick-icon-setting>summary b{
+  max-width:none;
+  font-size:11px;
+  color:var(--foreground);
+}
+.app-shell[data-route="workspace"] .create-studio-entry .quick-icon-setting>summary svg:last-child{
+  width:11px;height:11px;opacity:.6;
+}
+@media(max-width:600px){
+  .app-shell[data-route="workspace"] .create-studio-entry .experience-mode-switch{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+  }
+  .app-shell[data-route="workspace"] .create-studio-entry .experience-mode-switch button{
+    width:100%;min-width:0;height:32px;min-height:32px;font-size:10px;
+  }
+  .app-shell[data-route="workspace"] .create-studio-entry .quick-icon-setting{
+    flex-basis:74px;width:74px;
+  }
+}
