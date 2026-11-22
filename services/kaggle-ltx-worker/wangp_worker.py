@@ -192,6 +192,40 @@ def _generate_one(session, task: dict[str, Any], output_dir: Path) -> Path:
     return video
 
 
+
+def _brighten_video(video: Path) -> Path:
+    """Apply a restrained brightness/gamma lift to dark LTX renders, preserving audio."""
+    output = video.with_name(f"{video.stem}_brightened.mp4")
+    if output.exists():
+        output.unlink()
+    command = [
+        "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+        "-i", str(video),
+        "-map", "0:v:0", "-map", "0:a?",
+        "-vf", "eq=brightness=0.035:gamma=1.12:contrast=1.02:saturation=1.03",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "17",
+        "-pix_fmt", "yuv420p",
+        "-c:a", "aac", "-b:a", "192k",
+        "-movflags", "+faststart",
+        str(output),
+    ]
+    result = subprocess.run(command, capture_output=True, text=True, timeout=900)
+    if result.returncode != 0 or not output.is_file() or output.stat().st_size == 0:
+        raise RuntimeError(f"Brightness correction failed: {result.stderr[-1200:]}")
+    probe = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "stream=codec_type,width,height",
+         "-of", "json", str(output)],
+        capture_output=True, text=True, timeout=30,
+    )
+    if probe.returncode != 0:
+        raise RuntimeError(f"Brightened video validation failed: {probe.stderr[-800:]}")
+    streams = json.loads(probe.stdout).get("streams", [])
+    if not any(item.get("codec_type") == "video" for item in streams):
+        raise RuntimeError("Brightness correction produced no video stream.")
+    print("[ELLA] Applied gentle brightness/gamma correction and preserved original resolution/audio.", flush=True)
+    return output
+
+
 def process_one(session, token: str) -> bool:
     headers = {"Authorization": f"Bearer {token}"}
     response = requests.post(api_url("/claim"), headers=headers, json={}, timeout=30)
@@ -213,6 +247,7 @@ def process_one(session, token: str) -> bool:
     try:
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         video_path = _generate_one(session, task, OUTPUT_DIR)
+        video_path = _brighten_video(video_path)
         if state["lost"]:
             raise RuntimeError("The job lease was lost during generation; stale output was discarded.")
 
