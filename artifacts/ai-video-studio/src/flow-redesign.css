@@ -288,3 +288,91 @@ html.dark .app-shell:not([data-route="provider-keys"]) .final-film-actions{
   html.dark .app-shell:not([data-route="provider-keys"]) .final-film-actions{align-items:stretch;flex-direction:column}
   html.dark .app-shell:not([data-route="provider-keys"]) .final-film-actions>.btn{width:100%;justify-content:center}
 }
+
+
+/* Scene gallery: clear, cinematic clip cards on desktop and touch devices. */
+html.dark .app-shell[data-route="project-workspace"] .storyboard-grid{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));
+  gap:13px;align-items:start
+}
+html.dark .app-shell[data-route="project-workspace"] .storyboard-card{
+  min-width:0;overflow:hidden;border:1px solid rgba(145,169,205,.16);
+  border-radius:15px;background:linear-gradient(155deg,#111e30,#0a1320);
+  box-shadow:0 8px 24px rgba(0,0,0,.16);transition:border-color .18s,transform .18s,box-shadow .18s
+}
+html.dark .app-shell[data-route="project-workspace"] .storyboard-card:hover{
+  border-color:rgba(124,151,255,.48);transform:translateY(-2px);
+  box-shadow:0 14px 30px rgba(0,0,0,.24)
+}
+html.dark .app-shell[data-route="project-workspace"] .storyboard-card.is-selected{
+  border-color:rgba(111,210,231,.7);box-shadow:0 0 0 2px rgba(99,214,232,.12),0 12px 28px rgba(0,0,0,.2)
+}
+html.dark .app-shell[data-route="project-workspace"] .storyboard-card-main{
+  display:block;width:100%;min-width:0;text-align:start
+}
+html.dark .app-shell[data-route="project-workspace"] .storyboard-thumb{
+  position:relative;display:block;width:100%;aspect-ratio:16/9;overflow:hidden;
+  background:radial-gradient(ellipse at 50% 35%,#263b58,#070c14 75%);
+  border-bottom:1px solid rgba(145,169,205,.13)
+}
+html.dark .app-shell[data-route="project-workspace"] .storyboard-thumb>img,
+html.dark .app-shell[data-route="project-workspace"] .storyboard-thumb>video{
+  display:block;width:100%;height:100%;object-fit:cover;background:#050a12;
+  transition:transform .35s ease
+}
+html.dark .app-shell[data-route="project-workspace"] .storyboard-card:hover .storyboard-thumb>img,
+html.dark .app-shell[data-route="project-workspace"] .storyboard-card:hover .storyboard-thumb>video{transform:scale(1.035)}
+html.dark .app-shell[data-route="project-workspace"] .storyboard-number{
+  position:absolute;top:9px;inset-inline-start:9px;display:grid;place-items:center;
+  min-width:29px;height:25px;padding:0 7px;border:1px solid rgba(255,255,255,.18);
+  border-radius:7px;background:rgba(3,8,15,.72);color:#f4f7ff;
+  font:700 10px var(--app-font-mono);backdrop-filter:blur(10px)
+}
+html.dark .app-shell[data-route="project-workspace"] .storyboard-card-copy{
+  display:flex;flex-direction:column;gap:5px;min-width:0;padding:11px 12px 9px
+}
+html.dark .app-shell[data-route="project-workspace"] .storyboard-card-copy>b{
+  overflow:hidden;color:#edf3fc;font-size:12px;line-height:1.45;text-overflow:ellipsis;white-space:nowrap
+}
+html.dark .app-shell[data-route="project-workspace"] .storyboard-card-copy>span{
+  color:#9eafc3;font-size:10px;line-height:1.5
+}
+html.dark .app-shell[data-route="project-workspace"] .storyboard-status{
+  display:inline-flex;align-self:flex-start;align-items:center;min-height:21px;
+  padding:3px 7px;border:1px solid rgba(145,169,205,.15);border-radius:99px;
+  font-size:9px;line-height:1.2
+}
+html.dark .app-shell[data-route="project-workspace"] .storyboard-card-actions{
+  display:flex;align-items:center;gap:5px;padding:8px 10px 10px;
+  border-top:1px solid rgba(145,169,205,.1);background:rgba(4,10,18,.28)
+}
+html.dark .app-shell[data-route="project-workspace"] .storyboard-card-actions>button,
+html.dark .app-shell[data-route="project-workspace"] .storyboard-upload-label>span{
+  display:grid;place-items:center;width:32px;height:30px;border:1px solid rgba(145,169,205,.16);
+  border-radius:8px;background:rgba(255,255,255,.035);color:#b9c8da
+}
+html.dark .app-shell[data-route="project-workspace"] .storyboard-card-actions>button:hover,
+html.dark .app-shell[data-route="project-workspace"] .storyboard-upload-label:hover>span{
+  border-color:rgba(124,151,255,.45);background:rgba(120,137,255,.12);color:#eaf0ff
+}
+html.dark .app-shell[data-route="project-workspace"] .storyboard-card-actions>button.is-danger{margin-inline-start:auto;color:#f09a9a}
+html.dark .app-shell[data-route="project-workspace"] .storyboard-upload-label{display:block;cursor:pointer}
+html.dark .app-shell[data-route="project-workspace"] .storyboard-upload-label>input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+@media(max-width:767px){
+  html.dark .app-shell[data-route="project-workspace"] .storyboard-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+  html.dark .app-shell[data-route="project-workspace"] .storyboard-card{border-radius:11px}
+  html.dark .app-shell[data-route="project-workspace"] .storyboard-card-copy{gap:4px;padding:8px 9px 7px}
+  html.dark .app-shell[data-route="project-workspace"] .storyboard-card-copy>b{font-size:10px}
+  html.dark .app-shell[data-route="project-workspace"] .storyboard-card-copy>span{font-size:9px}
+  html.dark .app-shell[data-route="project-workspace"] .storyboard-card-actions{gap:4px;padding:7px 7px 8px}
+  html.dark .app-shell[data-route="project-workspace"] .storyboard-card-actions>button,
+  html.dark .app-shell[data-route="project-workspace"] .storyboard-upload-label>span{width:27px;height:27px}
+}
+@media(max-width:360px){
+  html.dark .app-shell[data-route="project-workspace"] .storyboard-grid{grid-template-columns:minmax(0,1fr)}
+}
+@media(prefers-reduced-motion:reduce){
+  html.dark .app-shell[data-route="project-workspace"] .storyboard-card,
+  html.dark .app-shell[data-route="project-workspace"] .storyboard-thumb>img,
+  html.dark .app-shell[data-route="project-workspace"] .storyboard-thumb>video{transition:none}
+}
