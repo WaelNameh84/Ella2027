@@ -82,6 +82,8 @@ router.post("/claim", async (_req, res): Promise<void> => {
           ...(project.characters ?? []).filter((character) => scene.characterIds.includes(character.id)).map((character) => `${character.name}, appearance: ${character.description}, clothing: ${character.costume}.`)
         ].join("\n").split(/\s+/).slice(0, 200).join(" "),
         durationSeconds: scene.durationSeconds, aspectRatio: project.aspectRatio,
+        model: String(input.model ?? "ltx-2.5"),
+        audioPrompt: String(scene.narration ?? ""),
         fps: 24, resolution: 768,
         mode: input.mode === "image" ? "image" : "text",
         referenceImageUrl: input.mode === "image" ? scene.assetUrl : null,
