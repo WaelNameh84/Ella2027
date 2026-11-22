@@ -50,3 +50,19 @@ test("GPU worker contract supports automatic model selection and capability-awar
   assert.match(media, /auto_split/);
   assert.match(docs, /supports_auto_split/);
 });
+
+test("one-click storyboard generation queues every scene in order for the sequential Kaggle worker", async () => {
+  const fs = await import("node:fs/promises");
+  const app = await fs.readFile(new URL("../../ai-video-studio/src/App.tsx", import.meta.url), "utf8");
+  const jobs = await fs.readFile(new URL("../src/lib/studioJobs.ts", import.meta.url), "utf8");
+  const workerRoutes = await fs.readFile(new URL("../src/routes/kaggleWorker.ts", import.meta.url), "utf8");
+  const worker = await fs.readFile(new URL("../../../services/kaggle-ltx-worker/wangp_worker.py", import.meta.url), "utf8");
+
+  assert.match(app, /setAutoGenerateVideo\(true\)/);
+  assert.match(app, /توليد المشاهد وإرسال كل المقاطع إلى المهام/);
+  assert.match(jobs, /if \(input\.autoGenerateVideo === true\)/);
+  assert.match(jobs, /\.sort\(\(a, b\) => a\.sortOrder - b\.sortOrder\)\.map\(\(scene, index\)/);
+  assert.match(jobs, /createdAt: new Date\(queueTime \+ index\)/);
+  assert.match(workerRoutes, /\.orderBy\(asc\(studioJobsTable\.createdAt\)\)/);
+  assert.match(worker, /while True:[\s\S]*?did_work = process_one\(session, TOKEN\)/);
+});
