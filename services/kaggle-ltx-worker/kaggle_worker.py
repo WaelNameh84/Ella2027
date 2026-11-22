@@ -47,6 +47,13 @@ def process_one_ltx_job(base_url: str, token: str,
         return False
 
     job_id = job["id"]
+    print(
+        f"[ELLA KAGGLE CLAIMED] job={job_id} "
+        f"durationSeconds={job.get('durationSeconds', 'MISSING')} "
+        f"worker={job.get('worker', 'unknown')} "
+        f"callback={getattr(generate_fn, '__name__', type(generate_fn).__name__)}",
+        flush=True,
+    )
     lease_token = job["leaseToken"]
     stop = threading.Event()
     state: dict[str, Any] = {"lost": False}
