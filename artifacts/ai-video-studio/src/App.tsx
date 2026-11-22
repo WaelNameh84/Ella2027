@@ -796,9 +796,9 @@ function ProjectForm({ onClose, initial, initialMode = 'auto', initialExperience
   return <Modal inline={inline} className="idea-entry-card" onClose={onClose} title={editing ? tx(lang,'تعديل تفاصيل المشروع','Edit project details') : mode === 'manual' ? tx(lang, 'مساحة العمل اليدوية', 'Manual production workspace') : tx(lang, 'فكرتك إلى قصة', 'Turn your idea into a story')} subtitle={editing ? tx(lang, 'عدّل تفاصيل المشروع ومشاهده.', 'Update the project details.') : mode === 'manual' ? tx(lang, 'أنشئ مشروعك ثم اكتب المشاهد وعدّلها واربط الصور المرجعية بنفسك.', 'Create your project, then write and edit scenes and attach visual references yourself.') : tx(lang, 'اكتب فكرة قصيرة، ثم اختر المسار السريع أو تحكم بالمشاهد في الوضع الاحترافي.', 'Describe your idea, then choose the quick path or control each scene in Professional mode.')}>
     <form onSubmit={e => { e.preventDefault(); void submit(); }} className="form-stack">
       {!editing && inline && <div className="experience-mode-switch" role="tablist" aria-label={tx(lang,'مستوى التحكم','Experience mode')}>
-        <button type="button" role="tab" title={tx(lang,'سريع','Quick')} aria-label={tx(lang,'سريع','Quick')} aria-selected={experienceMode==='quick'} className={experienceMode==='quick'?'is-selected':''} onClick={()=>chooseExperienceMode('quick')} disabled={projectCreated}><Sparkles size={16} aria-hidden="true" /></button>
-        <button type="button" role="tab" title={tx(lang,'احترافي','Professional')} aria-label={tx(lang,'احترافي','Professional')} aria-selected={experienceMode==='pro' && mode==='auto'} className={experienceMode==='pro' && mode==='auto'?'is-selected':''} onClick={()=>chooseExperienceMode('pro')} disabled={projectCreated}><Clapperboard size={16} aria-hidden="true" /></button>
-        <button type="button" role="tab" title={tx(lang,'يدوي','Manual')} aria-label={tx(lang,'يدوي','Manual')} aria-selected={mode==='manual'} className={mode==='manual'?'is-selected':''} onClick={()=>chooseExperienceMode('manual')} disabled={projectCreated}><Settings2 size={16} aria-hidden="true" /></button>
+        <button type="button" role="tab" aria-selected={experienceMode==='quick'} className={experienceMode==='quick'?'is-selected':''} onClick={()=>chooseExperienceMode('quick')} disabled={projectCreated}>{tx(lang,'سريع','Quick')}</button>
+        <button type="button" role="tab" aria-selected={experienceMode==='pro' && mode==='auto'} className={experienceMode==='pro' && mode==='auto'?'is-selected':''} onClick={()=>chooseExperienceMode('pro')} disabled={projectCreated}>{tx(lang,'احترافي','Professional')}</button>
+        <button type="button" role="tab" aria-selected={mode==='manual'} className={mode==='manual'?'is-selected':''} onClick={()=>chooseExperienceMode('manual')} disabled={projectCreated}>{tx(lang,'يدوي','Manual')}</button>
       </div>}
       {!editing && mode !== 'manual' && plan && <FilmPlanCard plan={plan} lang={lang} pending={pending} approveDisabled={useTextProvider && !approvePotentialCharges} onEdit={()=>setPlan(null)} onReanalyze={()=>setPlan(makePlan())} onApprove={approvePlan} />}
       {!editing && (experienceMode === 'quick' || (experienceMode === 'pro' && mode === 'auto')) ? <>
@@ -811,10 +811,15 @@ function ProjectForm({ onClose, initial, initialMode = 'auto', initialExperience
                 <summary><span>{tx(lang,'نوع الفيديو','Video type')}</span><b>{tx(lang,videoTypes.find(([value])=>value===form.videoType)?.[1]||'سينمائي',videoTypes.find(([value])=>value===form.videoType)?.[2]||'Cinematic')}</b><ChevronDown size={13}/></summary>
                 <div className="quick-dropdown-panel"><label><span className="field-label">{tx(lang,'اختر نوع الفيديو','Choose video type')}</span><select className="studio-input" value={form.videoType} disabled={projectCreated} onChange={e=>update('videoType',e.target.value)}>{videoTypes.map(([value,ar,en])=><option key={value} value={value}>{tx(lang,ar,en)}</option>)}</select></label></div>
               </details>
-              <details className="quick-setting-dropdown">
-                <summary><span>{tx(lang,'المشاهد والمدة','Scenes & duration')}</span><b>{sceneCount} · {sceneDurationSeconds}ث</b><ChevronDown size={13}/></summary>
-                <div className="quick-dropdown-panel quick-scene-settings">
+              <details className="quick-setting-dropdown quick-icon-setting">
+                <summary title={tx(lang,'عدد المشاهد','Number of scenes')} aria-label={tx(lang,'عدد المشاهد','Number of scenes')}><Clapperboard size={16}/><b>{sceneCount}</b><ChevronDown size={12}/></summary>
+                <div className="quick-dropdown-panel">
                   <label><span className="field-label">{tx(lang,'عدد المشاهد','Number of scenes')}</span><input aria-label={tx(lang,'عدد المشاهد','Number of scenes')} type="number" min="1" max="24" step="1" className="studio-input" value={sceneCount} disabled={projectCreated} onChange={e=>setSceneCount(Math.max(1,Math.min(24,Number(e.target.value)||1)))} data-testid="input-quick-scene-count" /></label>
+                </div>
+              </details>
+              <details className="quick-setting-dropdown quick-icon-setting">
+                <summary title={tx(lang,'الثواني لكل مشهد','Seconds per scene')} aria-label={tx(lang,'الثواني لكل مشهد','Seconds per scene')}><Clock3 size={16}/><b>{sceneDurationSeconds}ث</b><ChevronDown size={12}/></summary>
+                <div className="quick-dropdown-panel">
                   <label><span className="field-label">{tx(lang,'ثواني لكل مشهد','Seconds per scene')}</span><input aria-label={tx(lang,'الثواني لكل مشهد','Seconds per scene')} type="number" min="1" max={Math.floor(3600/quickSceneCount)} step="1" className="studio-input" value={sceneDurationSeconds || ''} disabled={projectCreated} onChange={e=>{const raw=e.target.value;setSceneDurationSeconds(raw===''?0:Math.max(1,Math.min(Math.floor(3600/quickSceneCount),Number(raw)||1)));}} data-testid="input-quick-scene-duration" /></label>
                 </div>
               </details>
