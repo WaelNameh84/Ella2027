@@ -90,3 +90,21 @@ html.dark .ella-studio-home a:focus-visible,html.dark button:focus-visible{outli
 }
 @media(min-width:768px) and (max-width:1050px){html.dark .sidebar{width:76px}html.dark .sidebar .sidebar-caption,html.dark .sidebar .side-link span:not(.nav-indicator),html.dark .sidebar .sidebar-note{display:none}html.dark .sidebar .side-link{justify-content:center;margin-inline:8px;padding:12px}html.dark .sidebar .sidebar-brand{justify-content:center}}
 @media(prefers-reduced-motion:reduce){html.dark *,html.dark *::before,html.dark *::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}}
+
+/* Keep the first screen focused on creating, recent projects, and task activity. */
+html.dark .ella-engine-card,html.dark .ella-rail-flow{display:none!important}
+html.dark .ella-studio-rail{grid-template-columns:minmax(0,1fr)}
+html.dark .ella-pro-note{font-size:12px}
+html.dark .ella-pro-primary{min-height:48px;padding:13px 20px;border-radius:13px;font-size:14px}
+html.dark .ella-pro-primary svg{width:16px;height:16px}
+html.dark .ella-activity-bar{background:rgba(15,24,38,.84);border:1px solid var(--ella-line)}
+html.dark .ella-rail-projects{background:rgba(15,24,38,.84)}
+html.dark .quick-idea-entry .studio-input{min-height:150px;font-size:16px;line-height:1.8}
+html.dark .quick-toolbar{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+html.dark .quick-toolbar label{min-width:0}
+html.dark .quick-toolbar select{width:100%}
+html.dark .quick-advanced{border:1px solid var(--ella-line);border-radius:13px;padding:12px 14px;background:rgba(255,255,255,.025)}
+html.dark .quick-advanced>summary{cursor:pointer;color:#b8c6da;font-size:13px;font-weight:600}
+html.dark .quick-advanced>summary small{display:block;color:#8294ad;font-size:11px;font-weight:400;margin-top:4px}
+html.dark .idea-entry-card .modal-head h2{font-size:clamp(22px,3vw,30px);color:#f2f6ff}
+@media(max-width:767px){html.dark .quick-toolbar{grid-template-columns:1fr}html.dark .quick-idea-entry .studio-input{min-height:130px}html.dark .ella-pro-actions{display:flex;flex-direction:column;align-items:stretch}html.dark .ella-pro-note{justify-content:center}}
