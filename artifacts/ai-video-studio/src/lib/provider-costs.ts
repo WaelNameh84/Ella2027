@@ -30,7 +30,7 @@ export function defaultVideoModel(provider: string | undefined, mode: 'text' | '
   if (provider === 'fal') return mode === 'image' ? 'minimax/h3-max/image-to-video' : 'minimax/h3-max/text-to-video';
   if (provider === 'agnes') return 'agnes-video-2.5';
   if (provider === 'magic-hour') return 'ltx-2.5';
-  if (provider === 'local-video-worker') return 'ltxv-2b-0.9.8-distilled';
+  if (provider === 'local-video-worker') return 'ltx2_25_22B_distilled';
   if (provider === 'replicate') return 'minimax/video-01';
   return '';
 }
