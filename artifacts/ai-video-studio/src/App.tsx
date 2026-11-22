@@ -329,7 +329,7 @@ function ThemeLanguageProvider({ children }: { children: ReactNode }) {
 }
 
 const navItems = [
-  { href: '/dashboard', icon: Aperture, ar: 'نظرة عامة', en: 'Overview' },
+  { href: '/dashboard', icon: WandSparkles, ar: 'إنشاء فيديو', en: 'Create video' },
   { href: '/projects', icon: Clapperboard, ar: 'المشاريع', en: 'Projects' },
   { href: '/jobs', icon: Clock3, ar: 'المهام', en: 'Jobs' },
   { href: '/media', icon: ImagePlus, ar: 'مكتبة الوسائط', en: 'Media library' },
@@ -1227,10 +1227,10 @@ function Projects({ homePage = false, manualPage = false, createPage = false }: 
             <div className="ella-pro-feature">
               <div className="ella-pro-copy">
                 <span className="ella-overline">{tx(lang, 'مساحة الإنتاج الرئيسية', 'THE MAIN PRODUCTION WORKSPACE')}</span>
-                <h3>{tx(lang, 'اصنع فيلمك باحتراف.', 'Create your next film.')}</h3>
-                <p>{tx(lang, 'تحكم بالسيناريو والشخصيات والمشاهد والإعدادات والمزوّدات، وراجع خطة الإنتاج قبل أن تبدأ.', 'Shape the screenplay, characters, scenes, settings, and providers. Review your production plan before generation.')}</p>
+                <h3>{tx(lang, 'حوّل فكرتك إلى فيديو.', 'Turn your idea into a video.')}</h3>
+                <p>{tx(lang, 'اكتب فكرتك وحدد مدة الفيديو فقط. إيلا تتولى تقسيم المشاهد وتجهيزها تلقائيًا.', 'Write your idea and choose the video length. Ella plans and prepares every scene automatically.')}</p>
                 <div className="ella-pro-actions">
-                  <Link href="/create?mode=pro" className="ella-pro-primary">{tx(lang, 'ابدأ مشروعًا احترافيًا', 'Start a Pro project')} <ArrowLeft size={16}/></Link>
+                  <Link href="/create?mode=quick" className="ella-pro-primary">{tx(lang, 'ابدأ إنشاء فيديو', 'Create a video')} <ArrowLeft size={16}/></Link>
                   <span className="ella-pro-note"><ShieldCheck size={14}/>{tx(lang, 'التوليد المدفوع بموافقتك فقط', 'Paid generation only with your approval')}</span>
                 </div>
               </div>
