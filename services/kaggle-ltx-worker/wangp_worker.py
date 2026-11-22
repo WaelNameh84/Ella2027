@@ -20,7 +20,7 @@ BASE_URL = os.environ.get("ELLA_API_BASE_URL", "https://ella2027.onrender.com").
 TOKEN = os.environ.get("ELLA_KAGGLE_WORKER_TOKEN", "").strip()
 WANGP_ROOT = Path("/kaggle/working/Wan2GP")
 OUTPUT_DIR = Path("/kaggle/working/ella2027-output")
-MODEL_TYPE = os.environ.get("ELLA_WANGP_MODEL_TYPE", "ltx2_22B_distilled")
+MODEL_TYPE = os.environ.get("ELLA_WANGP_MODEL_TYPE", "ltx2_25_22B_distilled")
 MODEL_MAX_SECONDS = 5
 MAX_UPLOAD_BYTES = 100 * 1024 * 1024
 FPS = 24
@@ -80,6 +80,7 @@ def _make_settings(session, task: dict[str, Any], output_dir: Path) -> dict[str,
         "video_length": f"{duration}s",
         "duration_seconds": duration,
         "force_fps": FPS,
+        "audio_prompt_type": "",
     })
     if not settings["prompt"]:
         raise RuntimeError("Ella2027 supplied an empty video prompt.")
@@ -248,7 +249,7 @@ def run_worker() -> None:
     if status == "missing":
         raise RuntimeError(
             "WanGP reports the selected LTX model as missing. The checkpoint files may exist in /tmp, "
-            "but their paths must also be selected in the WanGP model configuration before jobs can run."
+            "but the local LTX-2.5 finetune definition must be installed before jobs can run."
         )
     print(f"[ELLA] Connected to {BASE_URL}. Waiting for Ella2027 video jobs...", flush=True)
 
