@@ -22,17 +22,40 @@ def make_ltx_generator(pipe):
         frames = seconds * fps + 1
         width, height = 768, 448
         steps = 24
-        prompt = str(job.get("prompt") or "One coherent cinematic shot, realistic natural movement.")
+
+        scene_prompt = str(job.get("prompt") or "").strip()
+        # Put the visual constraints first: LTX is more reliable with one simple,
+        # concrete action and explicit instructions not to render typography.
+        prompt = (
+            "Photorealistic live-action cinematic video. One continuous shot, "
+            "one clear subject and one simple physical action. Natural human "
+            "anatomy, realistic proportions, detailed real-world objects, "
+            "stable faces, stable geometry, coherent motion, consistent lighting. "
+            "The entire image contains only the described real-world scene. "
+            "Absolutely no writing, no letters, no numbers, no typography, "
+            "no captions, no signs, no logos, no symbols, no graphic overlays. "
+            "Visual scene description: "
+            + scene_prompt
+            + ". Show the action clearly and continuously. Keep the camera steady "
+            "and the scene visually consistent from beginning to end."
+        )
         negative_prompt = (
-            "blurry, low detail, smeared textures, distorted faces, extra limbs, "
-            "flicker, jitter, unstable motion, artifacts, watermark, subtitles, text"
+            "text, writing, letters, Chinese characters, Japanese characters, "
+            "Korean characters, Arabic script, calligraphy, glyphs, numbers, "
+            "typography, subtitles, captions, watermark, logo, symbols, "
+            "UI, interface, graphic overlay, signs, posters, printed words, "
+            "random characters, abstract patterns, surreal shapes, "
+            "blurry, low detail, smeared textures, distorted faces, malformed "
+            "hands, extra limbs, duplicated objects, warped vehicles, "
+            "flicker, jitter, unstable motion, temporal artifacts"
         )
 
         print(
-            f"[ELLA LTX CALLBACK V2] job={job.get('id', 'unknown')} "
+            f"[ELLA LTX CALLBACK V3] job={job.get('id', 'unknown')} "
             f"received_duration={requested!r} | "
             f"Generating requested duration={seconds}s | "
-            f"native={width}x{height} | frames={frames} | steps={steps}"
+            f"native={width}x{height} | frames={frames} | steps={steps} | "
+            "text_artifacts_filter=enabled"
         )
         result = pipe(
             prompt=prompt,
