@@ -431,7 +431,7 @@ function DashboardOverview() {
   const q = useGetStudioSummary();
   const jobsQuery = useListStudioJobs(undefined, { query: { queryKey: getListStudioJobsQueryKey(), refetchInterval: query => query.state.data?.some(job => job.status === 'queued' || job.status === 'running') ? 3000 : false, staleTime: 15000 } });
   const summary = q.data;
-  const jobs = jobsQuery.data ?? [];
+  const jobs = [...(jobsQuery.data ?? [])].sort((a,b)=>new Date(a.createdAt).getTime()-new Date(b.createdAt).getTime());
   const activeJobs = jobs.filter(job => job.status === 'queued' || job.status === 'running');
   const failedJobs = jobs.filter(job => job.status === 'failed');
   const completedJobs = jobs.filter(job => job.status === 'completed');
