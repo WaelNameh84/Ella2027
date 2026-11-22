@@ -802,3 +802,48 @@ html.dark .app-shell[data-route="project-workspace"] .studio-rail-note{color:#92
   .app-shell[data-route="workspace"] .create-studio-entry .quick-duration-hint{margin-inline-start:auto}
   .app-shell[data-route="workspace"] .create-studio-entry .quick-advanced summary{align-items:flex-start;flex-direction:column;justify-content:center;padding:8px 0;gap:2px}
 }
+
+
+/* Idea-card controls: each option opens as a compact dropdown inside the composer. */
+.app-shell[data-route="workspace"] .create-studio-entry .quick-dropdown-toolbar{
+  display:flex;align-items:center;gap:8px;flex:1 1 100%;min-width:0;flex-wrap:wrap;
+}
+.app-shell[data-route="workspace"] .create-studio-entry .quick-setting-dropdown{
+  position:relative;flex:1 1 145px;min-width:0;
+}
+.app-shell[data-route="workspace"] .create-studio-entry .quick-setting-dropdown>summary{
+  display:flex;align-items:center;justify-content:space-between;gap:7px;min-height:39px;
+  padding:7px 10px;border:1px solid rgba(130,151,184,.28);border-radius:10px;
+  background:rgba(110,130,180,.08);color:var(--foreground);cursor:pointer;list-style:none;
+  font-size:11px;font-weight:700;
+}
+.app-shell[data-route="workspace"] .create-studio-entry .quick-setting-dropdown>summary::-webkit-details-marker{display:none}
+.app-shell[data-route="workspace"] .create-studio-entry .quick-setting-dropdown>summary span{white-space:nowrap}
+.app-shell[data-route="workspace"] .create-studio-entry .quick-setting-dropdown>summary b{
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted-foreground);font-size:10px;font-weight:600;
+}
+.app-shell[data-route="workspace"] .create-studio-entry .quick-setting-dropdown[open]>summary{
+  border-color:rgba(111,130,255,.65);background:rgba(111,130,255,.13)
+}
+.app-shell[data-route="workspace"] .create-studio-entry .quick-dropdown-panel{
+  display:grid;gap:10px;margin-top:6px;padding:11px;border:1px solid rgba(130,151,184,.28);
+  border-radius:11px;background:var(--card);box-shadow:0 12px 28px rgba(0,0,0,.16);
+}
+.app-shell[data-route="workspace"] .create-studio-entry .quick-dropdown-panel .studio-input{
+  min-height:38px;height:38px;width:100%;font-size:12px
+}
+.app-shell[data-route="workspace"] .create-studio-entry .quick-scene-settings{
+  grid-template-columns:repeat(2,minmax(0,1fr))
+}
+.app-shell[data-route="workspace"] .create-studio-entry .quick-more-dropdown{flex-basis:175px}
+.app-shell[data-route="workspace"] .create-studio-entry .quick-more-dropdown .quick-dropdown-panel{
+  color:var(--muted-foreground);font-size:11px;line-height:1.6
+}
+@media(max-width:600px){
+  .app-shell[data-route="workspace"] .create-studio-entry .quick-dropdown-toolbar{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+  .app-shell[data-route="workspace"] .create-studio-entry .quick-setting-dropdown{min-width:0;width:100%}
+  .app-shell[data-route="workspace"] .create-studio-entry .quick-setting-dropdown>summary{min-height:38px;padding:6px 8px;font-size:10px}
+  .app-shell[data-route="workspace"] .create-studio-entry .quick-setting-dropdown>summary b{max-width:76px}
+  .app-shell[data-route="workspace"] .create-studio-entry .quick-dropdown-panel{grid-column:1/-1}
+  .app-shell[data-route="workspace"] .create-studio-entry .quick-scene-settings{grid-template-columns:1fr}
+}
