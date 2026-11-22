@@ -206,10 +206,11 @@ async def _generate_async(job: dict[str, Any], mcp_url: str, wangp_root: str) ->
                 f"this scene requests {seconds}s. Split the scene in Ella2027 before queueing."
             )
         fps = int(metadata.get("fps") or settings.get("fps") or job.get("fps") or 24)
-        if "video_length" in settings:
-            settings["video_length"] = _align_frames(seconds, fps, schema)
-        elif "num_frames" in settings:
-            settings["num_frames"] = _align_frames(seconds, fps, schema)
+        aligned_frames = _align_frames(seconds, fps, schema)
+        # WanGP's generation API uses video_length as the generic frame-count field.
+        settings["video_length"] = aligned_frames
+        if "num_frames" in settings:
+            settings["num_frames"] = aligned_frames
         if "fps" in settings:
             settings["fps"] = fps
 
