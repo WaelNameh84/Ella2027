@@ -80,7 +80,7 @@ router.post("/claim", async (_req, res): Promise<void> => {
           `Main visual action: ${scene.imagePrompt || scene.description || scene.title}`,
           `Camera: ${scene.shotType}; ${scene.cameraMovement}. Location: ${scene.location}. Lighting: ${scene.lighting}.`,
           ...(project.characters ?? []).filter((character) => scene.characterIds.includes(character.id)).map((character) => `${character.name}, appearance: ${character.description}, clothing: ${character.costume}.`)
-        ].join("\n").split(/\\s+/).slice(0, 200).join(" "),
+        ].join("\n").split(/\s+/).slice(0, 200).join(" "),
         durationSeconds: scene.durationSeconds, aspectRatio: project.aspectRatio,
         fps: 24, resolution: 768,
         mode: input.mode === "image" ? "image" : "text",
