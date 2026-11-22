@@ -847,3 +847,71 @@ html.dark .app-shell[data-route="project-workspace"] .studio-rail-note{color:#92
   .app-shell[data-route="workspace"] .create-studio-entry .quick-dropdown-panel{grid-column:1/-1}
   .app-shell[data-route="workspace"] .create-studio-entry .quick-scene-settings{grid-template-columns:1fr}
 }
+
+/* Final polish: keep the mode switch and idea controls aligned to the card width. */
+.app-shell[data-route="workspace"] .create-studio-entry .experience-mode-switch{
+  display:grid;width:100%;max-width:100%;grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:6px;margin:0;padding:5px;border:1px solid rgba(130,151,184,.22);
+  border-radius:13px;background:rgba(7,14,27,.48);box-sizing:border-box;
+}
+.app-shell[data-route="workspace"] .create-studio-entry .experience-mode-switch button{
+  display:flex;align-items:center;justify-content:center;min-width:0;width:100%;
+  min-height:39px;padding:7px 8px;border:1px solid transparent;border-radius:9px;
+  background:transparent;color:#b8c5d8;font-size:12px;font-weight:750;white-space:nowrap;
+}
+.app-shell[data-route="workspace"] .create-studio-entry .experience-mode-switch button.is-selected{
+  border-color:rgba(132,155,255,.48);background:linear-gradient(135deg,rgba(111,130,255,.25),rgba(111,130,255,.10));
+  color:#fff;box-shadow:0 3px 12px rgba(40,65,140,.18);
+}
+.app-shell[data-route="workspace"] .create-studio-entry .quick-idea-entry.is-inline{
+  width:100%;min-width:0;box-sizing:border-box;padding:14px;
+}
+.app-shell[data-route="workspace"] .create-studio-entry .quick-composer-bottom{
+  display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;
+}
+.app-shell[data-route="workspace"] .create-studio-entry .quick-composer-bottom>.writing-assistant{
+  grid-column:1/-1;justify-self:start;
+}
+.app-shell[data-route="workspace"] .create-studio-entry .quick-dropdown-toolbar{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;
+  width:100%;min-width:0;flex:none;
+}
+.app-shell[data-route="workspace"] .create-studio-entry .quick-setting-dropdown{width:100%;min-width:0}
+.app-shell[data-route="workspace"] .create-studio-entry .quick-setting-dropdown>summary{
+  min-height:42px;padding:8px 11px;border-radius:11px;gap:8px;
+}
+.app-shell[data-route="workspace"] .create-studio-entry .quick-setting-dropdown>summary span{
+  overflow:hidden;text-overflow:ellipsis;font-size:11px;
+}
+.app-shell[data-route="workspace"] .create-studio-entry .quick-setting-dropdown>summary b{
+  max-width:45%;text-align:end;
+}
+.app-shell[data-route="workspace"] .create-studio-entry .quick-duration-hint{
+  align-self:center;justify-self:end;white-space:nowrap;
+}
+.app-shell[data-route="workspace"] .create-studio-entry .quick-advanced{
+  width:100%;box-sizing:border-box;
+}
+@media(max-width:600px){
+  .app-shell[data-route="workspace"] .create-studio-entry .experience-mode-switch{
+    grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;padding:4px;
+  }
+  .app-shell[data-route="workspace"] .create-studio-entry .experience-mode-switch button{
+    min-height:37px;padding:6px 3px;font-size:11px;letter-spacing:-.02em;
+  }
+  .app-shell[data-route="workspace"] .create-studio-entry .quick-idea-entry.is-inline{padding:10px}
+  .app-shell[data-route="workspace"] .create-studio-entry .quick-composer-bottom{
+    grid-template-columns:minmax(0,1fr);gap:8px;
+  }
+  .app-shell[data-route="workspace"] .create-studio-entry .quick-dropdown-toolbar{
+    grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;
+  }
+  .app-shell[data-route="workspace"] .create-studio-entry .quick-setting-dropdown>summary{
+    min-height:40px;padding:7px 8px;font-size:10px;
+  }
+  .app-shell[data-route="workspace"] .create-studio-entry .quick-setting-dropdown>summary b{max-width:42%}
+  .app-shell[data-route="workspace"] .create-studio-entry .quick-duration-hint{
+    justify-self:start;margin:0;
+  }
+}
+
