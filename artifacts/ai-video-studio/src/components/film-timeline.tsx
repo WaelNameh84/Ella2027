@@ -3,6 +3,8 @@ import {
   AudioLines,
   Captions,
   Check,
+  ChevronUp,
+  ChevronDown,
   Clapperboard,
   Film,
   LoaderCircle,
@@ -782,6 +784,22 @@ export function FilmTimeline({
                 style={{ width: `${sceneWidth(scene)}px` }}
               >
                 {trackClip(scene, "visual", index)}
+                <div className="film-clip-mobile-order" aria-label={lang === "ar" ? "تغيير ترتيب المشهد" : "Reorder scene"}>
+                  <button
+                    type="button"
+                    disabled={index === 0}
+                    title={lang === "ar" ? "نقل المشهد للأعلى في الترتيب" : "Move scene earlier"}
+                    aria-label={lang === "ar" ? "نقل المشهد قبل السابق" : "Move scene before previous"}
+                    onClick={() => index > 0 && onReorder(scene.id, scenes[index - 1].id)}
+                  ><ChevronUp size={13} /></button>
+                  <button
+                    type="button"
+                    disabled={index === scenes.length - 1}
+                    title={lang === "ar" ? "نقل المشهد للأسفل في الترتيب" : "Move scene later"}
+                    aria-label={lang === "ar" ? "نقل المشهد بعد التالي" : "Move scene after next"}
+                    onClick={() => index < scenes.length - 1 && onReorder(scene.id, scenes[index + 1].id)}
+                  ><ChevronDown size={13} /></button>
+                </div>
               </div>
             ))}
           </div>
