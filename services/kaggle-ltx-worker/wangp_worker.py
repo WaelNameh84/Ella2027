@@ -80,7 +80,6 @@ def _make_settings(session, task: dict[str, Any], output_dir: Path) -> dict[str,
         "video_length": f"{duration}s",
         "duration_seconds": duration,
         "force_fps": FPS,
-        "output_dir": str(output_dir),
     })
     if not settings["prompt"]:
         raise RuntimeError("Ella2027 supplied an empty video prompt.")
@@ -243,7 +242,14 @@ def run_worker() -> None:
             "Inspect session.list_model_metadata(family='ltx2') and select the installed LTX-2.5 model id."
         )
     print("[ELLA] WanGP model definition:", definitions[0].get("name", MODEL_TYPE), flush=True)
-    print("[ELLA] Model availability:", session.get_model_availability(MODEL_TYPE), flush=True)
+    availability = session.get_model_availability(MODEL_TYPE)
+    print("[ELLA] Model availability:", availability, flush=True)
+    status = str(availability.get("status", availability.get("availability", ""))).lower() if isinstance(availability, dict) else ""
+    if status == "missing":
+        raise RuntimeError(
+            "WanGP reports the selected LTX model as missing. The checkpoint files may exist in /tmp, "
+            "but their paths must also be selected in the WanGP model configuration before jobs can run."
+        )
     print(f"[ELLA] Connected to {BASE_URL}. Waiting for Ella2027 video jobs...", flush=True)
 
     while True:
