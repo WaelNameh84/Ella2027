@@ -632,3 +632,94 @@ html.dark .app-shell[data-route="project-workspace"] .studio-rail-note{color:#92
   html.dark .app-shell[data-route="project-workspace"] .studio-tools{padding:12px}
   html.dark .app-shell[data-route="project-workspace"] .timeline-panel{padding:11px}
 }
+
+
+/* Reliable Pro Studio redesign: route-scoped and independent of theme class.
+   Intentionally excludes /settings/providers so API key screens remain untouched. */
+.app-shell[data-route="workspace"] .create-studio-entry{
+  width:min(100%,1120px);margin:0 auto;padding:clamp(12px,2.5vw,30px) 0 44px;
+}
+.app-shell[data-route="workspace"] .create-studio-heading{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 18px;
+}
+.app-shell[data-route="workspace"] .create-studio-heading .ella-overline{
+  display:inline-flex;align-items:center;gap:8px;padding:8px 13px;border:1px solid rgba(105,125,180,.28);
+  border-radius:999px;background:rgba(105,125,180,.09);font-size:10px;font-weight:800;letter-spacing:.14em;
+}
+.app-shell[data-route="workspace"] .create-studio-entry .idea-entry-card{
+  width:100%;max-width:none;margin:0;border:1px solid rgba(115,139,190,.24);border-radius:24px;
+  padding:clamp(18px,3vw,34px);background:linear-gradient(145deg,#111d31 0%,#101827 58%,#132432 100%);
+  color:#f4f7fc;box-shadow:0 22px 65px rgba(0,0,0,.22);
+}
+.app-shell[data-route="workspace"] .create-studio-entry .idea-entry-card h2,
+.app-shell[data-route="workspace"] .create-studio-entry .idea-entry-card h3{color:#f7f9ff;font-size:clamp(22px,3vw,32px);letter-spacing:-.035em}
+.app-shell[data-route="workspace"] .create-studio-entry .idea-entry-card p{color:#aab8ca;line-height:1.75}
+.app-shell[data-route="workspace"] .create-studio-entry .form-stack{gap:18px}
+.app-shell[data-route="workspace"] .create-studio-entry .field-label{color:#e5edf8;font-size:12px;font-weight:750}
+.app-shell[data-route="workspace"] .create-studio-entry .studio-input{
+  min-height:46px;border:1px solid rgba(153,174,210,.22);border-radius:12px;
+  background:#0a1220;color:#f4f7fc;padding:11px 13px;box-shadow:none;
+}
+.app-shell[data-route="workspace"] .create-studio-entry textarea.studio-input{min-height:132px}
+.app-shell[data-route="workspace"] .create-studio-entry .experience-mode-switch,
+.app-shell[data-route="workspace"] .create-studio-entry .workflow-mode-grid{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;
+}
+.app-shell[data-route="workspace"] .create-studio-entry .experience-mode-switch>*,
+.app-shell[data-route="workspace"] .create-studio-entry .workflow-mode-grid>*{
+  min-width:0;border:1px solid rgba(145,166,204,.2);border-radius:14px;background:rgba(255,255,255,.045);padding:13px;
+}
+.app-shell[data-route="workspace"] .create-studio-entry .experience-mode-switch .is-active,
+.app-shell[data-route="workspace"] .create-studio-entry .workflow-mode-grid .is-active{
+  border-color:#8294ff;background:rgba(111,130,255,.15);
+}
+.app-shell[data-route="workspace"] .create-studio-entry .modal-actions .btn,
+.app-shell[data-route="workspace"] .create-studio-entry button[type="submit"]{
+  min-height:49px;border-radius:13px;font-weight:800;
+}
+.app-shell[data-route="project-workspace"] .workspace-head{
+  display:flex;align-items:center;justify-content:space-between;gap:18px;padding:0 0 18px;margin-bottom:18px;
+  border-bottom:1px solid rgba(130,151,184,.2);
+}
+.app-shell[data-route="project-workspace"] .studio-grid{
+  display:grid;grid-template-columns:minmax(185px,220px) minmax(0,1fr) minmax(285px,330px);
+  align-items:start;gap:14px;
+}
+.app-shell[data-route="project-workspace"] .studio-rail,
+.app-shell[data-route="project-workspace"] .studio-tools,
+.app-shell[data-route="project-workspace"] .preview-panel,
+.app-shell[data-route="project-workspace"] .timeline-panel{
+  min-width:0;border:1px solid rgba(130,151,184,.22);border-radius:16px;padding:14px;
+  background:var(--card);box-shadow:0 8px 26px rgba(0,0,0,.07);
+}
+.app-shell[data-route="project-workspace"] .studio-center{display:grid;gap:14px;min-width:0}
+.app-shell[data-route="project-workspace"] .studio-rail-step{
+  display:flex;align-items:center;gap:9px;width:100%;min-height:48px;padding:9px;border-radius:11px;text-align:start;
+}
+.app-shell[data-route="project-workspace"] .studio-rail-step.is-active{
+  background:rgba(111,130,255,.13);outline:1px solid rgba(111,130,255,.42);
+}
+.app-shell[data-route="project-workspace"] .studio-tools{position:sticky;top:14px;max-height:calc(100dvh - 105px);overflow:auto}
+.app-shell[data-route="project-workspace"] .preview-stage{
+  min-height:300px;border-radius:12px;overflow:hidden;background:#050912;
+}
+.app-shell[data-route="project-workspace"] .studio-tools-body,
+.app-shell[data-route="project-workspace"] .stage-tool-stack{display:grid;gap:13px}
+.app-shell[data-route="project-workspace"] .studio-tools .studio-input{
+  min-height:43px;border-radius:10px;
+}
+@media(max-width:1120px){
+  .app-shell[data-route="project-workspace"] .studio-grid{grid-template-columns:minmax(0,1fr) minmax(275px,320px)}
+  .app-shell[data-route="project-workspace"] .studio-rail{grid-column:1/-1}
+}
+@media(max-width:760px){
+  .app-shell[data-route="workspace"] .create-studio-entry{padding-top:8px}
+  .app-shell[data-route="workspace"] .create-studio-entry .idea-entry-card{padding:16px;border-radius:17px}
+  .app-shell[data-route="workspace"] .create-studio-entry .experience-mode-switch,
+  .app-shell[data-route="workspace"] .create-studio-entry .workflow-mode-grid{grid-template-columns:1fr}
+  .app-shell[data-route="project-workspace"] .workspace-head{align-items:stretch;flex-direction:column}
+  .app-shell[data-route="project-workspace"] .studio-grid{grid-template-columns:minmax(0,1fr);gap:10px}
+  .app-shell[data-route="project-workspace"] .studio-rail{grid-column:auto}
+  .app-shell[data-route="project-workspace"] .studio-tools{position:static;max-height:none}
+  .app-shell[data-route="project-workspace"] .preview-stage{min-height:210px}
+}
