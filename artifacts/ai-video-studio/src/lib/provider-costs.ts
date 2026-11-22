@@ -18,6 +18,7 @@ export const providerCostRanges: Record<string, Record<CostService, [number, num
 export function estimateCostText(provider: string | undefined, service: CostService, units: number, lang: 'ar' | 'en') {
   const range = providerCostRanges[provider || '']?.[service];
   if (provider === 'piper-local') return lang === 'ar' ? 'مجاني — صوت عربي محلي على الخادم' : 'Free — local Arabic voice on the app server';
+  if (provider === 'local-video-worker') return lang === 'ar' ? 'لا توجد رسوم API؛ تُطبّق حدود جلسة وحصة GPU في Kaggle.' : 'No video API fee; Kaggle GPU session and quota limits still apply.';
   if (provider === 'ai-horde') return lang === 'ar' ? 'مجاني — استخدام مجهول، أولوية منخفضة' : 'Free — anonymous use, low priority';
   if (provider === 'free-test') return lang === 'ar' ? 'مجاني — اختبار محلي' : 'Free — local test';
   if (provider === 'puter') return lang === 'ar' ? 'السعر يحدده نموذج Puter وحسابك؛ اختبار الاتصال مجاني ولا يستهلك رصيد توليد' : 'Price depends on the Puter model and your account; connection test is free and uses no generation credits';
