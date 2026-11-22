@@ -25,7 +25,7 @@ Do not use the older `ltx-2-5-wan2gp-kaggle.ipynb` in this folder as the recover
 ## Initial test profile
 
 - Model: `ltx2_25_22B_distilled`
-- Resolution: 768×448
+- Resolution: 1024×576 landscape / 576×1024 portrait / 768×768 square
 - FPS: 24
 - Maximum clip duration: 5 seconds
 - MP4 upload limit: 100 MiB
