@@ -158,6 +158,13 @@ async def _generate_async(job: dict[str, Any], mcp_url: str, wangp_root: str) ->
             item for item in video_models
             if "2.5" in (str(item.get("model_type", "")) + " " + str(item.get("name", ""))).lower()
         ]
+        exact_25.sort(
+            key=lambda item: (
+                "distilled" in (str(item.get("name", "")) + " " + str(item.get("finetune", "")) + " " + str(item.get("description", ""))).lower(),
+                "nvfp4" in (str(item.get("name", "")) + " " + str(item.get("description", ""))).lower(),
+            ),
+            reverse=True,
+        )
         chosen = exact_25[0] if exact_25 else None
         if not chosen:
             raise RuntimeError(
