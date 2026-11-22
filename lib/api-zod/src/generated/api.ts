@@ -1089,6 +1089,9 @@ export const queueProjectScriptBodySceneStyleDefault = `Cinematic`;
 export const queueProjectScriptBodySceneStyleMax = 200;
 
 export const queueProjectScriptBodyStoryMax = 30000;
+export const queueProjectScriptBodyAutoGenerateVideoDefault = false;
+export const queueProjectScriptBodyApproveVideoChargesDefault = false;
+export const queueProjectScriptBodyVideoModelMax = 200;
 
 
 
@@ -1099,7 +1102,11 @@ export const QueueProjectScriptBody = zod.object({
   "sceneCount": zod.number().int().min(1).max(queueProjectScriptBodySceneCountMax).default(queueProjectScriptBodySceneCountDefault),
   "sceneDurationSeconds": zod.number().int().min(1).max(queueProjectScriptBodySceneDurationSecondsMax).default(queueProjectScriptBodySceneDurationSecondsDefault),
   "sceneStyle": zod.string().min(1).max(queueProjectScriptBodySceneStyleMax).default(queueProjectScriptBodySceneStyleDefault),
-  "story": zod.string().min(1).max(queueProjectScriptBodyStoryMax).optional()
+  "story": zod.string().min(1).max(queueProjectScriptBodyStoryMax).optional(),
+  "autoGenerateVideo": zod.boolean().default(queueProjectScriptBodyAutoGenerateVideoDefault),
+  "videoProviderKeyId": zod.string().uuid().nullish(),
+  "videoModel": zod.string().min(1).max(queueProjectScriptBodyVideoModelMax).optional(),
+  "approveVideoCharges": zod.boolean().default(queueProjectScriptBodyApproveVideoChargesDefault)
 })
 
 export const queueProjectScriptResponseProgressMin = 0;
