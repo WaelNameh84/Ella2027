@@ -17,46 +17,42 @@ def make_ltx_generator(pipe):
             seconds = 5
         seconds = min(max(seconds, 1), 10)
 
+        # Keep the 8 fps frame-count contract so requested duration remains exact.
+        # LTX temporal alignment requires 8n + 1 frames.
         fps = 8
-        # LTX temporal alignment: 8n+1 frames.
         frames = seconds * fps + 1
-        width, height = 768, 448
-        steps = 24
+
+        # Use the model's standard 16:10 working resolution and quality-oriented
+        # denoising/decoder settings documented for LTX-Video.
+        width, height = 768, 512
+        steps = 50
 
         scene_prompt = str(job.get("prompt") or "").strip()
-        # Put the visual constraints first: LTX is more reliable with one simple,
-        # concrete action and explicit instructions not to render typography.
         prompt = (
-            "Photorealistic live-action cinematic video. One continuous shot, "
-            "one clear subject and one simple physical action. Natural human "
-            "anatomy, realistic proportions, detailed real-world objects, "
-            "stable faces, stable geometry, coherent motion, consistent lighting. "
-            "The entire image contains only the described real-world scene. "
-            "Absolutely no writing, no letters, no numbers, no typography, "
-            "no captions, no signs, no logos, no symbols, no graphic overlays. "
-            "Visual scene description: "
-            + scene_prompt
-            + ". Show the action clearly and continuously. Keep the camera steady "
-            "and the scene visually consistent from beginning to end."
-        )
+            scene_prompt
+            + "\n\n"
+            "Photorealistic natural live-action scene, one continuous shot, "
+            "one clear main action, realistic anatomy and object proportions, "
+            "coherent movement, stable scene geometry, natural lighting. "
+            "No visible writing, letters, numbers, logos, subtitles, or graphic overlays."
+        ).strip()
+
         negative_prompt = (
-            "text, writing, letters, Chinese characters, Japanese characters, "
-            "Korean characters, Arabic script, calligraphy, glyphs, numbers, "
-            "typography, subtitles, captions, watermark, logo, symbols, "
-            "UI, interface, graphic overlay, signs, posters, printed words, "
-            "random characters, abstract patterns, surreal shapes, "
-            "blurry, low detail, smeared textures, distorted faces, malformed "
-            "hands, extra limbs, duplicated objects, warped vehicles, "
-            "flicker, jitter, unstable motion, temporal artifacts"
+            "worst quality, low quality, blurry, smeared details, "
+            "inconsistent motion, jittery motion, flicker, distorted anatomy, "
+            "deformed faces, malformed hands, extra limbs, duplicated objects, "
+            "warped geometry, text, letters, numbers, captions, subtitles, "
+            "logos, watermark, random symbols"
         )
 
         print(
-            f"[ELLA LTX CALLBACK V3] job={job.get('id', 'unknown')} "
-            f"received_duration={requested!r} | "
-            f"Generating requested duration={seconds}s | "
-            f"native={width}x{height} | frames={frames} | steps={steps} | "
-            "text_artifacts_filter=enabled"
+            f"[ELLA LTX CALLBACK V4] job={job.get('id', 'unknown')} "
+            f"duration={seconds}s | resolution={width}x{height} | "
+            f"frames={frames} | fps={fps} | steps={steps} | "
+            "vae_decode_tuning=enabled",
+            flush=True,
         )
+
         result = pipe(
             prompt=prompt,
             negative_prompt=negative_prompt,
@@ -65,6 +61,8 @@ def make_ltx_generator(pipe):
             num_frames=frames,
             num_inference_steps=steps,
             guidance_scale=5.0,
+            decode_timestep=0.03,
+            decode_noise_scale=0.025,
         )
 
         job_id = str(job.get("id", "video"))
@@ -72,7 +70,6 @@ def make_ltx_generator(pipe):
         output = Path("/kaggle/working") / f"ella_{job_id}.mp4"
         export_to_video(result.frames[0], str(raw), fps=fps)
 
-        # Trim the extra temporal-alignment frame so delivered duration matches the request.
         command = [
             "ffmpeg", "-y", "-i", str(raw), "-t", str(seconds),
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
@@ -91,8 +88,9 @@ def make_ltx_generator(pipe):
 
         print(
             f"Finished {output.name} | duration={seconds}s | "
-            f"native resolution={width}x{height} | "
-            f"size={output.stat().st_size / 1024 / 1024:.1f} MiB"
+            f"native resolution={width}x{height} | steps={steps} | "
+            f"size={output.stat().st_size / 1024 / 1024:.1f} MiB",
+            flush=True,
         )
         return output
 
