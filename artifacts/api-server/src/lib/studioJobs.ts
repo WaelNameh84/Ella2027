@@ -549,24 +549,35 @@ async function processScriptJob(job: typeof studioJobsTable.$inferSelect): Promi
         throw new Error("Automatic video generation could not be queued because the selected video provider is no longer ready or approved.");
       }
       const localWorker = videoKey.provider === "local-video-worker";
-      const queueTime = Date.now();
-      await tx.insert(studioJobsTable).values([...insertedScenes].sort((a, b) => a.sortOrder - b.sortOrder).map((scene, index) => ({
-        userId: job.userId,
-        projectId: project.id,
-        jobType: "video",
-        stage: localWorker ? "kaggle_waiting" : "queued",
-        input: {
-          sceneId: scene.id,
-          providerKeyId: videoKey.id,
-          model: input.videoModel!.trim(),
-          mode: "text",
-          approvePotentialCharges: true,
-          ...(localWorker ? { worker: "kaggle-ltx" } : {}),
-        },
-        message: localWorker ? "Queued automatically; waiting for the Kaggle LTX worker." : "Queued automatically from the storyboard.",
-        createdAt: new Date(queueTime + index),
-        updatedAt: new Date(queueTime + index),
-      })));
+      const orderedScenes = [...insertedScenes].sort((a, b) => a.sortOrder - b.sortOrder);
+      let queuedVideoJobs = 0;
+      // Insert each scene as its own durable job in storyboard order.
+      // Keeping this explicit also lets the transaction verify that no scene was skipped.
+      for (const scene of orderedScenes) {
+        const [queuedJob] = await tx.insert(studioJobsTable).values({
+          userId: job.userId,
+          projectId: project.id,
+          jobType: "video",
+          stage: localWorker ? "kaggle_waiting" : "queued",
+          input: {
+            sceneId: scene.id,
+            providerKeyId: videoKey.id,
+            model: input.videoModel!.trim(),
+            mode: "text",
+            approvePotentialCharges: true,
+            ...(localWorker ? { worker: "kaggle-ltx" } : {}),
+          },
+          message: localWorker ? "Queued automatically; waiting for the Kaggle LTX worker." : "Queued automatically from the storyboard.",
+        }).returning({ id: studioJobsTable.id });
+        if (!queuedJob?.id) {
+          throw new Error(`Could not queue video generation for scene ${scene.sortOrder + 1}.`);
+        }
+        queuedVideoJobs += 1;
+      }
+      if (queuedVideoJobs !== orderedScenes.length) {
+        throw new Error(`Only ${queuedVideoJobs} of ${orderedScenes.length} scene videos were queued.`);
+      }
+      console.info(`[studio] Queued ${queuedVideoJobs} video jobs for ${orderedScenes.length} storyboard scenes in order.`);
     }
 
     await tx.update(projectsTable).set({
