@@ -194,6 +194,9 @@ async def _generate_async(job: dict[str, Any], mcp_url: str, wangp_root: str) ->
         settings["prompt"] = str(job.get("prompt") or "").strip()
         if not settings["prompt"]:
             raise ValueError("Ella2027 supplied an empty video prompt.")
+        audio_prompt = str(job.get("audioPrompt") or "").strip()
+        if audio_prompt:
+            settings["prompt"] += "\\nNatural synchronized speech/audio: " + audio_prompt
 
         seconds = max(1, int(job.get("durationSeconds") or 5))
         if seconds > 10:
@@ -216,7 +219,7 @@ async def _generate_async(job: dict[str, Any], mcp_url: str, wangp_root: str) ->
 
         # Preserve the model's native audio defaults; supply an audio description
         # only when this model explicitly exposes a matching prompt field.
-        audio_description = "Natural synchronized ambient sound and realistic location audio matching the visible action; clean dialogue only when dialogue is present."
+        audio_description = audio_prompt or "Natural synchronized ambient sound and realistic location audio matching the visible action."
         for key in ("audio_prompt", "sound_prompt", "audio_description"):
             if key in settings:
                 settings[key] = audio_description
