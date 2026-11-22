@@ -1025,3 +1025,57 @@ html.dark .app-shell[data-route="project-workspace"] .studio-rail-note{color:#92
     flex-basis:74px;width:74px;
   }
 }
+
+
+/* Compact grouped controls beside the AI writing assistant; workspace only. */
+.app-shell[data-route="workspace"] .quick-dropdown-toolbar {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: start;
+  gap: 8px;
+}
+.app-shell[data-route="workspace"] .quick-dropdown-toolbar > .quick-setting-dropdown {
+  min-width: 0;
+  width: 100%;
+}
+.app-shell[data-route="workspace"] .quick-dropdown-toolbar > .quick-setting-dropdown > summary {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 9px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 11px;
+  background: hsl(var(--muted) / .28);
+  font-size: 11px;
+  overflow: hidden;
+}
+.app-shell[data-route="workspace"] .quick-dropdown-toolbar > .quick-setting-dropdown > summary span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.app-shell[data-route="workspace"] .quick-dropdown-toolbar > .quick-setting-dropdown > summary b {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+}
+.app-shell[data-route="workspace"] .quick-dropdown-toolbar .quick-dropdown-panel {
+  z-index: 30;
+  min-width: min(240px, 82vw);
+}
+@media (max-width: 620px) {
+  .app-shell[data-route="workspace"] .quick-dropdown-toolbar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+  }
+  .app-shell[data-route="workspace"] .quick-dropdown-toolbar > .quick-setting-dropdown > summary {
+    min-height: 40px;
+    padding: 7px 8px;
+    font-size: 10px;
+  }
+}
