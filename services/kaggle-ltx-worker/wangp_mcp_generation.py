@@ -101,9 +101,9 @@ def _resolve_output_path(snapshot: Any, root: str) -> Path:
 
 def _align_frames(seconds: int, fps: int, schema: dict[str, Any]) -> int:
     metadata = schema.get("metadata", {}) if isinstance(schema, dict) else {}
-    minimum = int(metadata.get("frames_minimum") or 9)
-    step = max(1, int(metadata.get("frames_steps") or 8))
-    maximum = int(metadata.get("frames_maximum") or 241)
+    minimum = int(metadata.get("frames_minimum") or schema.get("frames_minimum") or 17)
+    step = max(1, int(metadata.get("frames_steps") or schema.get("frames_steps") or 8))
+    maximum = int(metadata.get("frames_maximum") or schema.get("frames_maximum") or 241)
     target = seconds * fps + 1
     frames = minimum + round(max(0, target - minimum) / step) * step
     if frames > maximum:
@@ -208,7 +208,7 @@ async def _generate_async(job: dict[str, Any], mcp_url: str, wangp_root: str) ->
                 f"LTX-2.5 Kaggle worker is configured for clips up to 10 seconds; "
                 f"this scene requests {seconds}s. Split the scene in Ella2027 before queueing."
             )
-        fps = int(metadata.get("fps") or settings.get("fps") or job.get("fps") or 24)
+        fps = int(metadata.get("fps") or schema.get("fps") or settings.get("fps") or job.get("fps") or 24)
         aligned_frames = _align_frames(seconds, fps, schema)
         # WanGP's generation API uses video_length as the generic frame-count field.
         settings["video_length"] = aligned_frames
