@@ -25,7 +25,7 @@ import {
   Aperture, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, ChevronDown, Clapperboard, Sparkles,
   Clock3, Copy, ExternalLink, Eye, EyeOff, Film, Globe2, Heart, ImagePlus, KeyRound, Languages,
   LoaderCircle, LogOut, Mic, Moon, Pause, Plus, Search, Settings2, ShieldCheck, Sun, Trash2, UserRound, WandSparkles, X, AudioLines, Music2, Play,
-  Activity, AlertTriangle, Ban, CheckCircle2, CircleUserRound, Download, FileUp, RefreshCw, Megaphone, Smartphone, BookOpen, Share2, Shield, Users,
+  Activity, AlertTriangle, Ban, CheckCircle2, CircleUserRound, Download, FileUp, RefreshCw, Megaphone, Smartphone, BookOpen, Share2, Shield, Users, Maximize,
 } from 'lucide-react';
 import NotFound from '@/pages/not-found';
 import { ErrorBoundary } from '@/components/error-boundary';
@@ -1426,6 +1426,10 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
   const [previewPlaying,setPreviewPlaying]=useState(false);
   const [sceneMediaError,setSceneMediaError]=useState('');
   const previewVideo=useRef<HTMLVideoElement|null>(null);
+  const previewStageRef=useRef<HTMLDivElement|null>(null);
+  const [previewMetadata,setPreviewMetadata]=useState<{width:number;height:number;duration:number}|null>(null);
+  const [previewSettingsOpen,setPreviewSettingsOpen]=useState(false);
+  const [previewPlaybackRate,setPreviewPlaybackRate]=useState(1);
   const [exportSettings,setExportSettings]=useState<{resolution:480|720|1080|2160;fps:24|25|30|60;includeSubtitles:boolean;format:'mp4'|'webm';codec:'h264'|'hevc';subtitleStyle:'classic'|'outline'|'pill'}>({resolution:1080,fps:30,includeSubtitles:true,format:'mp4',codec:'h264',subtitleStyle:'classic'});
   const [previewUrl,setPreviewUrl]=useState<string|null>(null);
   const [previewing,setPreviewing]=useState(false);
@@ -1455,7 +1459,25 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
   useEffect(() => {
     setPreviewPlaying(false);
     setSceneMediaError('');
+    setPreviewMetadata(null);
+    setPreviewSettingsOpen(false);
+    setPreviewPlaybackRate(1);
   }, [activeScene?.id, activeScene?.assetUrl]);
+  const togglePreviewFullscreen=async()=>{
+    const stage=previewStageRef.current;
+    if(!stage)return;
+    try{
+      if(document.fullscreenElement){await document.exitFullscreen();return;}
+      if(stage.requestFullscreen){await stage.requestFullscreen();return;}
+      const legacyVideo=previewVideo.current as (HTMLVideoElement & {webkitEnterFullscreen?:()=>void})|null;
+      legacyVideo?.webkitEnterFullscreen?.();
+    }catch{setSceneMediaError(tx(lang,'تعذر تكبير المعاينة على هذا المتصفح.','Fullscreen is not available in this browser.'))}
+  };
+  const setPreviewRate=(rate:number)=>{
+    setPreviewPlaybackRate(rate);
+    if(previewVideo.current)previewVideo.current.playbackRate=rate;
+    setPreviewSettingsOpen(false);
+  };
   const downloadScript = () => {
     if (!project) return;
     const safeName = project.title.replace(/[^a-z0-9\u0600-\u06ff]+/gi, '-').replace(/^-|-$/g, '') || 'ella-script';
@@ -1733,7 +1755,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
       <ProductionRail lang={lang} stages={stages} active={stage} onSelect={next=>{setStage(next);setMobilePane('tools')}} />
       <section className={`studio-center ${mobilePane==='tools'?'is-hidden-mobile':''}`}>
         <div className="preview-panel panel"><div className="preview-top"><span className="eyebrow">{tx(lang,'معاينة المشهد','SCENE PREVIEW')}</span><span className="small-mono">{activeScene ? `${String(activeScene.sortOrder+1).padStart(2,'0')} / ${String(scenes.length).padStart(2,'0')}` : '00 / 00'}</span></div>
-          <div className={`preview-stage ratio-${project.aspectRatio.replace(':','-')}`} style={{aspectRatio:project.aspectRatio.replace(':',' / ')}}>{activeScene?.assetUrl ? activeScene.assetType==='video' ? <video key={activeScene.id + ':' + activeScene.assetUrl} ref={previewVideo} src={activeScene.assetUrl} controls playsInline preload="metadata" className="h-full w-full object-contain" onPlay={()=>{setSceneMediaError('');setPreviewPlaying(true)}} onPause={()=>setPreviewPlaying(false)} onError={()=>{setPreviewPlaying(false);setSceneMediaError(tx(lang,'تعذر تحميل ملف الفيديو. قد يكون الملف مفقودًا من مساحة التخزين؛ أعد توليد فيديو هذا المشهد.','Could not load this video file. It may be missing from storage; regenerate this scene video.'))}} /> : activeScene.assetType==='audio' ? <div className="stage-empty"><Languages size={26}/><p>{tx(lang,'ملف صوتي للمشهد','Scene audio asset')}</p><audio src={activeScene.assetUrl} controls /></div> : <img src={activeScene.assetUrl} alt={activeScene.title} /> : <div className="stage-empty"><div className="stage-cross"><span/><span/></div><Film size={26}/><p>{tx(lang,'أضف صورة أو فيديو للمشهد','Add an image or video to this scene')}</p>{activeScene && <Link className="text-link" href={`/media?projectId=${projectId}&sceneId=${activeScene.id}`}>{tx(lang,'استكشف الوسائط المرخّصة','Browse licensed media')}</Link>}</div>}<span className="stage-ratio">{project.aspectRatio}</span></div>
+          <div ref={previewStageRef} className={`preview-stage ratio-${project.aspectRatio.replace(':','-')}`} style={{aspectRatio:project.aspectRatio.replace(':',' / ')}}>{activeScene?.assetUrl ? activeScene.assetType==='video' ? <video key={activeScene.id + ':' + activeScene.assetUrl} ref={previewVideo} src={activeScene.assetUrl} controls playsInline preload="metadata" className="h-full w-full object-contain" onLoadedMetadata={event=>{const video=event.currentTarget;setPreviewMetadata({width:video.videoWidth,height:video.videoHeight,duration:video.duration})}} onPlay={()=>{setSceneMediaError('');setPreviewPlaying(true)}} onPause={()=>setPreviewPlaying(false)} onError={()=>{setPreviewPlaying(false);setSceneMediaError(tx(lang,'تعذر تحميل ملف الفيديو. قد يكون الملف مفقودًا من مساحة التخزين؛ أعد توليد فيديو هذا المشهد.','Could not load this video file. It may be missing from storage; regenerate this scene video.'))}} /> : activeScene.assetType==='audio' ? <div className="stage-empty"><Languages size={26}/><p>{tx(lang,'ملف صوتي للمشهد','Scene audio asset')}</p><audio src={activeScene.assetUrl} controls /></div> : <img src={activeScene.assetUrl} alt={activeScene.title} /> : <div className="stage-empty"><div className="stage-cross"><span/><span/></div><Film size={26}/><p>{tx(lang,'أضف صورة أو فيديو للمشهد','Add an image or video to this scene')}</p>{activeScene && <Link className="text-link" href={`/media?projectId=${projectId}&sceneId=${activeScene.id}`}>{tx(lang,'استكشف الوسائط المرخّصة','Browse licensed media')}</Link>}</div>}<span className="stage-ratio">{project.aspectRatio}</span>{activeScene?.assetType==='video'&&<><button type="button" className="preview-center-play" onClick={()=>{const player=previewVideo.current;if(!player)return;if(player.paused)void player.play();else player.pause()}} aria-label={previewPlaying?tx(lang,'إيقاف الفيديو','Pause video'):tx(lang,'تشغيل الفيديو','Play video')}>{previewPlaying?<Pause size={28}/>:<Play size={30} fill="currentColor"/>}</button><div className="preview-overlay-actions"><button type="button" className="preview-icon-button" onClick={()=>void togglePreviewFullscreen()} aria-label={tx(lang,'تكبير الشاشة','Fullscreen')}><Maximize size={17}/></button><button type="button" className="preview-icon-button" onClick={()=>setPreviewSettingsOpen(value=>!value)} aria-label={tx(lang,'إعدادات الفيديو','Video settings')}><Settings2 size={17}/></button></div>{previewSettingsOpen&&<div className="preview-settings-popover"><b>{tx(lang,'سرعة التشغيل','Playback speed')}</b><div>{[0.5,0.75,1,1.25,1.5,2].map(rate=><button type="button" key={rate} className={previewPlaybackRate===rate?'is-active':''} onClick={()=>setPreviewRate(rate)}>{rate}×</button>)}</div></div>}</>}</div>{previewMetadata&&activeScene?.assetType==='video'&&<div className="preview-metadata"><span>{tx(lang,'الدقة الفعلية','Actual resolution')}: <b>{previewMetadata.width} × {previewMetadata.height}</b></span><span>{tx(lang,'المدة','Duration')}: <b>{Number.isFinite(previewMetadata.duration)?formatTime(previewMetadata.duration):'—'}</b></span><span>{tx(lang,'الصيغة','Format')}: <b>{activeScene.assetUrl?.split('?')[0].split('.').pop()?.toUpperCase()||'VIDEO'}</b></span></div>
           {sceneMediaError && <p className="inline-error" role="alert">{sceneMediaError}</p>}
           <div className="preview-controls"><button className="play-button" aria-label={previewPlaying?tx(lang,'إيقاف المعاينة','Pause preview'):tx(lang,'تشغيل المعاينة','Play preview')} disabled={activeScene?.assetType!=='video'} onClick={()=>{const player=previewVideo.current;if(!player)return;if(player.paused)void player.play();else player.pause()}}>{previewPlaying?<Pause size={12}/>:<span />}</button><span className="small-mono">{tx(lang,'المشهد','Scene')} {activeScene?String(activeScene.sortOrder+1).padStart(2,'0'):'—'} / {String(scenes.length).padStart(2,'0')} · {formatTime(duration)}</span><div className="control-spacer"/><span className="eyebrow">{scenes.length} {tx(lang,'مشاهد','SCENES')}</span></div>
         </div>
@@ -1834,11 +1856,22 @@ function ExportActions({ projectId, lang }: { projectId: string; lang: Lang }) {
   return <div className="flex flex-wrap gap-2 mt-3"><button className="btn btn-primary" onClick={() => void downloadVideo()} disabled={sharing}><ArrowDown size={15}/>{tx(lang, 'تنزيل على الهاتف', 'Download to phone')}</button><button className="btn btn-quiet" onClick={() => void share()} disabled={sharing}><Share2 size={15}/>{sharing ? tx(lang, 'جارٍ تجهيز المشاركة…', 'Preparing share…') : tx(lang, 'إرسال / مشاركة', 'Send / Share')}</button>{message && <small className="provider-message" role="status">{message}</small>}</div>;
 }
 
+function estimateJobRemaining(job: StudioJob): string | null {
+  if (!job.startedAt || job.progress < 5 || job.progress >= 100 || job.status !== 'running') return null;
+  const elapsed = Date.now() - new Date(job.startedAt).getTime();
+  if (!Number.isFinite(elapsed) || elapsed <= 0) return null;
+  const remaining = elapsed * (100 - job.progress) / job.progress;
+  if (!Number.isFinite(remaining) || remaining < 1000 || remaining > 24 * 60 * 60 * 1000) return null;
+  const seconds = Math.ceil(remaining / 1000);
+  return seconds < 60 ? `${seconds} ث` : `${Math.ceil(seconds / 60)} د`;
+}
+
 function JobCard({ job, lang, retrying, onRetry }: { job: StudioJob; lang: Lang; retrying: boolean; onRetry: () => void }) {
   const typeLabel = tx(lang,({script:'سيناريو وStoryboard',export:'تصدير فيديو',image:'توليد صورة',video:'توليد فيديو',voice:'توليد صوت'})[job.jobType],({script:'Script and storyboard',export:'Video export',image:'Image generation',video:'Video generation',voice:'Voice generation'})[job.jobType]);
   const statusLabel = tx(lang,job.status==='queued'?'في الانتظار':job.status==='running'?'قيد التنفيذ':job.status==='completed'?'مكتملة':'فشلت',job.status);
   return <article className="job-card panel"><div className="job-progress-head"><div><b>{typeLabel}</b><span className={`job-state job-${job.status}`}>{statusLabel}</span></div><Link className="text-link" href={`/projects/${job.projectId}`}>{tx(lang,'فتح المشروع','Open project')}<ArrowLeft size={14}/></Link></div>
-    {(job.status==='queued'||job.status==='running')&&<div className="job-progress-track"><span style={{width:`${job.progress}%`}}/></div>}
+    {(job.status==='queued'||job.status==='running')&&<><div className="job-progress-label"><b>{Math.max(0,Math.min(100,job.progress))}%</b><span>{job.status==='queued'?tx(lang,'بانتظار بدء التنفيذ','Waiting to start'):estimateJobRemaining(job)?tx(lang,`متبقي تقريبًا ${estimateJobRemaining(job)}`,`About ${estimateJobRemaining(job)} remaining`):tx(lang,'جارٍ حساب الوقت المتبقي…','Estimating remaining time…')}</span></div><div className="job-progress-track"><span style={{width:`${Math.max(0,Math.min(100,job.progress))}%`}}/></div></>}
+    {job.status==='completed'&&<div className="job-progress-label is-complete"><b>100%</b><span>{tx(lang,'اكتملت المهمة','Job completed')}</span></div>}
     <div className="job-card-meta"><span>{job.message}</span><time>{new Date(job.createdAt).toLocaleString(lang==='ar'?'ar':'en')}</time></div>
     {job.error&&<ErrorRecoveryPanel compact lang={lang} message={job.error}/>}
     {job.status==='completed'&&job.jobType==='export'&&<ExportActions projectId={job.projectId} lang={lang}/>}
