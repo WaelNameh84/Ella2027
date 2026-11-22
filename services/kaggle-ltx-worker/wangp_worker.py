@@ -316,7 +316,7 @@ def run_worker() -> None:
     session = init(
         root=WANGP_ROOT,
         output_dir=OUTPUT_DIR,
-        cli_args=["--attention", "sdpa", "--profile", "4"],
+        cli_args=["--attention", "sdpa", "--profile", "4", "--preload", "2048"],
         console_output=True,
         console_isatty=True,
     )
