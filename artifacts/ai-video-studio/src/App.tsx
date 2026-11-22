@@ -817,17 +817,13 @@ function ProjectForm({ onClose, initial, initialMode = 'auto', initialExperience
                   <label><span className="field-label">{tx(lang,'ثواني لكل مشهد','Seconds per scene')}</span><input aria-label={tx(lang,'الثواني لكل مشهد','Seconds per scene')} type="number" min="1" max={Math.floor(3600/quickSceneCount)} step="1" className="studio-input" value={sceneDurationSeconds || ''} disabled={projectCreated} onChange={e=>{const raw=e.target.value;setSceneDurationSeconds(raw===''?0:Math.max(1,Math.min(Math.floor(3600/quickSceneCount),Number(raw)||1)));}} data-testid="input-quick-scene-duration" /></label>
                 </div>
               </details>
-              <details className="quick-setting-dropdown quick-more-dropdown">
-                <summary><span>{tx(lang,'إعدادات أخرى','More settings')}</span><b>{tx(lang,'اللغة · المقاس · الأسلوب','Language · ratio · style')}</b><ChevronDown size={13}/></summary>
-                <div className="quick-dropdown-panel"><span>{tx(lang,'افتح الإعدادات المتقدمة أسفل الكرت لباقي خيارات الفيلم.','Open the advanced settings below this card for the remaining film options.','')}</span></div>
-              </details>
             </div>
             <span className="quick-duration-hint">{tx(lang,quickPlannedDuration+' ثانية إجمالي',quickPlannedDuration+' sec total')}</span>
           </div>
         </div>
         {!plan && submitButton}
         <details className="quick-advanced">
-          <summary><span>{tx(lang,'إعدادات الفيلم المتقدمة','Advanced film settings')}</span><small>{tx(lang,'اللغة · المقاس · المشاهد · الأسلوب · المزودات','Language · format · scenes · style · providers')}</small></summary>
+          <summary><span>{tx(lang,'باقي إعدادات الفيلم','All other film settings')}</span><small>{tx(lang,'اللغة · الجمهور · المنصة · الأسلوب · المقاس · التوليد','Language · audience · platform · style · ratio · generation')}</small></summary>
         <div className="form-two"><label><span className="field-label">{tx(lang,'لغة الفيلم','Film language')}</span><select className="studio-input" value={form.language} disabled={projectCreated} onChange={e=>update('language',e.target.value)}><option value="ar">العربية</option><option value="en">English</option><option value="fr">Français</option><option value="es">Español</option><option value="de">Deutsch</option><option value="sv">Svenska</option></select></label></div>
         
         <div className="form-two"><label><span className="field-label">{tx(lang,'الجمهور','Audience')}</span><input maxLength={300} className="studio-input" value={form.audience} disabled={projectCreated} onChange={e=>update('audience',e.target.value)} placeholder={tx(lang,'مثال: العائلة، الشباب','e.g. families, young adults')}/></label></div>
