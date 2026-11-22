@@ -805,10 +805,22 @@ function ProjectForm({ onClose, initial, initialMode = 'auto', initialExperience
           <label className="quick-idea-label"><span className="field-label">{tx(lang,'فكرة الفيلم','Film idea')}</span><textarea required maxLength={1500} rows={3} className="studio-input resize-y quick-idea-input" value={form.idea} onChange={e=>update('idea',e.target.value)} placeholder={tx(lang,'اكتب فكرتك هنا… إيلا تتولى الباقي.','Write your idea here… Ella handles the rest.')} data-testid="input-project-idea" disabled={projectCreated} autoFocus /></label>
           <div className="quick-composer-bottom">
             <WritingAssistant lang={lang} context="idea" values={{idea:form.idea}} onApply={(field,value)=>{if(field==='idea')update('idea',value)}} />
-            <div className="quick-toolbar">
-              <label><span className="field-label">{tx(lang,'الفيديو','Format')}</span><select className="studio-input" value={form.videoType} disabled={projectCreated} onChange={e=>update('videoType',e.target.value)}>{videoTypes.map(([value,ar,en])=><option key={value} value={value}>{tx(lang,ar,en)}</option>)}</select></label>
-              <label><span className="field-label">{tx(lang,'المشاهد','Scenes')}</span><input aria-label={tx(lang,'عدد المشاهد','Number of scenes')} type="number" min="1" max="24" step="1" className="studio-input" value={sceneCount} disabled={projectCreated} onChange={e=>setSceneCount(Math.max(1,Math.min(24,Number(e.target.value)||1)))} data-testid="input-quick-scene-count" /></label>
-              <label><span className="field-label">{tx(lang,'ثواني/مشهد','Sec/scene')}</span><input aria-label={tx(lang,'الثواني لكل مشهد','Seconds per scene')} type="number" min="1" max={Math.floor(3600/quickSceneCount)} step="1" className="studio-input" value={sceneDurationSeconds || ''} disabled={projectCreated} onChange={e=>{const raw=e.target.value;setSceneDurationSeconds(raw===''?0:Math.max(1,Math.min(Math.floor(3600/quickSceneCount),Number(raw)||1)));}} data-testid="input-quick-scene-duration" /></label>
+            <div className="quick-toolbar quick-dropdown-toolbar">
+              <details className="quick-setting-dropdown">
+                <summary><span>{tx(lang,'نوع الفيديو','Video type')}</span><b>{tx(lang,videoTypes.find(([value])=>value===form.videoType)?.[1]||'سينمائي',videoTypes.find(([value])=>value===form.videoType)?.[2]||'Cinematic')}</b><ChevronDown size={13}/></summary>
+                <div className="quick-dropdown-panel"><label><span className="field-label">{tx(lang,'اختر نوع الفيديو','Choose video type')}</span><select className="studio-input" value={form.videoType} disabled={projectCreated} onChange={e=>update('videoType',e.target.value)}>{videoTypes.map(([value,ar,en])=><option key={value} value={value}>{tx(lang,ar,en)}</option>)}</select></label></div>
+              </details>
+              <details className="quick-setting-dropdown">
+                <summary><span>{tx(lang,'المشاهد والمدة','Scenes & duration')}</span><b>{sceneCount} · {sceneDurationSeconds}ث</b><ChevronDown size={13}/></summary>
+                <div className="quick-dropdown-panel quick-scene-settings">
+                  <label><span className="field-label">{tx(lang,'عدد المشاهد','Number of scenes')}</span><input aria-label={tx(lang,'عدد المشاهد','Number of scenes')} type="number" min="1" max="24" step="1" className="studio-input" value={sceneCount} disabled={projectCreated} onChange={e=>setSceneCount(Math.max(1,Math.min(24,Number(e.target.value)||1)))} data-testid="input-quick-scene-count" /></label>
+                  <label><span className="field-label">{tx(lang,'ثواني لكل مشهد','Seconds per scene')}</span><input aria-label={tx(lang,'الثواني لكل مشهد','Seconds per scene')} type="number" min="1" max={Math.floor(3600/quickSceneCount)} step="1" className="studio-input" value={sceneDurationSeconds || ''} disabled={projectCreated} onChange={e=>{const raw=e.target.value;setSceneDurationSeconds(raw===''?0:Math.max(1,Math.min(Math.floor(3600/quickSceneCount),Number(raw)||1)));}} data-testid="input-quick-scene-duration" /></label>
+                </div>
+              </details>
+              <details className="quick-setting-dropdown quick-more-dropdown">
+                <summary><span>{tx(lang,'إعدادات أخرى','More settings')}</span><b>{tx(lang,'اللغة · المقاس · الأسلوب','Language · ratio · style')}</b><ChevronDown size={13}/></summary>
+                <div className="quick-dropdown-panel"><span>{tx(lang,'افتح الإعدادات المتقدمة أسفل الكرت لباقي خيارات الفيلم.','Open the advanced settings below this card for the remaining film options.','')}</span></div>
+              </details>
             </div>
             <span className="quick-duration-hint">{tx(lang,quickPlannedDuration+' ثانية إجمالي',quickPlannedDuration+' sec total')}</span>
           </div>
