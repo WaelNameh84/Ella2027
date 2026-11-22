@@ -61,8 +61,10 @@ test("one-click storyboard generation queues every scene in order for the sequen
   assert.match(app, /setAutoGenerateVideo\(true\)/);
   assert.match(app, /توليد المشاهد وإرسال كل المقاطع إلى المهام/);
   assert.match(jobs, /if \(input\.autoGenerateVideo === true\)/);
-  assert.match(jobs, /\.sort\(\(a, b\) => a\.sortOrder - b\.sortOrder\)\.map\(\(scene, index\)/);
-  assert.match(jobs, /createdAt: new Date\(queueTime \+ index\)/);
+  assert.match(jobs, /for \(const scene of orderedScenes\)/);
+  assert.match(jobs, /\.returning\(\{ id: studioJobsTable\.id \}\)/);
+  assert.match(jobs, /queuedVideoJobs !== orderedScenes\.length/);
+  assert.match(jobs, /Queued \$\{queuedVideoJobs\} video jobs/);
   assert.match(workerRoutes, /\.orderBy\(asc\(studioJobsTable\.createdAt\)\)/);
   assert.match(worker, /while True:[\s\S]*?did_work = process_one\(session, TOKEN\)/);
 });
