@@ -823,16 +823,16 @@ function ProjectForm({ onClose, initial, initialMode = 'auto', initialExperience
                 <summary><span>{tx(lang,'الأسلوب','Style')}</span><b>{visualStyles.find(([value])=>value===form.visualStyle)?.[1]||tx(lang,'مخصص','Custom')}</b><ChevronDown size={13}/></summary>
                 <div className="quick-dropdown-panel"><label><span className="field-label">{tx(lang,'الأسلوب البصري','Visual style')}</span><select className="studio-input" value={visualStyles.some(([value])=>value===form.visualStyle)?form.visualStyle:'custom'} disabled={projectCreated} onChange={e=>{if(e.target.value!=='custom')update('visualStyle',e.target.value);else if(visualStyles.some(([value])=>value===form.visualStyle))update('visualStyle','');}}><option value="custom">{tx(lang,'أسلوب مخصص','Custom style')}</option>{visualStyles.map(([value,ar])=><option key={value} value={value}>{lang==='ar'?ar:value}</option>)}</select>{!visualStyles.some(([value])=>value===form.visualStyle)&&<input className="studio-input mt-2" value={form.visualStyle} disabled={projectCreated} onChange={e=>update('visualStyle',e.target.value)} placeholder={tx(lang,'اكتب أسلوبك الخاص','Describe your style')}/>}</label></div>
               </details>
-              <details className="quick-setting-dropdown quick-icon-setting">
-                <summary title={tx(lang,'نسبة العرض','Aspect ratio')} aria-label={tx(lang,'نسبة العرض','Aspect ratio')}><span>16:9</span><b>{form.aspectRatio}</b><ChevronDown size={12}/></summary>
+              <details className="quick-setting-dropdown quick-icon-setting quick-aspect-setting">
+                <summary title={tx(lang,'نسبة العرض','Aspect ratio')} aria-label={tx(lang,'نسبة العرض','Aspect ratio')}><span>{tx(lang,'نسبة العرض','Aspect ratio')}</span><b>{form.aspectRatio}</b><ChevronDown size={12}/></summary>
                 <div className="quick-dropdown-panel"><label><span className="field-label">{tx(lang,'نسبة العرض','Aspect ratio')}</span><select className="studio-input" value={form.aspectRatio} disabled={projectCreated} onChange={e=>update('aspectRatio',e.target.value)}><option>16:9</option><option>9:16</option><option>1:1</option></select></label></div>
               </details>
               <details className="quick-setting-dropdown">
                 <summary><span>{tx(lang,'خطة المشاهد','Scene plan')}</span><b>{reviewBeforeRendering?tx(lang,'مراجعة','Review'):tx(lang,'تلقائي','Auto')}</b><ChevronDown size={13}/></summary>
                 <div className="quick-dropdown-panel"><label className="rotation-row"><span><b>{tx(lang,'مراجعة المشاهد قبل التوليد','Review scenes before generation')}</b><small>{tx(lang,'أنشئ السيناريو والشخصيات والمشاهد أولاً ثم عدّلها قبل تشغيل GPU.','Create the screenplay, characters and scenes first, then edit before GPU rendering.')}</small></span><input type="checkbox" checked={reviewBeforeRendering} disabled={projectCreated} onChange={e=>setReviewBeforeRendering(e.target.checked)} /></label></div>
               </details>
-              <details className="quick-setting-dropdown quick-icon-setting">
-                <summary title={tx(lang,'عدد المشاهد','Number of scenes')} aria-label={tx(lang,'عدد المشاهد','Number of scenes')}><Clapperboard size={16}/><b>{sceneCount}</b><ChevronDown size={12}/></summary>
+              <details className="quick-setting-dropdown quick-icon-setting quick-scene-setting">
+                <summary title={tx(lang,'عدد المشاهد','Number of scenes')} aria-label={tx(lang,'عدد المشاهد','Number of scenes')}><Clapperboard size={16}/><span>{tx(lang,'المشاهد','Scenes')}</span><b>{sceneCount}</b><ChevronDown size={12}/></summary>
                 <div className="quick-dropdown-panel">
                   <label><span className="field-label">{tx(lang,'عدد المشاهد','Number of scenes')}</span><input aria-label={tx(lang,'عدد المشاهد','Number of scenes')} type="number" min="1" max="24" step="1" className="studio-input" value={sceneCount} disabled={projectCreated} onChange={e=>setSceneCount(Math.max(1,Math.min(24,Number(e.target.value)||1)))} data-testid="input-quick-scene-count" /></label>
                 </div>
