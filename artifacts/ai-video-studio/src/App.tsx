@@ -1511,7 +1511,7 @@ function ProjectWorkspace({ projectId }: { projectId: string }) {
   useEffect(()=>{if(!autoVideoProviderId&&autoVideoKeys[0]){setAutoVideoProviderId(autoVideoKeys[0].id);setAutoGenerateVideo(true)}},[autoVideoKeys[0]?.id,autoVideoProviderId]);
   useEffect(()=>{if(selectedAutoVideoKey)setAutoVideoModel(defaultVideoModel(selectedAutoVideoKey.provider,'text'))},[selectedAutoVideoKey?.id]);
   const autoVideoApprovalSignature=JSON.stringify({enabled:autoGenerateVideo,provider:selectedAutoVideoKey?.id||'',model:autoVideoModel,scenes:scriptSettings.sceneCount});
-  useEffect(()=>{setAutoVideoApproved(false)},[autoVideoApprovalSignature]);
+  useEffect(()=>{setAutoVideoApproved(selectedAutoVideoKey?.provider==='local-video-worker')},[autoVideoApprovalSignature,selectedAutoVideoKey?.provider]);
   const chargeSignature=JSON.stringify({service:'text',scenes:scriptSettings.sceneCount,duration:scriptSettings.sceneDurationSeconds,style:scriptSettings.sceneStyle,provider:textProviderReady});
   useEffect(()=>{setChargeApproved(false)},[chargeSignature]);
   const generationKeys=[...(keysQuery.data||[]),...FREE_TEST_KEYS];
