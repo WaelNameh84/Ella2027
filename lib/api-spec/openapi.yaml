@@ -1142,6 +1142,10 @@ components:
         sceneDurationSeconds: { type: integer, minimum: 1, maximum: 600, default: 8 }
         sceneStyle: { type: string, minLength: 1, maxLength: 200, default: Cinematic }
         story: { type: string, minLength: 1, maxLength: 30000 }
+        autoGenerateVideo: { type: boolean, default: false }
+        videoProviderKeyId: { type: ["string", "null"], format: uuid }
+        videoModel: { type: string, minLength: 1, maxLength: 200 }
+        approveVideoCharges: { type: boolean, default: false }
       required: [allowRotation, approvePotentialCharges]
     SceneImageGenerationInput:
       type: object

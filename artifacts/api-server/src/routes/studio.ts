@@ -796,6 +796,25 @@ router.post("/projects/:projectId/jobs/script", async (req, res): Promise<void> 
     res.status(403).json({ error: ZERO_SPEND_ERROR });
     return;
   }
+  if (parsed.data.autoGenerateVideo) {
+    if (parsed.data.approveVideoCharges !== true || !parsed.data.videoProviderKeyId || !parsed.data.videoModel?.trim()) {
+      res.status(400).json({ error: "Select a video provider and model, and approve the video requests before enabling automatic video generation." });
+      return;
+    }
+    const [videoKey] = await db.select().from(providerKeysTable).where(and(
+      eq(providerKeysTable.id, parsed.data.videoProviderKeyId),
+      eq(providerKeysTable.userId, userId),
+      eq(providerKeysTable.serviceType, "video"),
+      eq(providerKeysTable.enabled, true),
+    )).limit(1);
+    const supportedVideoProviders = ["replicate", "fal", "agnes", "magic-hour", "local-video-worker"];
+    if (!videoKey || !supportedVideoProviders.includes(videoKey.provider)
+      || !providerCredentialUsable(videoKey.provider, videoKey.status as ProviderStatus)
+      || (videoKey.cooldownUntil && videoKey.cooldownUntil.getTime() > Date.now())) {
+      res.status(409).json({ error: "The selected video provider is unavailable, incompatible, or cooling down. Choose a ready video provider." });
+      return;
+    }
+  }
   const project = await projectForUser(params.data.projectId, userId);
   if (!project) {
     res.status(404).json({ error: "Project not found." });

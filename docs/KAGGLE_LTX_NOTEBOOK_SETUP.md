@@ -1,15 +1,32 @@
-# Import and run the Ella2027 Kaggle LTX notebook
+# Import and run the Ella2027 Kaggle LTX-2.5 notebook
 
-Notebook: `notebooks/Ella2027_Kaggle_LTX_Worker.ipynb`
+Canonical notebook: [`notebooks/Ella2027_Kaggle_LTX_Worker.ipynb`](../notebooks/Ella2027_Kaggle_LTX_Worker.ipynb)
 
-1. In Kaggle, create a new notebook and enable **GPU** plus **Internet** in notebook settings.
-2. Add a Kaggle secret named `ELLA_KAGGLE_WORKER_TOKEN`. Its value must match Render's `KAGGLE_LTX_WORKER_TOKEN`. Never put the token in a notebook cell or commit it to GitHub.
-3. Import this `.ipynb` file into Kaggle (download it from GitHub, then use Kaggle's notebook import/upload flow).
-4. Run the cells from top to bottom. The notebook checks the Render worker health, downloads the LTX distilled model, and starts polling the Ella2027 queue.
-5. Leave the session running while jobs are being generated.
+This is the recovery notebook. It is designed so a fresh Kaggle runtime can be rebuilt from GitHub without manually editing code cells.
 
-## Important limits
+## One-time Kaggle setup
 
-This is a first-pass LTX Diffusers setup, not a guarantee that the checkpoint will fit or run on every Kaggle GPU image. Kaggle free GPU availability, session duration, RAM/VRAM, package compatibility, and Hugging Face download availability are not guaranteed. The notebook deliberately caps each generation at five seconds and 576x320 for its initial T4 test. Extend duration/resolution only after a successful end-to-end test. The existing Render worker endpoints and Cloudinary signed upload flow are reused; no new provider key is required in Ella2027.
+1. Import `notebooks/Ella2027_Kaggle_LTX_Worker.ipynb` from the `feature/ltx25-wangp-api-worker` branch into Kaggle.
+2. In Kaggle notebook settings, enable **GPU** and **Internet**.
+3. Add a Kaggle secret named `ELLA_KAGGLE_WORKER_TOKEN`. Its value must exactly match Render's `KAGGLE_LTX_WORKER_TOKEN`. Never put the token in notebook source or GitHub.
+4. Use **Run All**.
 
-If the model-loading cell fails, copy the complete error output; do not rerun only the final worker cell because the model and callback must be loaded first.
+## What Run All does
+
+1. Checks the GPU, CUDA, disk space, Render worker health, and ffmpeg.
+2. Clones WanGP into `/kaggle/working/WanGP` if it is not already present.
+3. Installs WanGP requirements while constraining the existing Kaggle Torch/TorchVision/Torchaudio versions.
+4. Downloads or reuses the LTX-2.5 NVFP4 transformer checkpoint and Gemma 4 12B INT8 ConvRot encoder under `/tmp/ella-ltx25`.
+5. Writes the local WanGP finetune profile `finetunes/ltx2_25_22B_distilled.json`.
+6. Downloads the worker source from this GitHub branch, validates its Python syntax, and starts it as a detached background process.
+7. Saves the worker PID to `/kaggle/working/ella_worker.pid` and logs to `/kaggle/working/ella_worker.log`.
+
+The final cell is expected to finish after startup. That does **not** mean the worker stopped. Confirm it prints `WORKER STATUS: RUNNING` and `Waiting for Ella2027 video jobs...`.
+
+## Recovery and limitations
+
+- A new Kaggle runtime has an empty `/tmp`, so WanGP and both model files must be downloaded again. A rerun in the same runtime reuses existing source and model files.
+- Keep the Kaggle session active while sending jobs. Kaggle sessions, GPU availability, VRAM, RAM, download speed, and quotas are controlled by Kaggle and are not guaranteed.
+- Initial profile: `ltx2_25_22B_distilled`, 768×448, 24 FPS, maximum 5 seconds per clip, 100 MiB upload limit.
+- The worker checks that the generated MP4 contains both audio and video streams before publishing it.
+- Permanent code changes must be committed to this branch first. The notebook downloads the worker from this branch; do not patch the live Kaggle copy as a substitute for a GitHub commit.

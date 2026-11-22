@@ -31,4 +31,10 @@ export interface ScriptGenerationInput {
      * @maxLength 30000
      */
   story?: string;
+  autoGenerateVideo?: boolean;
+  /** @nullable */
+  videoProviderKeyId?: string | null;
+  /** @minLength 1 @maxLength 200 */
+  videoModel?: string;
+  approveVideoCharges?: boolean;
 }
