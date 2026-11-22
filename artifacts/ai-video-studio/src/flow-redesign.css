@@ -1,0 +1,92 @@
+/* Ella Flow-inspired responsive redesign — visual layer only; preserves existing APIs and worker pipeline. */
+:root{--ella-ink:#eaf0f7;--ella-muted:#9aa9ba;--ella-line:rgba(151,177,205,.16);--ella-panel:rgba(18,27,42,.82);--ella-panel-2:rgba(24,36,54,.72);--ella-accent:#8b9cff;--ella-cyan:#63d6e8}
+html.dark body{background:#080d16;color:var(--ella-ink)}
+html.dark .app-shell{background:radial-gradient(ellipse at 72% -15%,rgba(81,112,190,.2),transparent 42%),radial-gradient(ellipse at 8% 75%,rgba(39,160,177,.08),transparent 35%),#080d16}
+html.dark .sidebar{background:rgba(9,15,26,.94);border-inline-end:1px solid var(--ella-line);backdrop-filter:blur(24px)}
+html.dark .sidebar-brand{border-bottom:1px solid var(--ella-line)}
+html.dark .sidebar-caption,.html.dark .eyebrow{color:#8fa1b9}
+html.dark .side-link{color:#a9b6c7;border-radius:12px;margin:3px 10px;padding:11px 13px;transition:background .18s,color .18s}
+html.dark .side-link:hover,html.dark .side-link.active{background:linear-gradient(100deg,rgba(113,135,255,.18),rgba(99,214,232,.06));color:#f4f7ff}
+html.dark .side-link.active .nav-indicator{background:var(--ella-cyan);box-shadow:0 0 14px rgba(99,214,232,.7)}
+html.dark .main-area{background:transparent}
+html.dark .topbar{background:rgba(8,13,22,.72);border-bottom:1px solid var(--ella-line);backdrop-filter:blur(22px);padding:16px clamp(16px,3vw,42px);min-height:76px}
+html.dark .topbar h1{color:#f2f5fb}
+html.dark .page-content{max-width:1680px;margin:0 auto;padding:clamp(14px,2.4vw,34px)}
+html.dark .panel,html.dark .ella-rail-card,html.dark .ella-activity-bar,html.dark .ella-pro-feature,html.dark .launch-card{background:linear-gradient(145deg,rgba(22,33,51,.94),rgba(13,21,34,.94));border:1px solid var(--ella-line);box-shadow:0 18px 60px rgba(0,0,0,.22);color:#eaf0f7}
+html.dark .ella-studio-welcome{padding:clamp(18px,3vw,34px);border:1px solid rgba(130,154,255,.2);border-radius:24px;background:linear-gradient(120deg,rgba(40,55,92,.72),rgba(14,26,42,.72) 65%,rgba(18,43,55,.62));box-shadow:0 24px 70px rgba(0,0,0,.2)}
+html.dark .ella-studio-welcome h2{color:#f7f9ff;font-size:clamp(28px,4vw,48px);letter-spacing:-.04em;line-height:1.12}
+html.dark .ella-studio-welcome p,html.dark .ella-pro-copy p,html.dark .ella-rail-card p{color:#aab8ca}
+html.dark .ella-pro-feature{border-radius:22px;overflow:hidden;padding:clamp(18px,3vw,32px);background:radial-gradient(circle at 82% 35%,rgba(105,126,255,.18),transparent 32%),linear-gradient(130deg,#17243a,#101a2a 70%,#10252e)}
+html.dark .ella-pro-copy h3{color:#f6f8ff;font-size:clamp(24px,3vw,36px);letter-spacing:-.035em}
+html.dark .ella-pro-art{filter:saturate(1.15)}
+html.dark .ella-pro-primary,.html.dark .btn-primary{background:linear-gradient(110deg,#7889ff,#4cbbd2);color:#08111d;border:0;box-shadow:0 8px 28px rgba(91,133,238,.22)}
+html.dark .btn-quiet,html.dark .btn-ghost{background:rgba(255,255,255,.045);border:1px solid var(--ella-line);color:#dce6f3}
+html.dark .studio-input{background:rgba(7,14,24,.78);border-color:var(--ella-line);color:#edf4ff;border-radius:12px;min-height:44px}
+html.dark .studio-input:focus{border-color:#8494ff;box-shadow:0 0 0 3px rgba(132,148,255,.14)}
+html.dark .field-label{color:#a8b8cc}
+html.dark .production-stages,html.dark .dashboard-launchpad{background:linear-gradient(135deg,rgba(26,40,63,.9),rgba(15,25,40,.94));border-color:var(--ella-line)}
+html.dark .mobile-nav{background:rgba(8,13,22,.94);border-top:1px solid var(--ella-line);backdrop-filter:blur(24px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html.dark .mobile-nav a{color:#91a2b8}
+html.dark .mobile-nav a.active{color:#9eacff}
+html.dark .mobile-nav a.active svg{filter:drop-shadow(0 0 8px rgba(132,148,255,.45))}
+html.dark .grain{opacity:.012}
+html.dark .ella-overline{color:#a7b7d0}
+html.dark .ella-live-indicator{color:#86e3d1}
+html.dark .ella-activity-items a{color:#dce6f3;border-color:var(--ella-line)}
+html.dark .ella-recent-project{color:#e6edf8;border-color:var(--ella-line)}
+html.dark .ella-recent-project small,html.dark .ella-rail-footer{color:#91a3ba}
+html.dark .ella-engine-icon{background:rgba(120,137,255,.16);color:#a9b5ff}
+html.dark .ella-engine-count{color:#8be1d2}
+html.dark .ella-flow-steps span{color:#d4deec}
+html.dark .ella-flow-steps i{background:rgba(132,148,255,.14);color:#aab6ff}
+html.dark .modal,html.dark .inline-project-form{background:#111b2a;border-color:var(--ella-line);color:#eef3fb}
+html.dark .modal-backdrop{background:rgba(1,5,12,.76);backdrop-filter:blur(8px)}
+html.dark .modal p,html.dark .modal .text-muted-foreground{color:#a7b5c7}
+html.dark .project-card,html.dark .scene-card,html.dark .inspector-panel{background:#111b2a;border-color:var(--ella-line)}
+/* Remove secondary workflows from the primary navigation; keep provider setup available. */
+html.dark .side-nav>.side-link:nth-child(4),html.dark .side-nav>.side-link:nth-child(n+6){display:none}
+html.dark .mobile-nav>a:nth-child(4),html.dark .mobile-nav>a:nth-child(n+6){display:none}
+html.dark .ella-alternate-heading,html.dark .ella-alternate-modes{display:none!important}
+html.dark .ella-workspace-foot{margin-top:14px}
+html.dark .ella-studio-home{grid-template-columns:minmax(0,1fr) 290px;gap:clamp(14px,2vw,26px)}
+html.dark .ella-studio-main{gap:clamp(14px,2vw,22px)}
+html.dark .ella-studio-rail{gap:14px}
+html.dark .ella-rail-card{border-radius:18px;padding:18px}
+html.dark .ella-activity-bar{border-radius:18px;padding:16px 18px}
+html.dark .ella-activity-title{color:#b7c5d8}
+html.dark .ella-pro-note{color:#a8b8ca}
+html.dark .ella-rail-heading h3{color:#edf3fc}
+html.dark .ella-rail-eyebrow{color:#8fa4c1}
+html.dark .ella-engine-foot{border-top-color:var(--ella-line)}
+html.dark .ella-studio-home a:focus-visible,html.dark button:focus-visible{outline:2px solid #8e9dff;outline-offset:3px}
+@media(max-width:1100px){html.dark .ella-studio-home{grid-template-columns:1fr}html.dark .ella-studio-rail{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}html.dark .ella-rail-projects{grid-row:auto}}
+@media(max-width:767px){
+ html.dark .topbar{min-height:62px;padding:10px 14px}
+ html.dark .topbar h1{font-size:16px}
+ html.dark .page-content{padding:12px 12px calc(84px + env(safe-area-inset-bottom,0px))}
+ html.dark .ella-studio-home{display:flex;flex-direction:column;gap:13px}
+ html.dark .ella-studio-welcome{border-radius:18px;padding:18px}
+ html.dark .ella-studio-welcome h2{font-size:29px}
+ html.dark .ella-studio-welcome p{font-size:13px}
+ html.dark .ella-welcome-meta{gap:8px;flex-wrap:wrap}
+ html.dark .ella-pro-feature{display:block;border-radius:18px;padding:18px}
+ html.dark .ella-pro-art{display:none}
+ html.dark .ella-pro-copy h3{font-size:25px}
+ html.dark .ella-pro-primary{width:100%;min-height:48px}
+ html.dark .ella-studio-rail{display:flex;flex-direction:column;width:100%}
+ html.dark .ella-rail-card{border-radius:16px;padding:15px}
+ html.dark .ella-activity-bar{display:flex;flex-direction:column;align-items:stretch;gap:10px}
+ html.dark .ella-activity-items{display:flex;flex-direction:column;width:100%}
+ html.dark .ella-activity-items a{min-width:0}
+ html.dark .mobile-nav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));height:auto;min-height:64px;padding:8px 8px calc(8px + env(safe-area-inset-bottom,0px));gap:3px}
+ html.dark .mobile-nav>a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:10px;min-width:0;padding:5px 2px}
+ html.dark .mobile-nav>a:nth-child(4),html.dark .mobile-nav>a:nth-child(n+6){display:none}
+ html.dark .mobile-nav>a svg{width:19px;height:19px}
+ html.dark .create-studio-entry,html.dark .manual-studio-entry{width:100%;padding:0}
+ html.dark .inline-project-form{padding:16px!important;border-radius:18px}
+ html.dark .form-two{grid-template-columns:1fr!important}
+ html.dark .modal{width:calc(100vw - 20px);max-height:calc(100dvh - 24px);overflow:auto}
+ html.dark input,html.dark textarea,html.dark select{font-size:16px}
+}
+@media(min-width:768px) and (max-width:1050px){html.dark .sidebar{width:76px}html.dark .sidebar .sidebar-caption,html.dark .sidebar .side-link span:not(.nav-indicator),html.dark .sidebar .sidebar-note{display:none}html.dark .sidebar .side-link{justify-content:center;margin-inline:8px;padding:12px}html.dark .sidebar .sidebar-brand{justify-content:center}}
+@media(prefers-reduced-motion:reduce){html.dark *,html.dark *::before,html.dark *::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}}
