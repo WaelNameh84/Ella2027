@@ -66,6 +66,10 @@ type JobInput = {
   sceneDurationSeconds?: number;
   sceneStyle?: string;
   story?: string;
+  autoGenerateVideo?: boolean;
+  videoProviderKeyId?: string | null;
+  videoModel?: string;
+  approveVideoCharges?: boolean;
 };
 
 function parseGeneratedJson(text: string): ScriptResult {
@@ -524,12 +528,47 @@ async function processScriptJob(job: typeof studioJobsTable.$inferSelect): Promi
     if (existing.length) {
       throw new Error("The project changed while this job was running. Review its existing scenes.");
     }
-    await tx.insert(scenesTable).values(generated!.scenes.map((scene, index) => ({
+    const insertedScenes = await tx.insert(scenesTable).values(generated!.scenes.map((scene, index) => ({
       projectId: project.id,
       userId: job.userId,
       sortOrder: index,
       ...scene,
-    })));
+    }))).returning();
+
+    if (input.autoGenerateVideo === true) {
+      const [videoKey] = await tx.select().from(providerKeysTable).where(and(
+        eq(providerKeysTable.id, String(input.videoProviderKeyId ?? "")),
+        eq(providerKeysTable.userId, job.userId),
+        eq(providerKeysTable.serviceType, "video"),
+        eq(providerKeysTable.enabled, true),
+      )).limit(1);
+      if (!videoKey || !supportsJob(videoKey.provider, "video")
+        || !providerCredentialUsable(videoKey.provider, videoKey.status as ProviderStatus)
+        || (videoKey.cooldownUntil && videoKey.cooldownUntil.getTime() > Date.now())
+        || input.approveVideoCharges !== true || !input.videoModel?.trim()) {
+        throw new Error("Automatic video generation could not be queued because the selected video provider is no longer ready or approved.");
+      }
+      const localWorker = videoKey.provider === "local-video-worker";
+      const queueTime = Date.now();
+      await tx.insert(studioJobsTable).values(insertedScenes.map((scene, index) => ({
+        userId: job.userId,
+        projectId: project.id,
+        jobType: "video",
+        stage: localWorker ? "kaggle_waiting" : "queued",
+        input: {
+          sceneId: scene.id,
+          providerKeyId: videoKey.id,
+          model: input.videoModel!.trim(),
+          mode: "text",
+          approvePotentialCharges: true,
+          ...(localWorker ? { worker: "kaggle-ltx" } : {}),
+        },
+        message: localWorker ? "Queued automatically; waiting for the Kaggle LTX worker." : "Queued automatically from the storyboard.",
+        createdAt: new Date(queueTime + index),
+        updatedAt: new Date(queueTime + index),
+      })));
+    }
+
     await tx.update(projectsTable).set({
       status: "editing",
       progress: 45,
