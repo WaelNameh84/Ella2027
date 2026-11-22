@@ -1,32 +1,41 @@
 # Ella2027 — LTX-2.5 Kaggle worker
 
-This branch contains the LTX-2.5 22B Distilled NVFP4 + Gemma 4 12B INT8 ConvRot Kaggle notebook, using Wan2GP, plus an Ella2027 polling worker backed by WanGP's supported Python API.
+## Canonical Run All notebook
 
-## Open the notebook
+Use the single recovery notebook:
 
-[Open the connected Kaggle notebook](./ltx-2-5-wan2gp-kaggle.ipynb)
+[`notebooks/Ella2027_Kaggle_LTX_Worker.ipynb`](../../notebooks/Ella2027_Kaggle_LTX_Worker.ipynb)
 
-Notebook URL:
-https://github.com/WaelNameh84/Ella2027/blob/feature/ltx25-wangp-api-worker/workers/ltx25/ltx-2-5-wan2gp-kaggle.ipynb
+GitHub URL:
+https://github.com/WaelNameh84/Ella2027/blob/feature/ltx25-wangp-api-worker/notebooks/Ella2027_Kaggle_LTX_Worker.ipynb
 
-## What it does
+Do not use the older `ltx-2-5-wan2gp-kaggle.ipynb` in this folder as the recovery entry point. It is retained as the original setup reference; the canonical notebook above adds the detached worker launch, PID/log tracking, and current branch-pinned worker download.
 
-1. Checks the Kaggle GPU and storage.
-2. Clones Wan2GP and installs its requirements while preserving Kaggle's installed Torch/TorchVision/Torchaudio versions.
-3. Downloads/reuses the LTX-2.5 NVFP4 checkpoint and Gemma 4 INT8 text encoder under `/tmp/ella-ltx25`.
-4. Writes a local WanGP finetune profile that points to the downloaded LTX-2.5 NVFP4 and Gemma INT8 ConvRot files, then starts WanGP through `shared.api`.
-5. Polls Ella2027's job queue, generates the requested scene, uploads the MP4 to the existing Cloudinary storage, and attaches it to the scene.
+## What the canonical notebook does
 
-## First test profile
+1. Checks the Kaggle GPU, CUDA, storage, ffmpeg, and Ella2027 Render worker health.
+2. Clones WanGP and installs requirements while preserving Kaggle's existing Torch/TorchVision/Torchaudio versions.
+3. Downloads or reuses the LTX-2.5 22B Distilled NVFP4 checkpoint and Gemma 4 12B INT8 ConvRot encoder under `/tmp/ella-ltx25`.
+4. Writes the local WanGP finetune definition at `finetunes/ltx2_25_22B_distilled.json`.
+5. Downloads `services/kaggle-ltx-worker/wangp_worker.py` from this branch and checks its Python syntax.
+6. Starts the worker in a detached background process and records:
+   - PID: `/kaggle/working/ella_worker.pid`
+   - Log: `/kaggle/working/ella_worker.log`
+
+## Initial test profile
 
 - Model: `ltx2_25_22B_distilled`
 - Resolution: 768×448
 - FPS: 24
-- Maximum clip duration: 5 seconds on the initial Kaggle T4 profile
-- Batch size: 1 / model defaults
+- Maximum clip duration: 5 seconds
+- MP4 upload limit: 100 MiB
 
-The worker refuses scenes longer than five seconds rather than silently truncating them. The worker uses WanGP's prompt-generated audio setting (`audio_prompt_type=""`); verify that the resulting MP4 contains an audio stream during the first test.
+The worker verifies that generated MP4 files contain both video and audio streams before uploading them to Cloudinary and completing the Ella2027 job.
 
-## Kaggle T4 limitations
+## Secrets and limits
 
-T4 does not provide optimized native NVFP4 kernels. Wan2GP may use a slower fallback path. Runtime, quality, and whether the session can complete generation depend on Kaggle's active image, memory, and upstream compatibility. No generation-time guarantee is made.
+- Kaggle Secret: `ELLA_KAGGLE_WORKER_TOKEN`
+- Render secret: `KAGGLE_LTX_WORKER_TOKEN` (must have the same value)
+- Never put either secret in GitHub or notebook source.
+- Kaggle T4 may use a slower NVFP4 fallback path. Kaggle GPU availability, session duration, memory, and download availability are not guaranteed.
+- `/tmp` is ephemeral. A fresh Kaggle runtime must download the model weights again.
