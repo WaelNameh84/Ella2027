@@ -2456,6 +2456,14 @@ function BatchVideoGeneration({projectId,scenes,keys,lang,hasActiveJob,onQueued,
   const scenesWithoutVideo=scenes.filter(scene=>scene.assetType!=='video'||!scene.assetUrl);
   const allHaveImages=scenesWithoutVideo.every(scene=>scene.assetType==='image'&&Boolean(scene.assetUrl));
   const [open,setOpen]=useState(false);
+  const [selectedSceneIds,setSelectedSceneIds]=useState<string[]>([]);
+  const selectionInitialized=useRef(false);
+  const selectableSceneSignature=scenesWithoutVideo.map(scene=>scene.id).join('|');
+  useEffect(()=>{
+    if(!selectionInitialized.current&&scenesWithoutVideo.length){setSelectedSceneIds(scenesWithoutVideo.map(scene=>scene.id));selectionInitialized.current=true;return;}
+    setSelectedSceneIds(current=>{const next=current.filter(id=>scenesWithoutVideo.some(scene=>scene.id===id));return next.length===current.length?current:next;});
+  },[selectableSceneSignature]);
+  const selectedScenes=scenesWithoutVideo.filter(scene=>selectedSceneIds.includes(scene.id));
   const [providerId,setProviderId]=useState('');
   const [model,setModel]=useState('');
   const [mode,setMode]=useState<'text'|'image'>('text');
@@ -2469,7 +2477,7 @@ function BatchVideoGeneration({projectId,scenes,keys,lang,hasActiveJob,onQueued,
   const batchExportStarted=useRef(false);
   const activeKey=videoKeys.find(key=>key.id===providerId)||videoKeys[0];
   useEffect(()=>{if(!providerId)setModel(defaultVideoModel(firstVideoProvider,mode));},[providerId,firstVideoProvider,mode]);
-  const scenesToQueue=mode==='image'?scenesWithoutVideo.filter(scene=>scene.assetType==='image'&&Boolean(scene.assetUrl)):scenesWithoutVideo;
+  const scenesToQueue=mode==='image'?selectedScenes.filter(scene=>scene.assetType==='image'&&Boolean(scene.assetUrl)):selectedScenes;
   const [approved,setApproved]=useRequestApproval(JSON.stringify({provider:activeKey?.id||'',model,mode,scenes:scenesToQueue.map(scene=>scene.id)}));
   const close=()=>{if(queueing)return;setOpen(false);setApproved(false)};
   const begin=async()=>{
@@ -2547,15 +2555,16 @@ function BatchVideoGeneration({projectId,scenes,keys,lang,hasActiveJob,onQueued,
   return <>
     <section className="script-bar panel mt-4" data-testid="batch-video-panel">
       <div className="script-symbol"><Film size={18}/></div>
-      <div className="script-copy"><b>{tx(lang,'حوّل المشاهد إلى فيديو','Turn scenes into video')}</b><p>{scenesWithoutVideo.length?tx(lang,'ولّد مقطعًا لكل مشهد ناقص دفعة واحدة، أو اختر كل مشهد وولّده وحده.','Generate clips for all scenes without video, or generate each scene individually.'):tx(lang,'كل المشاهد لديها فيديو بالفعل.','Every scene already has a video.')}</p>
+      <div className="script-copy"><b>{tx(lang,'حوّل المشاهد إلى فيديو','Turn scenes into video')}</b><p>{scenesWithoutVideo.length?tx(lang,'حدّد المشاهد التي تريد توليدها، ثم أرسلها إلى المهام دفعة واحدة.','Select the scenes you want to generate, then queue them all at once.'):tx(lang,'كل المشاهد لديها فيديو بالفعل.','Every scene already has a video.')}</p>
+        {scenesWithoutVideo.length>0&&<div className="batch-scene-picker" data-testid="batch-scene-picker"><div className="batch-scene-picker-head"><b>{tx(lang,'تحديد المشاهد','Select scenes')} <span>{selectedSceneIds.length} / {scenesWithoutVideo.length}</span></b><div><button type="button" onClick={()=>setSelectedSceneIds(scenesWithoutVideo.map(scene=>scene.id))} disabled={queueing}>{tx(lang,'تحديد الكل','Select all')}</button><button type="button" onClick={()=>setSelectedSceneIds([])} disabled={queueing}>{tx(lang,'إلغاء الكل','Clear')}</button></div></div><div className="batch-scene-picker-list">{scenesWithoutVideo.map((scene,index)=><label key={scene.id} className={selectedSceneIds.includes(scene.id)?'is-checked':''}><input type="checkbox" checked={selectedSceneIds.includes(scene.id)} disabled={queueing} onChange={event=>setSelectedSceneIds(current=>event.target.checked?[...current,scene.id]:current.filter(id=>id!==scene.id))}/><span>{String(index+1).padStart(2,'0')}</span><b>{scene.title||tx(lang,`مشهد ${index+1}`,`Scene ${index+1}`)}</b><small>{scene.durationSeconds}{tx(lang,'ث','s')}</small></label>)}</div></div>}
         {videoKeys.length===0&&scenesWithoutVideo.length>0&&<Link href="/settings/providers" className="text-link" data-testid="link-batch-video-provider-settings">{tx(lang,'أضف مفتاح Magic Hour أو Agnes AI أو Replicate أو fal.ai لخدمة الفيديو','Add a Magic Hour, Agnes AI, Replicate, or fal.ai video key')}<ArrowLeft size={14}/></Link>}
         {hasActiveJob&&<small className="provider-purpose-description">{tx(lang,'انتظر انتهاء المهمة الحالية قبل بدء دفعة فيديو جديدة.','Wait for the current job to finish before starting a video batch.')}</small>}
         {summary&&<p role="status" data-testid="batch-video-result">{summary.failed?tx(lang,`أُرسل ${summary.queued} من ${summary.total} طلبات الفيديو؛ تعذّر إرسال ${summary.failed}.`,`${summary.queued} of ${summary.total} video requests were queued; ${summary.failed} could not be queued.`):tx(lang,`تم إرسال ${summary.queued} طلبات فيديو إلى قائمة المهام.`,`Queued ${summary.queued} video requests.`)} <Link href="/jobs" className="text-link">{tx(lang,'عرض المهام','View jobs')}<ArrowLeft size={13}/></Link></p>}
         {batchMessage&&<p className={batchPhase==='failed'?'inline-error':'provider-purpose-description'} role="status" data-testid="batch-video-assembly-status">{batchPhase==='assembling'?<LoaderCircle size={13} className="inline animate-spin"/>:batchPhase==='complete'?<CheckCircle2 size={13} className="inline"/>:null} {batchMessage} {batchPhase==='complete'&&<Link href={`/projects/${projectId}`} className="text-link">{tx(lang,'مشاهدة الفيلم','Watch final film')}</Link>} {batchPhase==='failed'&&<Link href={`/projects/${projectId}`} className="text-link">{tx(lang,'فتح التصدير','Open export')}</Link>}</p>}
       </div>
-      {scenesWithoutVideo.length>0&&<button className="btn btn-primary" disabled={!videoKeys.length||hasActiveJob} onClick={()=>{setProgress(null);setSummary(null);setApproved(false);setProviderId('');setMode('text');setModel(defaultVideoModel(firstVideoProvider,'text'));setOpen(true)}} data-testid="button-batch-video">{tx(lang,'توليد فيديو لكل المشاهد','Generate all scene videos')}</button>}
+      {scenesWithoutVideo.length>0&&<button className="btn btn-primary" disabled={!videoKeys.length||hasActiveJob||selectedSceneIds.length===0} onClick={()=>{setProgress(null);setSummary(null);setApproved(false);setProviderId('');setMode('text');setModel(defaultVideoModel(firstVideoProvider,'text'));setOpen(true)}} data-testid="button-batch-video">{tx(lang,`توليد المحدد (${selectedSceneIds.length})`,`Generate selected (${selectedSceneIds.length})`)}</button>}
     </section>
-    {open&&<Modal title={tx(lang,'توليد فيديو للمشاهد','Generate scene videos')} subtitle={tx(lang,`سيتم إرسال ${scenesToQueue.length} طلب فيديو. قد تُحتسب رسوم لكل مشهد.`,`This will send ${scenesToQueue.length} video requests. Each scene may incur a charge.`)} onClose={close}>
+    {open&&<Modal title={tx(lang,'توليد فيديو للمشاهد','Generate scene videos')} subtitle={tx(lang,`سيتم إرسال ${scenesToQueue.length} من المشاهد المحددة إلى المهام بالترتيب. قد تُحتسب رسوم لكل مشهد.`,`${scenesToQueue.length} selected scenes will be queued in order. Each scene may incur a charge.`)} onClose={close}>
       <div className="form-stack">
         {videoKeys.length>1&&<label><span className="field-label">{tx(lang,'مفتاح الفيديو','Video key')}</span><select className="studio-input" value={activeKey?.id||''} onChange={e=>{setProviderId(e.target.value);const selected=videoKeys.find(key=>key.id===e.target.value);setModel(defaultVideoModel(selected?.provider,mode));}} data-testid="select-batch-video-key">{videoKeys.map(key=><option key={key.id} value={key.id}>{key.label} · {key.provider}</option>)}</select></label>}
         <label><span className="field-label">{tx(lang,'معرّف نموذج الفيديو','Video model endpoint')}</span><input required className="studio-input" value={model} onChange={e=>setModel(e.target.value)} placeholder={activeKey?.provider==='fal'?'minimax/h3-max/text-to-video':activeKey?.provider==='agnes'?'agnes-video-2.5':activeKey?.provider==='magic-hour'?'ltx-2.5':'minimax/video-01'} data-testid="input-batch-video-model"/></label>
