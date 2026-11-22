@@ -226,6 +226,143 @@ def _brighten_video(video: Path) -> Path:
     return output
 
 
+
+UPSCALE_PYTHON = Path("/kaggle/working/ella-python312/bin/python")
+UPSCALE_WEIGHTS = Path("/kaggle/working/RealESRGAN_x2plus.pth")
+
+
+def _upscale_video_2x(video: Path) -> Path:
+    """Automatically enhance every generated frame with verified Real-ESRGAN x2.
+
+    Uses the secondary T4 when available, preserves the original and audio,
+    and safely falls back to the source if enhancement cannot be completed.
+    """
+    if not UPSCALE_PYTHON.is_file() or not UPSCALE_WEIGHTS.is_file():
+        print("[ELLA][UPSCALE] Real-ESRGAN runtime/weights missing; keeping the original video.", flush=True)
+        return video
+
+    target = video.with_name(f"{video.stem}_2K.mp4")
+    if target.exists():
+        target = video.with_name(f"{video.stem}_{int(time.time())}_2K.mp4")
+    work_dir = OUTPUT_DIR / f".upscale_{int(time.time())}"
+    frames_in = work_dir / "input"
+    frames_out = work_dir / "upscaled"
+    try:
+        probe = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_streams", "-show_format", "-of", "json", str(video)],
+            capture_output=True, text=True, timeout=45, check=True,
+        )
+        metadata = json.loads(probe.stdout)
+        video_streams = [s for s in metadata.get("streams", []) if s.get("codec_type") == "video"]
+        if not video_streams:
+            raise RuntimeError("No video stream found before upscaling.")
+        source_video = video_streams[0]
+        fps = source_video.get("avg_frame_rate") or source_video.get("r_frame_rate") or "24/1"
+        has_audio = any(s.get("codec_type") == "audio" for s in metadata.get("streams", []))
+
+        frames_in.mkdir(parents=True, exist_ok=True)
+        frames_out.mkdir(parents=True, exist_ok=True)
+        print(
+            f"[ELLA][UPSCALE] Starting automatic 2x enhancement: "
+            f"{source_video.get('width')}x{source_video.get('height')} -> "
+            f"{int(source_video.get('width', 0))*2}x{int(source_video.get('height', 0))*2}",
+            flush=True,
+        )
+        subprocess.run(
+            ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(video),
+             "-map", "0:v:0", "-fps_mode", "passthrough", str(frames_in / "frame_%06d.png")],
+            capture_output=True, text=True, timeout=600, check=True,
+        )
+        frame_count = len(list(frames_in.glob("frame_*.png")))
+        if frame_count < 1:
+            raise RuntimeError("FFmpeg extracted no frames.")
+
+        upscale_code = r'''import sys, types, torch
+from pathlib import Path
+from PIL import Image
+from torchvision.transforms import functional as F
+shim = types.ModuleType("torchvision.transforms.functional_tensor")
+shim.rgb_to_grayscale = F.rgb_to_grayscale
+sys.modules["torchvision.transforms.functional_tensor"] = shim
+from basicsr.archs.rrdbnet_arch import RRDBNet
+from realesrgan import RealESRGANer
+import numpy as np
+src, dst, weights = map(Path, sys.argv[1:4])
+if not torch.cuda.is_available():
+    raise RuntimeError("CUDA is unavailable in the isolated upscaler environment")
+gpu = 1 if torch.cuda.device_count() > 1 else 0
+device = torch.device(f"cuda:{gpu}")
+print(f"[ELLA][UPSCALE] GPU {gpu}: {torch.cuda.get_device_name(gpu)}", flush=True)
+model = RRDBNet(num_in_ch=3, num_out_ch=3, num_feat=64, num_block=23, num_grow_ch=32, scale=2)
+up = RealESRGANer(scale=2, model_path=str(weights), model=model, tile=256, tile_pad=10,
+                  pre_pad=0, half=True, device=device)
+files = sorted(src.glob("frame_*.png"))
+for i, path in enumerate(files, 1):
+    image = Image.open(path).convert("RGB")
+    arr = np.array(image)[:, :, ::-1].copy()
+    result, _ = up.enhance(arr, outscale=2)
+    Image.fromarray(result[:, :, ::-1]).save(dst / path.name)
+    if i == 1 or i % 24 == 0 or i == len(files):
+        print(f"[ELLA][UPSCALE] Enhanced {i}/{len(files)} frames", flush=True)
+print("[ELLA][UPSCALE] All frames enhanced.", flush=True)
+'''
+        process = subprocess.Popen(
+            [str(UPSCALE_PYTHON), "-u", "-c", upscale_code,
+             str(frames_in), str(frames_out), str(UPSCALE_WEIGHTS)],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1,
+        )
+        assert process.stdout is not None
+        for line in process.stdout:
+            print(line, end="", flush=True)
+        return_code = process.wait()
+        if return_code:
+            raise RuntimeError(f"Real-ESRGAN exited with code {return_code}")
+
+        enhanced_count = len(list(frames_out.glob("frame_*.png")))
+        if enhanced_count != frame_count:
+            raise RuntimeError(f"Frame count mismatch: {frame_count} source vs {enhanced_count} enhanced")
+
+        mux_command = [
+            "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+            "-framerate", fps, "-i", str(frames_out / "frame_%06d.png"),
+            "-i", str(video), "-map", "0:v:0", "-map", "1:a?",
+            "-c:v", "libx264", "-preset", "medium", "-crf", "18",
+            "-pix_fmt", "yuv420p", "-c:a", "copy", "-movflags", "+faststart", str(target),
+        ]
+        subprocess.run(mux_command, capture_output=True, text=True, timeout=1800, check=True)
+        final_probe = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_streams", "-show_format", "-of", "json", str(target)],
+            capture_output=True, text=True, timeout=45, check=True,
+        )
+        final_data = json.loads(final_probe.stdout)
+        final_video = next((s for s in final_data.get("streams", []) if s.get("codec_type") == "video"), None)
+        final_audio = any(s.get("codec_type") == "audio" for s in final_data.get("streams", []))
+        expected = (int(source_video["width"]) * 2, int(source_video["height"]) * 2)
+        actual = (int(final_video.get("width", 0)), int(final_video.get("height", 0))) if final_video else (0, 0)
+        if actual != expected:
+            raise RuntimeError(f"Unexpected enhanced dimensions: {actual}, expected {expected}")
+        if has_audio and not final_audio:
+            raise RuntimeError("Audio stream was lost during 2x enhancement.")
+        if target.stat().st_size > MAX_UPLOAD_BYTES:
+            raise RuntimeError(
+                f"Enhanced MP4 exceeds upload limit ({target.stat().st_size / 1024 / 1024:.1f} MiB); "
+                "keeping the original to avoid losing the job."
+            )
+        print(
+            f"[ELLA][UPSCALE] SUCCESS: {actual[0]}x{actual[1]}, "
+            f"{frame_count} frames, audio={final_audio}, "
+            f"{target.stat().st_size / 1024 / 1024:.1f} MiB",
+            flush=True,
+        )
+        return target
+    except Exception as exc:
+        print(f"[ELLA][UPSCALE] WARNING: enhancement failed; original video will be used: {exc}", flush=True)
+        if target.exists():
+            target.unlink()
+        return video
+    finally:
+        shutil.rmtree(work_dir, ignore_errors=True)
+
 def process_one(session, token: str) -> bool:
     headers = {"Authorization": f"Bearer {token}"}
     response = requests.post(api_url("/claim"), headers=headers, json={}, timeout=30)
@@ -248,6 +385,7 @@ def process_one(session, token: str) -> bool:
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         video_path = _generate_one(session, task, OUTPUT_DIR)
         video_path = _brighten_video(video_path)
+        video_path = _upscale_video_2x(video_path)
         if state["lost"]:
             raise RuntimeError("The job lease was lost during generation; stale output was discarded.")
 
