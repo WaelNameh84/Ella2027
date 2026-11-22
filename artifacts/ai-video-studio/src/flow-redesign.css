@@ -915,3 +915,57 @@ html.dark .app-shell[data-route="project-workspace"] .studio-rail-note{color:#92
   }
 }
 
+
+
+/* Ultra-compact icon-only mode selector and smaller idea card. Provider keys route is untouched. */
+.app-shell[data-route="workspace"] .create-studio-entry .idea-entry-card{
+  max-width:680px;
+  padding:clamp(12px,1.7vw,19px);
+  border-radius:18px;
+}
+.app-shell[data-route="workspace"] .create-studio-entry .experience-mode-switch{
+  display:inline-grid;
+  width:max-content;
+  max-width:100%;
+  grid-template-columns:repeat(3,34px);
+  gap:4px;
+  padding:3px;
+  margin:0 auto 2px;
+  border-radius:11px;
+}
+.app-shell[data-route="workspace"] .create-studio-entry .experience-mode-switch button{
+  width:34px;
+  min-width:34px;
+  min-height:32px;
+  height:32px;
+  padding:0;
+  border-radius:8px;
+  display:grid;
+  place-items:center;
+}
+.app-shell[data-route="workspace"] .create-studio-entry .experience-mode-switch button svg{
+  width:15px;height:15px;flex:none;
+}
+.app-shell[data-route="workspace"] .create-studio-entry .quick-idea-entry.is-inline{
+  padding:11px;
+  border-radius:14px;
+}
+.app-shell[data-route="workspace"] .create-studio-entry .quick-idea-input{
+  min-height:88px;height:88px;
+}
+@media(max-width:600px){
+  .app-shell[data-route="workspace"] .create-studio-entry .idea-entry-card{
+    max-width:calc(100% - 12px);
+    padding:10px;
+    border-radius:14px;
+  }
+  .app-shell[data-route="workspace"] .create-studio-entry .experience-mode-switch{
+    grid-template-columns:repeat(3,32px);
+    gap:3px;padding:3px;
+  }
+  .app-shell[data-route="workspace"] .create-studio-entry .experience-mode-switch button{
+    width:32px;min-width:32px;height:30px;min-height:30px;
+  }
+  .app-shell[data-route="workspace"] .create-studio-entry .quick-idea-entry.is-inline{padding:9px}
+  .app-shell[data-route="workspace"] .create-studio-entry .quick-idea-input{min-height:78px;height:78px}
+}
