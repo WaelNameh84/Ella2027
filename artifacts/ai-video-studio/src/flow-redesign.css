@@ -430,3 +430,205 @@ html.dark .app-shell[data-route="project-workspace"] .batch-scene-picker-list la
   html.dark .app-shell[data-route="project-workspace"] .batch-scene-picker-list{grid-template-columns:1fr}
   html.dark .app-shell[data-route="project-workspace"] .batch-scene-picker-list>label{min-height:42px}
 }
+
+
+/* ELLA PRO STUDIO — calmer, clearer creation flow */
+html.dark .app-shell[data-route="workspace"] .create-studio-entry{
+  width:min(100%,1180px);padding:clamp(4px,1.5vw,18px) 0 34px
+}
+html.dark .app-shell[data-route="workspace"] .create-studio-heading{
+  align-items:center;margin:0 auto 18px;max-width:1040px
+}
+html.dark .app-shell[data-route="workspace"] .create-studio-heading .btn{
+  min-height:40px;border:1px solid rgba(160,180,210,.15);border-radius:11px;
+  background:rgba(255,255,255,.035);color:#b8c5d8
+}
+html.dark .app-shell[data-route="workspace"] .create-studio-heading>span{
+  padding:6px 10px;border:1px solid rgba(145,163,195,.16);border-radius:99px;
+  background:rgba(255,255,255,.035);color:#aab8ce;font-size:9px;letter-spacing:.12em
+}
+html.dark .app-shell[data-route="workspace"] .create-studio-entry>.idea-entry-card{
+  width:min(100%,1040px);margin-inline:auto;padding:clamp(18px,3vw,34px);
+  border:1px solid rgba(145,165,197,.17);border-radius:22px;
+  background:linear-gradient(155deg,rgba(20,29,45,.98),rgba(12,19,31,.98) 68%);
+  box-shadow:0 24px 70px rgba(0,0,0,.22),inset 0 1px rgba(255,255,255,.045)
+}
+html.dark .app-shell[data-route="workspace"] .create-studio-entry>.idea-entry-card::before{display:none}
+html.dark .app-shell[data-route="workspace"] .create-studio-entry .modal-head{
+  align-items:flex-start;margin-bottom:23px;padding-bottom:18px;border-bottom:1px solid rgba(145,165,197,.12)
+}
+html.dark .app-shell[data-route="workspace"] .create-studio-entry .modal-head h2{
+  color:#f1f5fb;font-size:clamp(23px,3vw,31px);font-weight:680;letter-spacing:-.035em
+}
+html.dark .app-shell[data-route="workspace"] .create-studio-entry .modal-head p{
+  max-width:660px;margin-top:8px;color:#a7b5c9;font-size:12px;line-height:1.8
+}
+html.dark .app-shell[data-route="workspace"] .create-studio-entry .form-stack{
+  max-width:850px;margin-inline:auto;gap:18px
+}
+html.dark .app-shell[data-route="workspace"] .create-studio-entry .experience-mode-switch{
+  width:min(100%,430px);margin:0 auto 4px;padding:4px;border:1px solid rgba(145,165,197,.16);
+  border-radius:13px;background:rgba(4,10,19,.62)
+}
+html.dark .app-shell[data-route="workspace"] .create-studio-entry .experience-mode-switch button{
+  min-height:43px;border-radius:9px;color:#9eacc1;font-size:12px
+}
+html.dark .app-shell[data-route="workspace"] .create-studio-entry .experience-mode-switch button.is-selected{
+  border-color:rgba(130,151,255,.28);background:linear-gradient(120deg,rgba(102,119,230,.23),rgba(72,153,190,.12));
+  color:#f1f4ff;box-shadow:inset 0 1px rgba(255,255,255,.07)
+}
+html.dark .app-shell[data-route="workspace"] .create-studio-entry .field-label{
+  display:block;margin-bottom:8px;color:#c6d1e1;font-size:11px;font-weight:650
+}
+html.dark .app-shell[data-route="workspace"] .create-studio-entry .studio-input{
+  min-height:46px;border:1px solid rgba(145,165,197,.18);border-radius:11px;
+  background:rgba(4,10,19,.58);color:#edf3fc;box-shadow:none
+}
+html.dark .app-shell[data-route="workspace"] .create-studio-entry textarea.studio-input{
+  min-height:150px;padding:15px;line-height:1.85
+}
+html.dark .app-shell[data-route="workspace"] .create-studio-entry .studio-input:focus{
+  border-color:rgba(132,151,255,.62);outline:3px solid rgba(132,151,255,.09)
+}
+html.dark .app-shell[data-route="workspace"] .create-studio-entry .section-heading{
+  align-items:center;margin:2px 0 0;padding-top:16px;border-top:1px solid rgba(145,165,197,.12)
+}
+html.dark .app-shell[data-route="workspace"] .create-studio-entry .section-heading h3{
+  color:#e9eff9;font-size:15px
+}
+html.dark .app-shell[data-route="workspace"] .create-studio-entry .workflow-mode-grid{
+  gap:10px
+}
+html.dark .app-shell[data-route="workspace"] .create-studio-entry .workflow-mode-card{
+  min-height:108px;padding:15px;border:1px solid rgba(145,165,197,.16);border-radius:14px;
+  background:rgba(255,255,255,.025);color:#dce6f4;text-align:start
+}
+html.dark .app-shell[data-route="workspace"] .create-studio-entry .workflow-mode-card.is-selected{
+  border-color:rgba(132,151,255,.52);background:linear-gradient(145deg,rgba(104,120,232,.15),rgba(64,150,181,.07));
+  box-shadow:0 0 0 2px rgba(132,151,255,.07)
+}
+html.dark .app-shell[data-route="workspace"] .create-studio-entry .quick-preset-grid .workflow-mode-card{
+  min-height:92px;align-items:flex-start
+}
+html.dark .app-shell[data-route="workspace"] .create-studio-entry .film-plan{
+  padding:18px;border:1px solid rgba(130,151,255,.24);border-radius:16px;
+  background:linear-gradient(145deg,rgba(77,94,176,.12),rgba(9,17,29,.58))
+}
+html.dark .app-shell[data-route="workspace"] .create-studio-entry .film-plan h3{color:#f0f4ff}
+html.dark .app-shell[data-route="workspace"] .create-studio-entry .film-plan-block{
+  border:1px solid rgba(145,165,197,.1);border-radius:12px;background:rgba(255,255,255,.035)
+}
+html.dark .app-shell[data-route="workspace"] .create-studio-entry .film-plan-stats>div{
+  border-color:rgba(145,165,197,.13);border-radius:11px;background:rgba(4,10,19,.45)
+}
+html.dark .app-shell[data-route="workspace"] .create-studio-entry .btn-primary{
+  min-height:50px;padding:0 22px;border:1px solid rgba(151,164,255,.36);border-radius:12px;
+  background:linear-gradient(105deg,#5969d8,#387eaa);color:#fff;font-size:13px;font-weight:700;
+  box-shadow:0 9px 24px rgba(67,91,190,.2)
+}
+html.dark .app-shell[data-route="workspace"] .create-studio-entry .btn-primary:disabled{
+  opacity:.5;box-shadow:none
+}
+html.dark .app-shell[data-route="workspace"] .create-studio-entry .quick-advanced{
+  border-color:rgba(145,165,197,.15);border-radius:12px;background:rgba(255,255,255,.025)
+}
+html.dark .app-shell[data-route="workspace"] .create-studio-entry .quick-advanced summary{
+  min-height:46px;color:#cbd6e6
+}
+html.dark .app-shell[data-route="workspace"] .create-studio-entry .service-purpose-hint{
+  border-color:rgba(145,165,197,.14);border-radius:12px;background:rgba(255,255,255,.035)
+}
+@media(max-width:767px){
+  html.dark .app-shell[data-route="workspace"] .create-studio-entry{padding-top:0}
+  html.dark .app-shell[data-route="workspace"] .create-studio-entry>.idea-entry-card{
+    padding:17px 14px 20px;border-radius:17px
+  }
+  html.dark .app-shell[data-route="workspace"] .create-studio-entry .modal-head{
+    margin-bottom:16px;padding-bottom:14px
+  }
+  html.dark .app-shell[data-route="workspace"] .create-studio-entry .modal-head h2{font-size:23px}
+  html.dark .app-shell[data-route="workspace"] .create-studio-entry .modal-head p{font-size:11px}
+  html.dark .app-shell[data-route="workspace"] .create-studio-entry .form-stack{gap:14px}
+  html.dark .app-shell[data-route="workspace"] .create-studio-entry .form-two{grid-template-columns:1fr;gap:12px}
+  html.dark .app-shell[data-route="workspace"] .create-studio-entry .workflow-mode-grid{grid-template-columns:1fr}
+  html.dark .app-shell[data-route="workspace"] .create-studio-entry .workflow-mode-card{min-height:0}
+  html.dark .app-shell[data-route="workspace"] .create-studio-entry .film-plan-grid{grid-template-columns:1fr}
+  html.dark .app-shell[data-route="workspace"] .create-studio-entry .film-plan-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  html.dark .app-shell[data-route="workspace"] .create-studio-entry .modal-actions{display:grid;grid-template-columns:1fr}
+  html.dark .app-shell[data-route="workspace"] .create-studio-entry .modal-actions .btn{width:100%}
+}
+
+/* Project workspace: visual-first editor with restrained panels and clearer hierarchy */
+html.dark .app-shell[data-route="project-workspace"] .workspace-head{
+  align-items:center;margin-bottom:22px;padding-bottom:17px;border-bottom:1px solid rgba(145,165,197,.13)
+}
+html.dark .app-shell[data-route="project-workspace"] .workspace-head h2{
+  color:#f1f5fb;font-size:clamp(22px,2.5vw,29px);letter-spacing:-.035em
+}
+html.dark .app-shell[data-route="project-workspace"] .workspace-head p{color:#aab8cc;line-height:1.7}
+html.dark .app-shell[data-route="project-workspace"] .studio-grid{
+  grid-template-columns:205px minmax(0,1fr) 310px;gap:13px
+}
+html.dark .app-shell[data-route="project-workspace"] .studio-rail,
+html.dark .app-shell[data-route="project-workspace"] .studio-tools,
+html.dark .app-shell[data-route="project-workspace"] .preview-panel,
+html.dark .app-shell[data-route="project-workspace"] .timeline-panel{
+  border:1px solid rgba(145,165,197,.14);border-radius:15px;
+  background:linear-gradient(155deg,rgba(19,29,45,.96),rgba(11,18,29,.96));
+  box-shadow:0 12px 34px rgba(0,0,0,.14),inset 0 1px rgba(255,255,255,.035)
+}
+html.dark .app-shell[data-route="project-workspace"] .studio-rail{padding:11px}
+html.dark .app-shell[data-route="project-workspace"] .studio-rail-head h3{color:#edf3fc;font-size:13px}
+html.dark .app-shell[data-route="project-workspace"] .studio-rail-step{
+  min-height:42px;align-items:center;padding:8px;border-radius:10px
+}
+html.dark .app-shell[data-route="project-workspace"] .studio-rail-step.is-active{
+  border-color:rgba(132,151,255,.35);background:rgba(112,128,242,.12)
+}
+html.dark .app-shell[data-route="project-workspace"] .studio-center{gap:13px}
+html.dark .app-shell[data-route="project-workspace"] .preview-panel{padding:13px}
+html.dark .app-shell[data-route="project-workspace"] .preview-stage{
+  min-height:300px;border:1px solid rgba(145,165,197,.12);border-radius:12px;background:#050a12
+}
+html.dark .app-shell[data-route="project-workspace"] .preview-top .eyebrow{color:#b7c5da}
+html.dark .app-shell[data-route="project-workspace"] .studio-tools{
+  padding:13px;max-height:calc(100dvh - 112px);border-radius:15px
+}
+html.dark .app-shell[data-route="project-workspace"] .studio-tools-head h3{color:#edf3fc}
+html.dark .app-shell[data-route="project-workspace"] .studio-tools-hint{color:#9eacc1;line-height:1.7}
+html.dark .app-shell[data-route="project-workspace"] .studio-tools-body{gap:14px}
+html.dark .app-shell[data-route="project-workspace"] .studio-tools .studio-input{
+  min-height:42px;border-color:rgba(145,165,197,.17);border-radius:10px;background:rgba(4,10,19,.55);color:#edf3fc
+}
+html.dark .app-shell[data-route="project-workspace"] .studio-progress{
+  border-color:rgba(145,165,197,.14);border-radius:12px;background:rgba(16,25,40,.86)
+}
+html.dark .app-shell[data-route="project-workspace"] .scene-action-row{
+  border-color:rgba(145,165,197,.14);border-radius:10px;background:rgba(255,255,255,.025)
+}
+html.dark .app-shell[data-route="project-workspace"] .scene-action-row.is-selected{
+  border-color:rgba(132,151,255,.38);background:rgba(112,128,242,.10)
+}
+html.dark .app-shell[data-route="project-workspace"] .timeline-panel{padding:14px}
+html.dark .app-shell[data-route="project-workspace"] .timeline-panel .section-heading h3{color:#edf3fc}
+html.dark .app-shell[data-route="project-workspace"] .timeline-panel .section-heading{margin-bottom:12px}
+html.dark .app-shell[data-route="project-workspace"] .studio-rail-note{color:#92a2b8}
+@media(max-width:1240px){
+  html.dark .app-shell[data-route="project-workspace"] .studio-grid{grid-template-columns:190px minmax(0,1fr) 285px}
+}
+@media(max-width:1024px){
+  html.dark .app-shell[data-route="project-workspace"] .studio-grid{grid-template-columns:minmax(0,1fr)}
+  html.dark .app-shell[data-route="project-workspace"] .studio-rail{position:static;order:-1}
+  html.dark .app-shell[data-route="project-workspace"] .studio-tools{position:static;max-height:none}
+  html.dark .app-shell[data-route="project-workspace"] .preview-stage{min-height:260px}
+}
+@media(max-width:767px){
+  html.dark .app-shell[data-route="project-workspace"] .workspace-head{align-items:stretch;gap:12px;margin-bottom:15px}
+  html.dark .app-shell[data-route="project-workspace"] .workspace-head h2{font-size:22px}
+  html.dark .app-shell[data-route="project-workspace"] .studio-grid{gap:10px}
+  html.dark .app-shell[data-route="project-workspace"] .studio-rail{padding:9px}
+  html.dark .app-shell[data-route="project-workspace"] .preview-panel{padding:9px}
+  html.dark .app-shell[data-route="project-workspace"] .preview-stage{min-height:210px;border-radius:10px}
+  html.dark .app-shell[data-route="project-workspace"] .studio-tools{padding:12px}
+  html.dark .app-shell[data-route="project-workspace"] .timeline-panel{padding:11px}
+}
