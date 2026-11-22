@@ -29,6 +29,8 @@ def make_ltx_generator(pipe):
         )
 
         print(
+            f"[ELLA LTX CALLBACK V2] job={job.get('id', 'unknown')} "
+            f"received_duration={requested!r} | "
             f"Generating requested duration={seconds}s | "
             f"native={width}x{height} | frames={frames} | steps={steps}"
         )
