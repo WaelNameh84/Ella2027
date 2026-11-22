@@ -17,13 +17,10 @@ def make_ltx_generator(pipe):
             seconds = 5
         seconds = min(max(seconds, 1), 10)
 
-        # Keep the 8 fps frame-count contract so requested duration remains exact.
-        # LTX temporal alignment requires 8n + 1 frames.
-        fps = 8
+        # LTX-Video is trained for 24 fps. Its temporal length must be 8n + 1.
+        # seconds * 24 + 1 satisfies that alignment and preserves real-time motion.
+        fps = 24
         frames = seconds * fps + 1
-
-        # Use the model's standard 16:10 working resolution and quality-oriented
-        # denoising/decoder settings documented for LTX-Video.
         width, height = 768, 512
         steps = 50
 
@@ -31,25 +28,24 @@ def make_ltx_generator(pipe):
         prompt = (
             scene_prompt
             + "\n\n"
-            "Photorealistic natural live-action scene, one continuous shot, "
-            "one clear main action, realistic anatomy and object proportions, "
-            "coherent movement, stable scene geometry, natural lighting. "
-            "No visible writing, letters, numbers, logos, subtitles, or graphic overlays."
+            "Photorealistic live-action video. Show the described subject and "
+            "objects clearly and completely. One continuous shot, one simple "
+            "main action, realistic proportions, natural movement, stable "
+            "geometry and consistent daylight. No visible text or graphic overlays."
         ).strip()
 
         negative_prompt = (
-            "worst quality, low quality, blurry, smeared details, "
-            "inconsistent motion, jittery motion, flicker, distorted anatomy, "
-            "deformed faces, malformed hands, extra limbs, duplicated objects, "
-            "warped geometry, text, letters, numbers, captions, subtitles, "
-            "logos, watermark, random symbols"
+            "worst quality, low quality, blurry, smeared details, inconsistent "
+            "motion, jitter, flicker, distorted anatomy, deformed faces, "
+            "malformed hands, extra limbs, duplicated objects, warped geometry, "
+            "text, letters, numbers, captions, subtitles, logos, watermark, "
+            "random symbols"
         )
 
         print(
-            f"[ELLA LTX CALLBACK V4] job={job.get('id', 'unknown')} "
+            f"[ELLA LTX CALLBACK V5] job={job.get('id', 'unknown')} "
             f"duration={seconds}s | resolution={width}x{height} | "
-            f"frames={frames} | fps={fps} | steps={steps} | "
-            "vae_decode_tuning=enabled",
+            f"frames={frames} | fps={fps} | steps={steps}",
             flush=True,
         )
 
@@ -72,8 +68,8 @@ def make_ltx_generator(pipe):
 
         command = [
             "ffmpeg", "-y", "-i", str(raw), "-t", str(seconds),
-            "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
-            "-pix_fmt", "yuv420p", "-an", str(output),
+            "-r", str(fps), "-c:v", "libx264", "-preset", "veryfast",
+            "-crf", "18", "-pix_fmt", "yuv420p", "-an", str(output),
         ]
         completed = subprocess.run(command, capture_output=True, text=True)
         if completed.returncode != 0:
@@ -87,9 +83,8 @@ def make_ltx_generator(pipe):
             pass
 
         print(
-            f"Finished {output.name} | duration={seconds}s | "
-            f"native resolution={width}x{height} | steps={steps} | "
-            f"size={output.stat().st_size / 1024 / 1024:.1f} MiB",
+            f"Finished {output.name} | duration={seconds}s | fps={fps} | "
+            f"resolution={width}x{height} | size={output.stat().st_size / 1024 / 1024:.1f} MiB",
             flush=True,
         )
         return output
