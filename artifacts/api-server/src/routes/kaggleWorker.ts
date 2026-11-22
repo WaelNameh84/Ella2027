@@ -74,10 +74,15 @@ router.post("/claim", async (_req, res): Promise<void> => {
     res.json({
       job: {
         id: claimed.id, leaseToken: input.kaggleLeaseToken,
-        prompt: [project.visualStyle || project.videoType, "Create one coherent cinematic shot with one clear main action, natural movement, stable character identity, realistic anatomy and consistent lighting. Avoid montage, sudden scene changes, unreadable details and on-screen text.", `Scene: ${scene.title}.`, `Visual direction: ${scene.imagePrompt || scene.description}`, `Story context: ${scene.description}`, `Shot: ${scene.shotType}; camera: ${scene.cameraMovement}; location: ${scene.location}; lighting: ${scene.lighting}.`,
-          ...(project.characters ?? []).filter((character) => scene.characterIds.includes(character.id)).map((character) => `${character.name}: ${character.description}. Clothing: ${character.costume}.`)].join("\n"),
+        prompt: [
+          "Create one photorealistic continuous shot. Show the main subject and requested object clearly; one simple action only. Natural proportions and movement. No montage, scene changes, text, symbols or overlays.",
+          `Scene: ${scene.title}.`,
+          `Main visual action: ${scene.imagePrompt || scene.description || scene.title}`,
+          `Camera: ${scene.shotType}; ${scene.cameraMovement}. Location: ${scene.location}. Lighting: ${scene.lighting}.`,
+          ...(project.characters ?? []).filter((character) => scene.characterIds.includes(character.id)).map((character) => `${character.name}, appearance: ${character.description}, clothing: ${character.costume}.`)
+        ].join("\n").split(/\\s+/).slice(0, 200).join(" "),
         durationSeconds: scene.durationSeconds, aspectRatio: project.aspectRatio,
-        fps: Number(input.fps) || 8, resolution: Number(input.resolution) || 768,
+        fps: 24, resolution: 768,
         mode: input.mode === "image" ? "image" : "text",
         referenceImageUrl: input.mode === "image" ? scene.assetUrl : null,
         upload,
