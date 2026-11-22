@@ -800,7 +800,7 @@ function ProjectForm({ onClose, initial, initialMode = 'auto', initialExperience
         <button type="button" role="tab" aria-selected={experienceMode==='pro'} className={experienceMode==='pro'?'is-selected':''} onClick={()=>chooseExperienceMode('pro')} disabled={projectCreated}>{tx(lang,'احترافي','Professional')}</button>
       </div>}
       {!editing && mode !== 'manual' && plan && <FilmPlanCard plan={plan} lang={lang} pending={pending} approveDisabled={useTextProvider && !approvePotentialCharges} onEdit={()=>setPlan(null)} onReanalyze={()=>setPlan(makePlan())} onApprove={approvePlan} />}
-      {!editing && experienceMode === 'quick' ? <>
+      {!editing && (experienceMode === 'quick' || (experienceMode === 'pro' && mode === 'auto')) ? <>
         <div className="quick-idea-entry is-inline">
           <label className="quick-idea-label"><span className="field-label">{tx(lang,'فكرة الفيلم','Film idea')}</span><textarea required maxLength={1500} rows={3} className="studio-input resize-y quick-idea-input" value={form.idea} onChange={e=>update('idea',e.target.value)} placeholder={tx(lang,'اكتب فكرتك هنا… إيلا تتولى الباقي.','Write your idea here… Ella handles the rest.')} data-testid="input-project-idea" disabled={projectCreated} autoFocus /></label>
           <div className="quick-composer-bottom">
