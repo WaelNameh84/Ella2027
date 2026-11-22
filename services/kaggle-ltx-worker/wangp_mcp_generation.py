@@ -195,7 +195,12 @@ async def _generate_async(job: dict[str, Any], mcp_url: str, wangp_root: str) ->
         if not settings["prompt"]:
             raise ValueError("Ella2027 supplied an empty video prompt.")
 
-        seconds = max(1, min(10, int(job.get("durationSeconds") or 5)))
+        seconds = max(1, int(job.get("durationSeconds") or 5))
+        if seconds > 10:
+            raise ValueError(
+                f"LTX-2.5 Kaggle worker is configured for clips up to 10 seconds; "
+                f"this scene requests {seconds}s. Split the scene in Ella2027 before queueing."
+            )
         fps = int(metadata.get("fps") or settings.get("fps") or job.get("fps") or 24)
         if "video_length" in settings:
             settings["video_length"] = _align_frames(seconds, fps, schema)
