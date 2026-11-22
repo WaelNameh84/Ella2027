@@ -739,7 +739,7 @@ function ProjectForm({ onClose, initial, initialMode = 'auto', initialExperience
   useEffect(() => { if (projectCreated && generationError) setApprovePotentialCharges(false); }, [projectCreated, generationError]);
   const chooseExperienceMode = (next: 'quick' | 'pro') => { setExperienceMode(next); if (next === 'quick') { setMode('auto'); setTemplate(''); } };
   const quickSceneCount = Math.max(1, Math.min(24, sceneCount));
-  const quickSceneDuration = Math.max(1, Math.min(Math.floor(3600 / quickSceneCount), sceneDurationSeconds));
+  const quickSceneDuration = sceneDurationSeconds === 0 ? 0 : Math.max(1, Math.min(Math.floor(3600 / quickSceneCount), sceneDurationSeconds));
   const quickPlannedDuration = quickSceneCount * quickSceneDuration;
   const makePlan = () => buildFilmPlan({ idea: form.idea, videoType: form.videoType, sceneCount: experienceMode === 'quick' ? quickSceneCount : sceneCount, sceneDurationSeconds: experienceMode === 'quick' ? quickSceneDuration : sceneDurationSeconds, visualStyle: form.visualStyle || selectedTemplate?.visualStyle, lang, providerReady: Boolean(allowExternalProviders && textProviderReady) });
   const submit = async (planConfirmed = false, splitStory = splitManualStory) => {
