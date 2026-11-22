@@ -26,12 +26,12 @@ The worker claims jobs from `/api/kaggle-worker/claim`, sends heartbeat requests
 
 ## Runtime settings and current limits
 
-- WanGP model type: `ltx2_22B_distilled`.
+- WanGP model type: `ltx2_25_22B_distilled`.
 - Initial output profile: 768×448 at 24 fps.
 - Maximum scene duration for this first T4 worker: 5 seconds. Longer requests fail explicitly rather than being silently shortened.
 - Maximum MP4 upload size: 100 MiB.
-- The worker reuses the model/config files in the active Kaggle runtime. `/tmp` is ephemeral across runtime replacement.
-- The active WanGP model defaults determine audio-generation options. LTX-2.5 supports audio output, but the presence of model capability alone does not prove that a given preset emitted an audio track. Verify the generated MP4's audio stream during the first end-to-end test.
+- The notebook writes a local WanGP finetune definition that points `URLs` to the downloaded NVFP4 transformer and `text_encoder_URLs` to the Gemma INT8 ConvRot encoder. `/tmp` is ephemeral across runtime replacement.
+- The worker keeps `audio_prompt_type` empty for the LTX-2.5 prompt-generated audio path. The first end-to-end test must still verify that the MP4 contains a real audio stream.
 
 ## Important
 
