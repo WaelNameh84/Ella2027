@@ -1232,7 +1232,7 @@ function Projects({ homePage = false, manualPage = false, createPage = false }: 
                 <h3>{tx(lang, 'حوّل فكرتك إلى فيديو.', 'Turn your idea into a video.')}</h3>
                 <p>{tx(lang, 'اكتب فكرتك وحدد مدة الفيديو فقط. إيلا تتولى تقسيم المشاهد وتجهيزها تلقائيًا.', 'Write your idea and choose the video length. Ella plans and prepares every scene automatically.')}</p>
                 <div className="ella-pro-actions">
-                  <Link href="/create?mode=quick" className="ella-pro-primary">{tx(lang, 'ابدأ إنشاء فيديو', 'Create a video')} <ArrowLeft size={16}/></Link>
+                  <Link href="/create?mode=pro" className="ella-pro-primary">{tx(lang, 'افتح الاستوديو الاحترافي', 'Open Pro Studio')} <ArrowLeft size={16}/></Link>
                   <span className="ella-pro-note"><ShieldCheck size={14}/>{tx(lang, 'التوليد المدفوع بموافقتك فقط', 'Paid generation only with your approval')}</span>
                 </div>
               </div>
