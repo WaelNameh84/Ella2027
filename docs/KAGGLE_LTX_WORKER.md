@@ -26,7 +26,7 @@ The worker claims jobs from `/api/kaggle-worker/claim`, sends heartbeats during 
 - WanGP model type: `ltx2_25_22B_distilled`.
 - Checkpoint: LTX-2.5 22B Distilled NVFP4.
 - Text encoder: Gemma 4 12B INT8 ConvRot.
-- Initial output profile: 768×448 at 24 FPS.
+- Initial high-quality output profile: 1024×576 landscape, 576×1024 portrait, or 768×768 square at 24 FPS.
 - Maximum scene duration: 5 seconds.
 - Maximum MP4 upload size: 100 MiB.
 - The worker refuses to publish an MP4 without both video and audio streams.
