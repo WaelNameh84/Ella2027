@@ -737,7 +737,7 @@ function ProjectForm({ onClose, initial, initialMode = 'auto', initialExperience
   useEffect(() => setAllowExternalProviders(!freeMode), [freeMode]);
   useEffect(() => setManualScenes(current => Array.from({ length: sceneCount }, (_, index) => current[index] || blankManualScene(index, lang))), [sceneCount, lang]);
   useEffect(() => { if (projectCreated && generationError) setApprovePotentialCharges(false); }, [projectCreated, generationError]);
-  const chooseExperienceMode = (next: 'quick' | 'pro') => { setExperienceMode(next); if (next === 'quick') { setMode('auto'); setTemplate(''); } };
+  const chooseExperienceMode = (next: 'quick' | 'pro' | 'manual') => { if (next === 'manual') { setMode('manual'); return; } setExperienceMode(next); setMode('auto'); if (next === 'quick') setTemplate(''); };
   const quickSceneCount = Math.max(1, Math.min(24, sceneCount));
   const quickSceneDuration = sceneDurationSeconds === 0 ? 0 : Math.max(1, Math.min(Math.floor(3600 / quickSceneCount), sceneDurationSeconds));
   const quickPlannedDuration = quickSceneCount * quickSceneDuration;
@@ -795,9 +795,10 @@ function ProjectForm({ onClose, initial, initialMode = 'auto', initialExperience
   const submitButton = <button type="submit" disabled={pending || !canSubmit} className="btn btn-primary" data-testid="button-create-project">{pending ? <LoaderCircle className="animate-spin" size={16}/> : editing ? <Check size={16}/> : <WandSparkles size={16}/ >}{submitLabel}</button>;
   return <Modal inline={inline} className="idea-entry-card" onClose={onClose} title={editing ? tx(lang,'تعديل تفاصيل المشروع','Edit project details') : mode === 'manual' ? tx(lang, 'مساحة العمل اليدوية', 'Manual production workspace') : tx(lang, 'فكرتك إلى قصة', 'Turn your idea into a story')} subtitle={editing ? tx(lang, 'عدّل تفاصيل المشروع ومشاهده.', 'Update the project details.') : mode === 'manual' ? tx(lang, 'أنشئ مشروعك ثم اكتب المشاهد وعدّلها واربط الصور المرجعية بنفسك.', 'Create your project, then write and edit scenes and attach visual references yourself.') : tx(lang, 'اكتب فكرة قصيرة، ثم اختر المسار السريع أو تحكم بالمشاهد في الوضع الاحترافي.', 'Describe your idea, then choose the quick path or control each scene in Professional mode.')}>
     <form onSubmit={e => { e.preventDefault(); void submit(); }} className="form-stack">
-      {!editing && inline && mode !== 'manual' && <div className="experience-mode-switch" role="tablist" aria-label={tx(lang,'مستوى التحكم','Experience mode')}>
+      {!editing && inline && <div className="experience-mode-switch" role="tablist" aria-label={tx(lang,'مستوى التحكم','Experience mode')}>
         <button type="button" role="tab" aria-selected={experienceMode==='quick'} className={experienceMode==='quick'?'is-selected':''} onClick={()=>chooseExperienceMode('quick')} disabled={projectCreated}>{tx(lang,'سريع','Quick')}</button>
-        <button type="button" role="tab" aria-selected={experienceMode==='pro'} className={experienceMode==='pro'?'is-selected':''} onClick={()=>chooseExperienceMode('pro')} disabled={projectCreated}>{tx(lang,'احترافي','Professional')}</button>
+        <button type="button" role="tab" aria-selected={experienceMode==='pro' && mode==='auto'} className={experienceMode==='pro' && mode==='auto'?'is-selected':''} onClick={()=>chooseExperienceMode('pro')} disabled={projectCreated}>{tx(lang,'احترافي','Professional')}</button>
+        <button type="button" role="tab" aria-selected={mode==='manual'} className={mode==='manual'?'is-selected':''} onClick={()=>chooseExperienceMode('manual')} disabled={projectCreated}>{tx(lang,'يدوي','Manual')}</button>
       </div>}
       {!editing && mode !== 'manual' && plan && <FilmPlanCard plan={plan} lang={lang} pending={pending} approveDisabled={useTextProvider && !approvePotentialCharges} onEdit={()=>setPlan(null)} onReanalyze={()=>setPlan(makePlan())} onApprove={approvePlan} />}
       {!editing && (experienceMode === 'quick' || (experienceMode === 'pro' && mode === 'auto')) ? <>
