@@ -550,7 +550,7 @@ async function processScriptJob(job: typeof studioJobsTable.$inferSelect): Promi
       }
       const localWorker = videoKey.provider === "local-video-worker";
       const queueTime = Date.now();
-      await tx.insert(studioJobsTable).values(insertedScenes.map((scene, index) => ({
+      await tx.insert(studioJobsTable).values([...insertedScenes].sort((a, b) => a.sortOrder - b.sortOrder).map((scene, index) => ({
         userId: job.userId,
         projectId: project.id,
         jobType: "video",
