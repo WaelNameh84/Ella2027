@@ -8,6 +8,7 @@ import asyncio
 import json
 import os
 import shutil
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -274,6 +275,38 @@ async def _generate_async(job: dict[str, Any], mcp_url: str, wangp_root: str) ->
         await _close_session(transport, session)
 
 
+def _run_async_in_thread(coroutine):
+    """Run asyncio code outside Jupyter's already-running event loop."""
+    result: dict[str, Any] = {}
+
+    def runner():
+        try:
+            result["value"] = asyncio.run(coroutine)
+        except BaseException as exc:
+            result["error"] = exc
+
+    thread = threading.Thread(target=runner, name="Ella WanGP MCP async call")
+    thread.start()
+    thread.join()
+    if "error" in result:
+        raise result["error"]
+    return result.get("value")
+
+
+async def _probe_async(mcp_url: str) -> list[str]:
+    transport, session = await _open_session(mcp_url)
+    try:
+        result = await session.list_tools()
+        return [tool.name for tool in result.tools]
+    finally:
+        await _close_session(transport, session)
+
+
+def probe_wangp_mcp(mcp_url: str = "http://127.0.0.1:8000/mcp") -> list[str]:
+    """Synchronously verify the local WanGP MCP endpoint from a notebook."""
+    return _run_async_in_thread(_probe_async(mcp_url))
+
+
 def make_wangp_generator(mcp_url: str = "http://127.0.0.1:8000/mcp", wangp_root: str = "/kaggle/working/Wan2GP"):
     """Return a synchronous callback compatible with kaggle_worker.process_one_ltx_job."""
     def generate(job: dict[str, Any]) -> Path:
@@ -282,5 +315,5 @@ def make_wangp_generator(mcp_url: str = "http://127.0.0.1:8000/mcp", wangp_root:
                 "The Ella2027-to-WanGP bridge currently supports text-to-video. "
                 "Image-to-video will be enabled after the first text-to-video connection test."
             )
-        return asyncio.run(_generate_async(job, mcp_url, wangp_root))
+        return _run_async_in_thread(_generate_async(job, mcp_url, wangp_root))
     return generate
