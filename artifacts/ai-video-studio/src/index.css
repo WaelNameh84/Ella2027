@@ -2959,3 +2959,45 @@ a[href]:active,
   .final-film-actions { align-items: stretch; flex-direction: column; }
   .final-film-actions > div, .final-film-actions > button { width: 100%; }
 }
+
+
+/* Accessible, touch-friendly scene preview controls */
+.preview-stage video { display: block; position: relative; z-index: 1; width: 100%; height: 100%; object-fit: contain; }
+.preview-center-play {
+  position: absolute; z-index: 4; inset: 50% auto auto 50%; transform: translate(-50%,-50%);
+  display: grid; place-items: center; width: 66px; height: 66px; border-radius: 999px;
+  color: white; background: hsl(var(--primary) / .92); border: 1px solid rgba(255,255,255,.72);
+  box-shadow: 0 8px 28px rgba(0,0,0,.38); cursor: pointer;
+}
+.preview-center-play:active { transform: translate(-50%,-50%) scale(.96); }
+.preview-overlay-actions { position: absolute; z-index: 5; inset-inline-end: 12px; bottom: 12px; display: flex; gap: 8px; }
+.preview-icon-button {
+  display: grid; place-items: center; width: 38px; height: 38px; border-radius: 10px;
+  color: white; background: rgba(8,12,16,.78); border: 1px solid rgba(255,255,255,.25);
+}
+.preview-settings-popover {
+  position: absolute; z-index: 6; inset-inline-end: 12px; bottom: 58px; min-width: 190px;
+  padding: 12px; border-radius: 12px; color: white; background: rgba(8,12,16,.94);
+  border: 1px solid rgba(255,255,255,.2); box-shadow: 0 10px 28px rgba(0,0,0,.35);
+}
+.preview-settings-popover b { display: block; margin-bottom: 9px; font-size: 11px; }
+.preview-settings-popover > div { display: flex; flex-wrap: wrap; gap: 5px; }
+.preview-settings-popover button {
+  padding: 6px 8px; border: 1px solid rgba(255,255,255,.2); border-radius: 7px;
+  color: white; background: rgba(255,255,255,.08); font-size: 10px;
+}
+.preview-settings-popover button.is-active { color: #111; background: #f5b938; border-color: #f5b938; }
+.preview-metadata { display: flex; flex-wrap: wrap; gap: 8px 16px; padding: 9px 2px 0; color: hsl(var(--muted-foreground)); font-size: 10px; }
+.preview-metadata b { color: hsl(var(--foreground)); font-variant-numeric: tabular-nums; }
+.preview-stage:fullscreen { width: 100vw; height: 100vh; max-height: 100vh; aspect-ratio: auto !important; border-radius: 0; background: #050607; }
+.preview-stage:fullscreen video { width: 100%; height: 100%; }
+.job-progress-label { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 10px 0 6px; color: hsl(var(--muted-foreground)); font-size: 10px; }
+.job-progress-label b { color: hsl(var(--foreground)); font: 700 13px var(--app-font-mono); }
+.job-progress-label.is-complete { justify-content: flex-start; color: hsl(var(--primary)); }
+@media (max-width: 640px) {
+  .preview-center-play { width: 58px; height: 58px; }
+  .preview-overlay-actions { inset-inline-end: 8px; bottom: 8px; }
+  .preview-icon-button { width: 36px; height: 36px; }
+  .preview-metadata { gap: 6px 12px; }
+  .job-progress-label { align-items: flex-start; flex-direction: column; gap: 3px; }
+}
