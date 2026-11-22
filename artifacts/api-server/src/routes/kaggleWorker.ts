@@ -74,7 +74,7 @@ router.post("/claim", async (_req, res): Promise<void> => {
     res.json({
       job: {
         id: claimed.id, leaseToken: input.kaggleLeaseToken,
-        prompt: [project.visualStyle || project.videoType, `Scene: ${scene.title}.`, scene.description, `Shot: ${scene.shotType}; camera: ${scene.cameraMovement}; location: ${scene.location}; lighting: ${scene.lighting}.`,
+        prompt: [project.visualStyle || project.videoType, "Create one coherent cinematic shot with one clear main action, natural movement, stable character identity, realistic anatomy and consistent lighting. Avoid montage, sudden scene changes, unreadable details and on-screen text.", `Scene: ${scene.title}.`, `Visual direction: ${scene.imagePrompt || scene.description}`, `Story context: ${scene.description}`, `Shot: ${scene.shotType}; camera: ${scene.cameraMovement}; location: ${scene.location}; lighting: ${scene.lighting}.`,
           ...(project.characters ?? []).filter((character) => scene.characterIds.includes(character.id)).map((character) => `${character.name}: ${character.description}. Clothing: ${character.costume}.`)].join("\n"),
         durationSeconds: scene.durationSeconds, aspectRatio: project.aspectRatio,
         fps: Number(input.fps) || 8, resolution: Number(input.resolution) || 768,
