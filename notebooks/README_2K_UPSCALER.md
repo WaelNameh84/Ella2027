@@ -38,6 +38,6 @@ The notebook now includes the full-video processing cell and final ffprobe check
 ## Important limits
 
 - The worker and generation profile are unchanged by the upscaler additions.
-- Original generation profile: LTX-2.5 22B Distilled NVFP4, 1024×576 landscape / 576×1024 portrait / 768×768 square, 24 FPS, maximum 5 seconds per scene.
+- Original generation profile: LTX-2.5 22B Distilled NVFP4, 1024×576 landscape / 576×1024 portrait / 768×768 square, 24 FPS, maximum 10 seconds per scene.
 - 2× upscaling increases pixel dimensions; it does not guarantee native 2K detail or prove temporal flicker-free quality for every video.
 - Kaggle is not an always-on host. If the session ends, the worker stops; Run All restores the environment but cannot bypass Kaggle quotas or session limits.
