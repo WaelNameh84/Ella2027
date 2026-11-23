@@ -75,12 +75,14 @@ router.post("/claim", async (_req, res): Promise<void> => {
       job: {
         id: claimed.id, leaseToken: input.kaggleLeaseToken,
         prompt: [
-          "Create one photorealistic continuous shot. Show the main subject and requested object clearly; one simple action only. Natural proportions and movement. No montage, scene changes, text, symbols or overlays.",
-          `Scene: ${scene.title}.`,
-          `Main visual action: ${scene.imagePrompt || scene.description || scene.title}`,
+          "Create this exact storyboard scene as one photorealistic continuous shot. Do not reuse the action, composition, opening frame, or events of another scene. Follow this scene's own description and visual prompt. Show one simple main action with natural movement. No montage, no scene changes, no text, symbols or overlays.",
+          `Storyboard scene number: ${scene.sortOrder + 1}; unique scene record: ${scene.id}.`,
+          `Scene title: ${scene.title}.`,
+          `Narrative action and events for THIS scene: ${scene.description}.`,
+          `Specific visual direction for THIS scene: ${scene.imagePrompt}.`,
           `Camera: ${scene.shotType}; ${scene.cameraMovement}. Location: ${scene.location}. Lighting: ${scene.lighting}.`,
-          ...(project.characters ?? []).filter((character) => scene.characterIds.includes(character.id)).map((character) => `${character.name}, appearance: ${character.description}, clothing: ${character.costume}.`)
-        ].join("\n").split(/\s+/).slice(0, 200).join(" "),
+          ...(project.characters ?? []).filter((character) => (scene.characterIds ?? []).includes(character.id)).map((character) => `${character.name}, appearance: ${character.description}, clothing: ${character.costume}.`)
+        ].join("\n").split(/\s+/).slice(0, 320).join(" "),
         durationSeconds: scene.durationSeconds, aspectRatio: project.aspectRatio,
         fps: 24, resolution: 768,
         mode: input.mode === "image" ? "image" : "text",
