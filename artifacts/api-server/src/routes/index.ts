@@ -11,6 +11,8 @@ const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use("/kaggle-worker", kaggleWorkerRouter);
+// Colab uses the same transactional job queue and lease protocol as Kaggle.
+router.use("/colab-worker", kaggleWorkerRouter);
 router.use(requireUser, adminRouter);
 router.use(requireUser, studioRouter);
 router.use(requireUser, generationRouter);
