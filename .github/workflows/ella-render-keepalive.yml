@@ -1,0 +1,26 @@
+name: Ella2027 Render Keep Alive
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ella2027-render-keepalive
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Ping Ella2027 on Render
+        run: |
+          echo "Pinging Ella2027..."
+          curl --silent --show-error --location --max-time 45 \
+            --output /dev/null \
+            --write-out "HTTP status: %{http_code}\n" \
+            "https://ella2027.onrender.com/"
