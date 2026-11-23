@@ -1,6 +1,6 @@
 """Ella2027 Colab worker backed by WanGP's supported in-process Python API.
 
-The notebook keeps WanGP and its model files in the same Kaggle runtime.
+The notebook keeps WanGP and its model files in the same Google Colab runtime.
 This worker claims jobs from Ella2027, submits them to shared.api, uploads
 the resulting MP4 to the signed Cloudinary target, and completes the job.
 """
@@ -26,7 +26,7 @@ if str(WANGP_ROOT) not in __import__("sys").path:
     __import__("sys").path.insert(0, str(WANGP_ROOT))
 os.chdir(WANGP_ROOT)
 
-# Kaggle's IPython OutStream does not implement TextIOBase.reconfigure().
+# Google Colab's IPython OutStream does not implement TextIOBase.reconfigure().
 # Patch WanGP's optional UTF-8 console setup before shared.api imports wgp.py.
 _WGP_ENTRY = WANGP_ROOT / "wgp.py"
 _WGP_UTF8_LINE = 'for _stream in (sys.stdout, sys.stderr): _stream.reconfigure(encoding="utf-8", errors="replace")'
@@ -35,7 +35,7 @@ _wgp_source = _WGP_ENTRY.read_text(encoding="utf-8")
 if _WGP_UTF8_LINE in _wgp_source:
     _WGP_ENTRY.with_suffix(".py.ella-backup").write_text(_wgp_source, encoding="utf-8")
     _WGP_ENTRY.write_text(_wgp_source.replace(_WGP_UTF8_LINE, _WGP_UTF8_SAFE, 1), encoding="utf-8")
-    print("[ELLA] Applied Kaggle-safe UTF-8 stream patch to WanGP.", flush=True)
+    print("[ELLA] Applied Colab-safe UTF-8 stream patch to WanGP.", flush=True)
 elif _WGP_UTF8_SAFE in _wgp_source:
     print("[ELLA] WanGP UTF-8 stream patch is already applied.", flush=True)
 else:
@@ -55,7 +55,7 @@ IDLE_SECONDS = 12
 
 
 def api_url(path: str) -> str:
-    return f"{BASE_URL}/api/kaggle-worker{path}"
+    return f"{BASE_URL}/api/colab-worker{path}"
 
 
 def _heartbeat(base_url: str, token: str, job_id: str, lease: str,
@@ -64,7 +64,7 @@ def _heartbeat(base_url: str, token: str, job_id: str, lease: str,
     while not stop.wait(40):
         try:
             response = requests.post(
-                f"{base_url}/api/kaggle-worker/{job_id}/heartbeat",
+                f"{base_url}/api/colab-worker/{job_id}/heartbeat",
                 headers=headers, json={"leaseToken": lease}, timeout=25,
             )
             if response.status_code == 409:
@@ -78,7 +78,7 @@ def _heartbeat(base_url: str, token: str, job_id: str, lease: str,
 
 
 def _resolution(aspect_ratio: str) -> str:
-    """High-quality first-pass output profile for the Kaggle T4 worker.
+    """High-quality first-pass output profile for the Colab GPU worker.
 
     Dimensions are aligned to 32 pixels for the LTX-2.5 pipeline.
     This increases pixel area over the original 768x448 profile while
@@ -97,7 +97,7 @@ def _make_settings(session, task: dict[str, Any], output_dir: Path) -> dict[str,
     duration = int(task.get("durationSeconds") or 5)
     if duration < 1 or duration > MODEL_MAX_SECONDS:
         raise RuntimeError(
-            f"This Kaggle T4 profile is configured for clips up to {MODEL_MAX_SECONDS} seconds. "
+            f"This Colab GPU profile is configured for clips up to {MODEL_MAX_SECONDS} seconds. "
             f"The scene requests {duration} seconds; reduce it to {MODEL_MAX_SECONDS} seconds or less before retrying. "
             "The worker will not silently truncate a scene."
         )
@@ -187,7 +187,7 @@ def _generate_one(session, task: dict[str, Any], output_dir: Path) -> Path:
     if video.stat().st_size > MAX_UPLOAD_BYTES:
         raise RuntimeError(
             f"Generated video is {video.stat().st_size / 1024 / 1024:.1f} MiB; "
-            "the Ella2027 Kaggle upload limit is 100 MiB."
+            "the Ella2027 Colab upload limit is 100 MiB."
         )
     return video
 
