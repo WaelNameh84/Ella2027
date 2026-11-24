@@ -1,0 +1,7 @@
+# Local credentials, model cache and generated files must never enter Git.
+.env.amd
+hf-cache/
+output/
+*.log
+__pycache__/
+*.py[cod]
