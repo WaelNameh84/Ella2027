@@ -20,7 +20,7 @@ echo "[ELLA AMD] Pulling official AMD xDiT image $IMAGE"
 docker pull "$IMAGE"
 docker run -d --name "$NAME" --restart unless-stopped \
   --device=/dev/kfd --device=/dev/dri --group-add video \
-  --ipc=host --network host --shm-size=64g \
+  --ipc=host --network host --shm-size=128g \
   -e HSA_NO_SCRATCH_RECLAIM=1 -e OMP_NUM_THREADS=20 \
   -e CUDA_VISIBLE_DEVICES=0 -e HIP_VISIBLE_DEVICES=0 -e ROCR_VISIBLE_DEVICES=0 \
   -e HF_HOME=/app/huggingface_models -e HF_TOKEN="$HF_TOKEN" \
@@ -34,6 +34,6 @@ docker run -d --name "$NAME" --restart unless-stopped \
   -e ELLA_MAX_SCENE_SECONDS="$ELLA_MAX_SCENE_SECONDS" \
   -v "$CACHE_DIR:/app/huggingface_models" -v "$OUTPUT_DIR:/app/output" \
   -v "$ROOT/amd_worker.py:/app/amd_worker.py:ro" \
-  "$IMAGE" bash -lc 'python -m pip install --no-cache-dir requests && torchrun --standalone --nproc_per_node=1 /app/amd_worker.py'
+  "$IMAGE" bash -lc 'apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/* && python -m pip install --no-cache-dir requests && torchrun --standalone --nproc_per_node=1 /app/amd_worker.py'
 echo "AMD worker container started. Follow startup/download/compile:"
 echo "docker logs -f $NAME"
