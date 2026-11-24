@@ -8,6 +8,9 @@ https://rocm.docs.amd.com/projects/ai-ecosystem/en/latest/inference/xdit.html
 
 The worker uses the official Diffusers checkpoint \`Lightricks/LTX-2.5-Diffusers\`, not the Kaggle NVFP4/Gemma INT8 files. xDiT's LTX-2.5 runner includes audio decode and writes MP4 with audio. It uses 8 fixed distilled steps.
 
+## Model access / Hugging Face
+The official LTX-2.5 Diffusers repository is gated behind a one-time Hugging Face login and **Agree and Access** action (it is not an application for GPU credits). Accept the LTX-2.x Community License and the Hugging Face access prompt, then create/use a read token locally in `.env.amd`. Without this access token, the model download may be rejected. Model card: https://huggingface.co/Lightricks/LTX-2.5-Diffusers
+
 ## Persistent model
 The worker uses xDiT's Python \`xFuserModelRunner\` API: initialize once at startup, then reuse the loaded model for every scene. This avoids loading the 22B model afresh for every scene. The official AMD benchmark uses AITER attention, Torch compile, and Ulysses parallelism; this first config uses degree 1 for one MI300X. Eight-GPU scaling is not claimed.
 
@@ -26,7 +29,7 @@ It uses Ella's existing \`/api/colab-worker\` alias and the same secret already 
 1. Copy \`.env.amd.example\` to \`.env.amd\`.
 2. Set \`ELLA_AMD_WORKER_TOKEN\` to the existing Render/Kaggle worker token.
 3. Run \`bash start_amd_worker.sh\`.
-4. Follow logs: \`docker logs -f ella-amd-ltx25\`.
+5. Follow logs: \`docker logs -f ella-amd-ltx25\`.
 
 ## Billing
 Do not create or run the GPU droplet until the introductory credit and billing terms are confirmed. The droplet is billed while running. First real generation is a paid-compute acceptance test; do not queue production work before validating health, model load, generated audio/video, upload, and scene completion.
