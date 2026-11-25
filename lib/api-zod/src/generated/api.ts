@@ -954,6 +954,7 @@ export const GenerateProjectScriptBody = zod.object({
   "allowRotation": zod.boolean().default(generateProjectScriptBodyAllowRotationDefault),
   "approvePotentialCharges": zod.boolean(),
   "autoScenePlan": zod.boolean().default(false),
+  "autoProductionSettings": zod.boolean().default(false),
   "sceneCount": zod.number().int().min(1).max(generateProjectScriptBodySceneCountMax).default(generateProjectScriptBodySceneCountDefault),
   "sceneDurationSeconds": zod.number().int().min(1).max(generateProjectScriptBodySceneDurationSecondsMax).default(generateProjectScriptBodySceneDurationSecondsDefault),
   "sceneStyle": zod.string().min(1).max(generateProjectScriptBodySceneStyleMax).default(generateProjectScriptBodySceneStyleDefault),
