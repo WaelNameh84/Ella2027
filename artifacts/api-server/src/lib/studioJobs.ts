@@ -304,7 +304,7 @@ async function claimNextJob() {
         stage: candidate.stage === "queued" ? "starting" : candidate.stage,
         message: "Processing has started.",
         attempts: candidate.attempts + 1,
-        startedAt: new Date(),
+        startedAt: candidate.startedAt ?? new Date(),
         updatedAt: new Date(),
       })
       .where(and(
@@ -1144,7 +1144,6 @@ async function recoverInterruptedJobs(): Promise<void> {
       await updateJob(job.id, {
         status: "queued",
         message: "Resuming from the last saved stage.",
-        startedAt: null,
       });
     }
   }
