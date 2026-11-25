@@ -192,7 +192,7 @@ export const providerDefinitions: Record<string, ProviderDefinition> = {
     testHeaders: (key) => ({ Authorization: `Bearer ${key}` }),
   },
   "local-video-worker": {
-    label: "Ella Local GPU Worker",
+    label: "ELLA VIDEO ENGINE — Wan 2.2",
     officialUrl: "https://github.com/Wan-Video/Wan2.2",
     testUrl: () => {
       const base = process.env.LOCAL_VIDEO_WORKER_URL?.trim().replace(/\/$/, "");
