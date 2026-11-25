@@ -59,6 +59,9 @@ test("one-click storyboard generation queues every scene in order for the sequen
   const worker = await fs.readFile(new URL("../../../services/kaggle-ltx-worker/wangp_worker.py", import.meta.url), "utf8");
 
   assert.match(app, /setAutoGenerateVideo\(true\)/);
+  assert.match(app, /readyLocalVideoWorker/);
+  assert.match(app, /allowExternalProviders === true \|\| readyLocalVideoWorker/);
+  assert.match(app, /settingsQuery\.data\?\.freeMode \? localVideoKey/);
   assert.match(app, /توليد المشاهد وإرسال كل المقاطع إلى المهام/);
   assert.match(jobs, /if \(input\.autoGenerateVideo === true\)/);
   assert.match(jobs, /for \(const scene of orderedScenes\)/);
