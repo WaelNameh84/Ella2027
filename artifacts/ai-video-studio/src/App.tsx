@@ -704,7 +704,7 @@ function ManualSceneImagePicker({sceneNumber,file,disabled,lang,onChange,onError
     {file&&<button type="button" className="btn btn-quiet manual-scene-image-remove" disabled={disabled} onClick={()=>{onChange(null);onError('');}}><Trash2 size={14}/>{tx(lang,'إزالة الصورة','Remove image')}</button>}
   </div>;
 }
-function ProjectForm({ onClose, initial, initialMode = 'auto', initialExperienceMode, initialTemplateId = '', onSave, pending, freeMode = true, textProviderReady = false, checkingProvider = false, generationError = false, projectCreated = false, onOpenCreated, inline = false }: { onClose: () => void; initial?: Partial<ProjectInput>; initialTemplateId?: string; onSave: (data: ProjectInput, approvePotentialCharges?: boolean, templateId?: string, mode?: 'auto' | 'manual', sceneCount?: number, sceneDurationSeconds?: number, allowExternalProviders?: boolean, manualScenes?: ManualSceneDraft[], manualFullStory?: string, splitManualStory?: boolean, reviewBeforeRendering?: boolean) => void | Promise<void>; pending: boolean; freeMode?: boolean; textProviderReady?: boolean; checkingProvider?: boolean; generationError?: boolean; projectCreated?: boolean; onOpenCreated?: () => void; initialMode?: 'auto' | 'manual'; initialExperienceMode?: 'quick' | 'pro'; inline?: boolean }) {
+function ProjectForm({ onClose, initial, initialMode = 'auto', initialExperienceMode, initialTemplateId = '', onSave, pending, freeMode = true, textProviderReady = false, checkingProvider = false, generationError = false, projectCreated = false, onOpenCreated, inline = false }: { onClose: () => void; initial?: Partial<ProjectInput>; initialTemplateId?: string; onSave: (data: ProjectInput, approvePotentialCharges?: boolean, templateId?: string, mode?: 'auto' | 'manual', sceneCount?: number, sceneDurationSeconds?: number, allowExternalProviders?: boolean, manualScenes?: ManualSceneDraft[], manualFullStory?: string, splitManualStory?: boolean, reviewBeforeRendering?: boolean, autoScenePlan?: boolean) => void | Promise<void>; pending: boolean; freeMode?: boolean; textProviderReady?: boolean; checkingProvider?: boolean; generationError?: boolean; projectCreated?: boolean; onOpenCreated?: () => void; initialMode?: 'auto' | 'manual'; initialExperienceMode?: 'quick' | 'pro'; inline?: boolean }) {
   const { lang } = useApp();
   const initialPreset = projectTemplates.find(item => item.id === initialTemplateId);
   const [form, setForm] = useState<ProjectInput>(() => ({ ...blankProject, language: lang, ...initial, ...(initialPreset ? { videoType: initialPreset.videoType, aspectRatio: initialPreset.aspectRatio, visualStyle: initialPreset.visualStyle, audience: lang === 'ar' ? 'الجمهور العام' : initialPreset.audience } : {}) }));
@@ -770,8 +770,8 @@ function ProjectForm({ onClose, initial, initialMode = 'auto', initialExperience
       return;
     }
     try {
-      const useTextProvider = !editing && mode === 'auto' && !selectedTemplate && allowExternalProviders && textProviderReady;
-      await onSave(payload, useTextProvider && approvePotentialCharges || splitStory && approvePotentialCharges, !editing ? selectedTemplate?.id : undefined, mode, effectiveSceneCount, effectiveSceneDuration, !editing && (mode === 'auto' || splitStory) ? allowExternalProviders : undefined, mode === 'manual' ? manualScenes : undefined, splitStory ? manualFullStory.trim() : undefined, splitStory, reviewBeforeRendering);
+      const useTextProvider = !editing && mode === 'auto' && allowExternalProviders && textProviderReady;
+      await onSave(payload, useTextProvider && approvePotentialCharges || splitStory && approvePotentialCharges, !editing ? selectedTemplate?.id : undefined, mode, effectiveSceneCount, effectiveSceneDuration, !editing && (mode === 'auto' || splitStory) ? allowExternalProviders : undefined, mode === 'manual' ? manualScenes : undefined, splitStory ? manualFullStory.trim() : undefined, splitStory, reviewBeforeRendering, experienceMode === 'quick' || (mode === 'manual' && splitStory));
       setSubmitError('');
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : tx(lang, 'تعذر حفظ إعدادات المشروع.', 'Could not save project settings.'));
@@ -793,10 +793,10 @@ function ProjectForm({ onClose, initial, initialMode = 'auto', initialExperience
   const manualScenesReady = manualScenes.length === sceneCount && manualScenes.every(scene => Boolean(scene.description.trim()));
   const manualStoryReady = manualFullStory.trim().length >= 20 && allowExternalProviders && textProviderReady && approvePotentialCharges;
   const retryingStory = projectCreated && mode === 'auto' && useTextProvider && generationError;
-  const canSubmit = editing || (retryingStory && approvePotentialCharges) || (!projectCreated && Boolean((experienceMode === 'quick' || mode === 'auto' ? form.idea.trim() : form.title.trim())) && (experienceMode === 'quick' || mode !== 'manual' || manualScenesReady || manualStoryReady) && (!useTextProvider || approvePotentialCharges));
+  const canSubmit = editing || (retryingStory && approvePotentialCharges) || (!projectCreated && Boolean((experienceMode === 'quick' || mode === 'auto' ? form.idea.trim() : form.title.trim())) && (experienceMode === 'quick' || mode !== 'manual' || manualStoryReady) && (mode !== 'auto' || (allowExternalProviders && textProviderReady && approvePotentialCharges)) && (!useTextProvider || approvePotentialCharges));
   const submitLabel = editing ? tx(lang,'حفظ التعديلات','Save changes') : pending ? projectCreated ? tx(lang,'جارٍ إنشاء الفيلم…','Creating film…') : tx(lang,'جارٍ إنشاء المشروع…','Creating project…') : experienceMode === 'quick' ? generationError ? tx(lang,'إعادة المحاولة','Retry') : tx(lang,'أنشئ الفيلم','Create film') : mode === 'manual' ? tx(lang,'أنشئ المشروع والمشاهد','Create project and scenes') : useTextProvider ? generationError ? tx(lang,'إعادة محاولة التأليف','Retry story generation') : tx(lang,'اكتب القصة','Write the story') : tx(lang,'أنشئ المشاهد تلقائيًا','Create scenes automatically');
   const submitButton = <button type="submit" disabled={pending || !canSubmit} className="btn btn-primary" data-testid="button-create-project">{pending ? <LoaderCircle className="animate-spin" size={16}/> : editing ? <Check size={16}/> : <WandSparkles size={16}/ >}{submitLabel}</button>;
-  return <Modal inline={inline} className="idea-entry-card" onClose={onClose} title={editing ? tx(lang,'تعديل تفاصيل المشروع','Edit project details') : mode === 'manual' ? tx(lang, 'مساحة العمل اليدوية', 'Manual production workspace') : tx(lang, 'فكرتك إلى قصة', 'Turn your idea into a story')} subtitle={editing ? tx(lang, 'عدّل تفاصيل المشروع ومشاهده.', 'Update the project details.') : mode === 'manual' ? tx(lang, 'أنشئ مشروعك ثم اكتب المشاهد وعدّلها واربط الصور المرجعية بنفسك.', 'Create your project, then write and edit scenes and attach visual references yourself.') : tx(lang, 'اكتب فكرة قصيرة، ثم اختر المسار السريع أو تحكم بالمشاهد في الوضع الاحترافي.', 'Describe your idea, then choose the quick path or control each scene in Professional mode.')}>
+  return <Modal inline={inline} className="idea-entry-card" onClose={onClose} title={editing ? tx(lang,'تعديل تفاصيل المشروع','Edit project details') : mode === 'manual' ? tx(lang, 'مساحة العمل اليدوية', 'Manual production workspace') : tx(lang, 'فكرتك إلى قصة', 'Turn your idea into a story')} subtitle={editing ? tx(lang, 'عدّل تفاصيل المشروع ومشاهده.', 'Update the project details.') : mode === 'manual' ? tx(lang, 'اكتب القصة كاملة، وإيلا تقسمها حسب أحداثها وتثبت شخصياتها.', 'Write the complete story; Ella splits it by story beats and locks character identity.') : tx(lang, 'اكتب فكرة قصيرة، ثم اختر المسار السريع أو تحكم بالمشاهد في الوضع الاحترافي.', 'Describe your idea, then choose the quick path or control each scene in Professional mode.')}>
     <form onSubmit={e => { e.preventDefault(); void submit(); }} className="form-stack">
       {!editing && inline && <div className="experience-mode-switch" role="tablist" aria-label={tx(lang,'مستوى التحكم','Experience mode')}>
         <button type="button" role="tab" aria-selected={experienceMode==='quick'} className={experienceMode==='quick'?'is-selected':''} onClick={()=>chooseExperienceMode('quick')} disabled={projectCreated}>{tx(lang,'سريع','Quick')}</button>
@@ -809,7 +809,7 @@ function ProjectForm({ onClose, initial, initialMode = 'auto', initialExperience
           <label className="quick-idea-label"><span className="field-label">{tx(lang,'فكرة الفيلم','Film idea')}</span><textarea required maxLength={1500} rows={3} className="studio-input resize-y quick-idea-input" value={form.idea} onChange={e=>update('idea',e.target.value)} placeholder={tx(lang,'اكتب فكرتك هنا… إيلا تتولى الباقي.','Write your idea here… Ella handles the rest.')} data-testid="input-project-idea" disabled={projectCreated} autoFocus /></label>
           <div className="quick-composer-bottom">
             <WritingAssistant lang={lang} context="idea" values={{idea:form.idea}} onApply={(field,value)=>{if(field==='idea')update('idea',value)}} />
-            <div className="quick-toolbar quick-dropdown-toolbar">
+            {experienceMode === 'pro' && <div className="quick-toolbar quick-dropdown-toolbar">
               <details className="quick-setting-dropdown">
                 <summary><span>{tx(lang,'نوع الفيديو','Video type')}</span><b>{tx(lang,videoTypes.find(([value])=>value===form.videoType)?.[1]||'سينمائي',videoTypes.find(([value])=>value===form.videoType)?.[2]||'Cinematic')}</b><ChevronDown size={13}/></summary>
                 <div className="quick-dropdown-panel"><label><span className="field-label">{tx(lang,'اختر نوع الفيديو','Choose video type')}</span><select className="studio-input" value={form.videoType} disabled={projectCreated} onChange={e=>update('videoType',e.target.value)}>{videoTypes.map(([value,ar,en])=><option key={value} value={value}>{tx(lang,ar,en)}</option>)}</select></label></div>
@@ -846,8 +846,9 @@ function ProjectForm({ onClose, initial, initialMode = 'auto', initialExperience
                   <label><span className="field-label">{tx(lang,'ثواني لكل مشهد','Seconds per scene')}</span><input aria-label={tx(lang,'الثواني لكل مشهد','Seconds per scene')} type="number" min="1" max={Math.floor(3600/quickSceneCount)} step="1" className="studio-input" value={sceneDurationSeconds || ''} disabled={projectCreated} onChange={e=>{const raw=e.target.value;setSceneDurationSeconds(raw===''?0:Math.max(1,Math.min(Math.floor(3600/quickSceneCount),Number(raw)||1)));}} data-testid="input-quick-scene-duration" /></label>
                 </div>
               </details>
-            </div>
-            <span className="quick-duration-hint">{tx(lang,quickPlannedDuration+' ثانية إجمالي',quickPlannedDuration+' sec total')}</span>
+            </div>}
+            {experienceMode === 'quick' && <p className="generation-note">{tx(lang,'إيلا ستحدد تلقائيًا نوع الفيديو والمقاس والأسلوب وعدد المشاهد ومدة كل مشهد، مع احترام أي شروط تذكرها في الفكرة.','Ella will choose the video type, format, style, scene count and each scene duration, while respecting any constraints you mention in the idea.')}</p>}
+            {experienceMode === 'pro' && <span className="quick-duration-hint">{tx(lang,quickPlannedDuration+' ثانية إجمالي',quickPlannedDuration+' sec total')}</span>
           </div>
         </div>
         {!plan && submitButton}
@@ -887,21 +888,8 @@ function ProjectForm({ onClose, initial, initialMode = 'auto', initialExperience
             <button type="button" className="btn btn-primary" disabled={pending || projectCreated || !manualStoryReady} onClick={() => { setSplitManualStory(true); void submit(false, true); }} data-testid="button-split-manual-story"><WandSparkles size={16}/>{tx(lang,'تقسيم القصة إلى مشاهد','Split story into scenes')}</button>
             {manualFullStory.trim().length > 0 && manualFullStory.trim().length < 20 && <p className="inline-error">{tx(lang,'أدخل قصة أطول قليلاً حتى يمكن تقسيمها بشكل مفيد.','Enter a longer story so it can be split meaningfully.')}</p>}
           </section>
-          <section className="manual-scene-drafts" aria-label={tx(lang, 'مسودات المشاهد اليدوية', 'Manual scene drafts')}>
-            <div className="section-heading"><div><span className="eyebrow">SCENE DRAFTS</span><h3>{tx(lang, 'اكتب المشاهد قبل الإنشاء', 'Write scenes before creating')}</h3></div><span className="small-mono">{sceneCount} {tx(lang, 'مشاهد', 'scenes')}</span></div>
-            <p className="generation-note">{tx(lang, 'هذه الحقول تُحفظ مباشرة في المشاهد ولا تُرسل إلى أي مزوّد كتابة. يمكنك تعديل كل التفاصيل لاحقًا من المحرر.', 'These fields are saved directly into the scenes and are never sent to a writing provider. You can edit every detail later in the workspace.')}</p>
-            <div className="manual-scene-draft-list">{manualScenes.map((scene, index) => <article className="manual-scene-draft" key={index}>
-              <div className="manual-scene-draft-head"><span className="storyboard-number">{String(index + 1).padStart(2, '0')}</span><b>{tx(lang, `المشهد ${index + 1}`, `Scene ${index + 1}`)}</b></div>
-              <ManualSceneImagePicker sceneNumber={index+1} file={scene.imageFile} disabled={projectCreated} lang={lang} onChange={file=>setManualScenes(current=>current.map((item,itemIndex)=>itemIndex===index?{...item,imageFile:file}:item))} onError={setSubmitError}/>
-              <label><span className="field-label">{tx(lang, 'العنوان', 'Title')}</span><input className="studio-input" disabled={projectCreated} value={scene.title} onChange={e => setManualScenes(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, title: e.target.value } : item))} maxLength={160} data-testid={`input-manual-scene-title-${index + 1}`} /></label>
-              <label><span className="field-label">{tx(lang, 'وصف الأحداث والمكان', 'Action and setting')}</span><textarea className="studio-input" disabled={projectCreated} rows={2} value={scene.description} onChange={e => setManualScenes(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, description: e.target.value } : item))} maxLength={4000} data-testid={`input-manual-scene-description-${index + 1}`} /></label>
-              <label><span className="field-label">{tx(lang, 'الحوار أو التعليق الصوتي', 'Dialogue or narration')}</span><textarea className="studio-input" disabled={projectCreated} rows={2} value={scene.narration} onChange={e => setManualScenes(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, narration: e.target.value } : item))} maxLength={12000} data-testid={`input-manual-scene-narration-${index + 1}`} /></label>
-              <label><span className="field-label">{tx(lang, 'وصف الصورة (اختياري)', 'Image prompt (optional)')}</span><textarea className="studio-input" disabled={projectCreated} rows={2} value={scene.imagePrompt} onChange={e => setManualScenes(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, imagePrompt: e.target.value } : item))} maxLength={3000} /></label>
-              <div className="form-two"><label><span className="field-label">{tx(lang, 'نوع اللقطة', 'Shot type')}</span><select className="studio-input" disabled={projectCreated} value={scene.shotType} onChange={e => setManualScenes(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, shotType: e.target.value } : item))}><option value="wide">{tx(lang, 'لقطة واسعة', 'Wide shot')}</option><option value="medium">{tx(lang, 'لقطة متوسطة', 'Medium shot')}</option><option value="close-up">{tx(lang, 'لقطة قريبة', 'Close-up')}</option><option value="establishing">{tx(lang, 'لقطة تأسيسية', 'Establishing shot')}</option><option value="over-the-shoulder">{tx(lang, 'من فوق الكتف', 'Over the shoulder')}</option></select></label><label><span className="field-label">{tx(lang, 'حركة الكاميرا', 'Camera movement')}</span><select className="studio-input" disabled={projectCreated} value={scene.cameraMovement} onChange={e => setManualScenes(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, cameraMovement: e.target.value } : item))}><option value="static">{tx(lang, 'ثابتة', 'Static')}</option><option value="pan">Pan</option><option value="tilt">Tilt</option><option value="tracking">Tracking</option><option value="dolly-in">Dolly in</option><option value="handheld">Handheld</option><option value="zoom">Zoom</option></select></label></div>
-              <div className="form-two"><label><span className="field-label">{tx(lang, 'موقع المشهد (اختياري)', 'Scene location (optional)')}</span><input className="studio-input" disabled={projectCreated} maxLength={500} value={scene.location} onChange={e => setManualScenes(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, location: e.target.value } : item))} /></label><label><span className="field-label">{tx(lang, 'الإضاءة (اختياري)', 'Lighting (optional)')}</span><input className="studio-input" disabled={projectCreated} maxLength={2000} value={scene.lighting} onChange={e => setManualScenes(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, lighting: e.target.value } : item))} /></label></div>
-            </article>)}</div>
-          </section>
-          <div className="service-purpose-hint"><b>{tx(lang, 'رفع يدوي دون مفتاح', 'Manual upload, no API key')}</b><span>{tx(lang, 'تُحفظ الصور في مساحة ملفات الخادم الحالية. على Render قد يكون التخزين مؤقتًا ما لم يكن قرص دائم مفعّلًا.', 'Images use the server’s current file storage. On Render, files may be temporary unless a persistent disk is configured.')}</span></div>
+          <div className="service-purpose-hint"><b>{tx(lang,'ثبات الشخصيات تلقائيًا','Automatic character consistency')}</b><span>{tx(lang,'سيبني الذكاء الاصطناعي ملفًا ثابتًا لكل شخصية ويربطه بالمشاهد المناسبة، مع تثبيت الوجه والشعر والملابس والصوت وتسلسل الأحداث.','AI will create a fixed profile for each character and attach it to relevant scenes, locking face, hair, clothing, voice and story continuity.')}</span></div>
+
         </>}
         {mode === 'auto' && <>
           <div className="section-heading"><div><span className="eyebrow">{tx(lang,'بداية سريعة','QUICK START')}</span><h3>{tx(lang,'اختر نقطة انطلاق','Choose a starting point')}</h3></div><span className="small-mono">{tx(lang,'إعداد بنقرة واحدة','One-click setup')}</span></div>
@@ -1062,7 +1050,7 @@ function Projects({ homePage = false, manualPage = false, createPage = false }: 
       setBackupImporting(false);
     }
   };
-  const startStory = (projectId: string, sceneCount: number, sceneDurationSeconds: number, sceneStyle: string, story?: string) => generate.mutate({ projectId, data: { providerKeyId: null, allowRotation: true, approvePotentialCharges: true, sceneCount, sceneDurationSeconds, sceneStyle, ...(story ? { story } : {}) } }, {
+  const startStory = (projectId: string, sceneCount: number, sceneDurationSeconds: number, sceneStyle: string, story?: string, autoScenePlan = false) => generate.mutate({ projectId, data: { providerKeyId: null, allowRotation: true, approvePotentialCharges: true, sceneCount, sceneDurationSeconds, sceneStyle, autoScenePlan, ...(story ? { story } : {}) } }, {
     onSuccess: () => {
       afterChange();
       setOpen(false);
@@ -1070,7 +1058,7 @@ function Projects({ homePage = false, manualPage = false, createPage = false }: 
       setLocation(`/projects/${projectId}`);
     },
   });
-  const runAutoFilm = async (projectId: string, sceneCount: number, sceneDurationSeconds: number, sceneStyle: string, useScriptProvider: boolean, reviewBeforeRendering = false) => {
+  const runAutoFilm = async (projectId: string, sceneCount: number, sceneDurationSeconds: number, sceneStyle: string, useScriptProvider: boolean, reviewBeforeRendering = false, autoScenePlan = false) => {
     setAutoFilmRunning(true);
     const keys = keysQuery.data || [];
     const videoKey = keys.find(key => key.enabled && key.serviceType === 'video' && providerSupports(key.provider, 'video') && providerKeyIsUsable(key.provider, key.status));
@@ -1094,7 +1082,7 @@ function Projects({ homePage = false, manualPage = false, createPage = false }: 
       throw new Error(`${label} timed out.`);
     };
     if (useScriptProvider) {
-      const scriptResponse = await fetch(`${basePath}/api/projects/${projectId}/jobs/script`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ providerKeyId: null, allowRotation: true, approvePotentialCharges: true, sceneCount, sceneDurationSeconds, sceneStyle }) });
+      const scriptResponse = await fetch(`${basePath}/api/projects/${projectId}/jobs/script`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ providerKeyId: null, allowRotation: true, approvePotentialCharges: true, sceneCount, sceneDurationSeconds, sceneStyle, autoScenePlan }) });
       if (!scriptResponse.ok) throw new Error((await scriptResponse.json().catch(() => null))?.error || 'Could not start the script stage.');
       await waitFor(jobs => jobs.some(job => job.jobType === 'script' && job.status === 'completed'), tx(lang, 'تأليف السيناريو', 'Script generation'), job => job.jobType === 'script');
     }
@@ -1152,10 +1140,10 @@ function Projects({ homePage = false, manualPage = false, createPage = false }: 
     const result = await response.json().catch(() => ({})) as { error?: string };
     if (!response.ok) throw new Error(result.error || tx(lang, 'تعذر رفع صورة المشهد.', 'Could not upload the scene image.'));
   };
-  const saveProjectAndWriteStory = async (data: ProjectInput, approvePotentialCharges = false, templateId?: string, mode: 'auto' | 'manual' = 'auto', sceneCount = 5, sceneDurationSeconds = 8, allowExternalProviders?: boolean, manualScenes?: ManualSceneDraft[], manualFullStory?: string, splitManualStory = false, reviewBeforeRendering = false) => {
+  const saveProjectAndWriteStory = async (data: ProjectInput, approvePotentialCharges = false, templateId?: string, mode: 'auto' | 'manual' = 'auto', sceneCount = 5, sceneDurationSeconds = 8, allowExternalProviders?: boolean, manualScenes?: ManualSceneDraft[], manualFullStory?: string, splitManualStory = false, reviewBeforeRendering = false, autoScenePlan = false) => {
     if (createdProjectId) {
       if (!approvePotentialCharges || allowExternalProviders !== true) throw new Error(tx(lang, 'أكّد السماح بالمزوّدات والموافقة على الرسوم المحتملة قبل إعادة المحاولة.', 'Confirm external providers and possible charges before retrying.'));
-      startStory(createdProjectId, sceneCount, sceneDurationSeconds, data.visualStyle || 'Cinematic');
+      startStory(createdProjectId, sceneCount, sceneDurationSeconds, data.visualStyle || 'Cinematic', mode === 'manual' && splitManualStory ? manualFullStory : undefined, autoScenePlan);
       return;
     }
     if (mode === 'auto' && allowExternalProviders !== undefined) {
@@ -1171,7 +1159,7 @@ function Projects({ homePage = false, manualPage = false, createPage = false }: 
       if (splitManualStory && manualFullStory?.trim()) {
         if (!allowExternalProviders || !approvePotentialCharges || !textProviderReady) throw new Error(tx(lang, 'فعّل مزوّد الكتابة ووافق على الطلب قبل تقسيم القصة.', 'Enable a writing provider and approve the request before splitting the story.'));
         setCreatedProjectId(project.id);
-        startStory(project.id, sceneCount, sceneDurationSeconds, data.visualStyle || 'Cinematic', manualFullStory.trim());
+        startStory(project.id, sceneCount, sceneDurationSeconds, data.visualStyle || 'Cinematic', manualFullStory.trim(), true);
         return;
       }
       setCreatedProjectId(project.id);
@@ -1211,10 +1199,10 @@ function Projects({ homePage = false, manualPage = false, createPage = false }: 
       setLocation(`/projects/${project.id}`);
       return;
     }
-    const useTextProvider = !templateId && allowExternalProviders === true && textProviderReady && approvePotentialCharges;
+    const useTextProvider = allowExternalProviders === true && textProviderReady && approvePotentialCharges;
     if (useTextProvider) {
       setCreatedProjectId(project.id);
-      void runAutoFilm(project.id, sceneCount, sceneDurationSeconds, data.visualStyle || 'Cinematic', true, reviewBeforeRendering).catch(error => {
+      void runAutoFilm(project.id, sceneCount, sceneDurationSeconds, data.visualStyle || 'Cinematic', true, reviewBeforeRendering, autoScenePlan).catch(error => {
         setAutoFilmRunning(false);
         setCreatedProjectId(null);
         setOpen(false);
