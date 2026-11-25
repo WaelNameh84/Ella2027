@@ -16,7 +16,7 @@
 
 ## التشغيل
 1. افتح الملف `notebooks/ELLA_WAN_ENGINE_KAGGLE.ipynb` في Kaggle.
-2. من Notebook settings اختر GPU ثم شغّل الخلايا بالترتيب.
+2. من Notebook settings فعّل GPU وInternet ثم شغّل الخلايا بالترتيب.
 3. عدّل متغيرات PROMPT وDURATION وMODE في خلية الإعدادات.
 4. عند image-to-video ارفع صورة مرجعية باسم `reference.png` إلى مساحة العمل أو عيّن مسارها.
 5. الناتج في `/kaggle/working/ella_output.mp4`.
