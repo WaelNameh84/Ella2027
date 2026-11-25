@@ -649,8 +649,42 @@ const freeTemplateBeats: Record<string, { ar: FreeTemplateBeat[]; en: FreeTempla
     ],
   },
 };
+function extractExplicitSceneBeats(idea:string) {
+  const heading=/(?:^|\\n)\\s*(?:المشهد|مشهد|scene)\\s*(\\d+|الأول|الثاني|الثالث|الرابع|الخامس|السادس)?\\s*(?:\\((\\d+)\\s*(?:ثانية|ثوانٍ|ثواني|seconds?|sec|s)\\))?\\s*[:：\\-–—]?\\s*/gi;
+  const matches=[...idea.matchAll(heading)];
+  if(!matches.length)return [];
+  return matches.slice(0,24).map((match,index)=>{
+    const start=(match.index??0)+match[0].length;
+    const end=index+1<matches.length?(matches[index+1].index??idea.length):idea.length;
+    const raw=idea.slice(start,end).trim().replace(/^[\\s:：\\-–—]+|[\\s\\-–—]+$/g,'');
+    const durationInText=raw.match(/(?:^|\\s)(\\d+)\\s*(?:ثانية|ثوانٍ|ثواني|seconds?|sec)\\b?/i);
+    const duration=Number(match[2]||durationInText?.[1]);
+    const title=match[1] ? `المشهد ${match[1]}` : `المشهد ${index+1}`;
+    return {title,description:raw.replace(/^\\(?\\d+\\s*(?:ثانية|ثوانٍ|ثواني|seconds?|sec)\\)?\\s*[:：\\-–—]?/i,'').trim(),durationSeconds:Number.isFinite(duration)&&duration>0?Math.min(600,Math.max(1,Math.round(duration))):undefined};
+  }).filter(scene=>scene.description.length>0);
+}
 function buildFreeTemplateScenes(templateId:string,idea:string,lang:Lang,visualStyle:string,sceneCount:number,sceneDurationSeconds:number) {
   const ar=lang==='ar';
+  const explicitScenes=extractExplicitSceneBeats(idea);
+  if(explicitScenes.length){
+    const firstHeading=/(?:^|\\n)\\s*(?:المشهد|مشهد|scene)\\s*(?:\\d+|الأول|الثاني|الثالث|الرابع|الخامس|السادس)?/i.exec(idea);
+    const sharedContext=firstHeading?idea.slice(0,firstHeading.index).trim():'';
+    return explicitScenes.map((scene,index)=>{
+      const continuity=ar?'ثبات الشخصيات إلزامي: حافظ على الوجه والشعر والعمر والبنية والملابس والألوان نفسها في كل المشاهد؛ غيّر الحركة والتعبير وزاوية الكاميرا فقط.':'Character continuity is mandatory: preserve the same face, hair, age, build, costume and color palette in every scene; only action, expression and camera angle may change.';
+      const description=[sharedContext,scene.description].filter(Boolean).join('\\n');
+      return {
+        title:scene.title,
+        description,
+        imagePrompt:`${visualStyle||'Cinematic'}; ${description}. ${continuity} ${ar?'لا تضف نصوصًا أو شعارات داخل الصورة.':'No text or logos inside the image.'}`,
+        narration:'',
+        durationSeconds:scene.durationSeconds||sceneDurationSeconds,
+        shotType:'cinematic',
+        cameraMovement:'slow cinematic movement',
+        location:'',
+        lighting:ar?'إضاءة سينمائية متناسقة مع الحدث':'Cinematic lighting appropriate to the action',
+      };
+    });
+  }
   const defaultBeats:FreeTemplateBeat[]=ar?[
     ['الافتتاح','قدّم المكان أو اللحظة التي تبدأ منها الفكرة.','establishing','pan','المكان الذي تدور فيه الفكرة','إضاءة تأسيسية ناعمة تبرز المكان','لقطة واسعة تكشف عالم القصة وتفاصيله.','كل حكاية تبدأ من تفصيل صغير يستحق أن ننتبه له.'],
     ['السياق','عرّف المشاهد على الشخصية أو الحاجة الأساسية.','medium','tracking','بيئة الشخصية الرئيسية','إضاءة طبيعية متوازنة على الشخصية والخلفية','لقطة متوسطة تتبع الشخصية في بيئة واضحة.','هنا نلتقي بالشخصية التي تقود هذه الحكاية.'],
@@ -793,7 +827,7 @@ function ProjectForm({ onClose, initial, initialMode = 'auto', initialExperience
   const manualScenesReady = manualScenes.length === sceneCount && manualScenes.every(scene => Boolean(scene.description.trim()));
   const manualStoryReady = manualFullStory.trim().length >= 20 && allowExternalProviders && textProviderReady && approvePotentialCharges;
   const retryingStory = projectCreated && mode === 'auto' && useTextProvider && generationError;
-  const canSubmit = editing || (retryingStory && approvePotentialCharges) || (!projectCreated && Boolean((experienceMode === 'quick' || mode === 'auto' ? form.idea.trim() : form.title.trim())) && (experienceMode === 'quick' || mode !== 'manual' || manualStoryReady) && (mode !== 'auto' || (allowExternalProviders && textProviderReady && approvePotentialCharges)) && (!useTextProvider || approvePotentialCharges));
+  const canSubmit = editing || (retryingStory && approvePotentialCharges) || (!projectCreated && Boolean((experienceMode === 'quick' || mode === 'auto' ? form.idea.trim() : form.title.trim())) && (experienceMode === 'quick' || mode !== 'manual' || manualStoryReady) && (mode !== 'auto' || experienceMode === 'quick' || (allowExternalProviders && textProviderReady && approvePotentialCharges)) && (!useTextProvider || approvePotentialCharges));
   const submitLabel = editing ? tx(lang,'حفظ التعديلات','Save changes') : pending ? projectCreated ? tx(lang,'جارٍ إنشاء الفيلم…','Creating film…') : tx(lang,'جارٍ إنشاء المشروع…','Creating project…') : experienceMode === 'quick' ? generationError ? tx(lang,'إعادة المحاولة','Retry') : tx(lang,'أنشئ الفيلم','Create film') : mode === 'manual' ? tx(lang,'أنشئ المشروع والمشاهد','Create project and scenes') : useTextProvider ? generationError ? tx(lang,'إعادة محاولة التأليف','Retry story generation') : tx(lang,'اكتب القصة','Write the story') : tx(lang,'أنشئ المشاهد تلقائيًا','Create scenes automatically');
   const submitButton = <button type="submit" disabled={pending || !canSubmit} className="btn btn-primary" data-testid="button-create-project">{pending ? <LoaderCircle className="animate-spin" size={16}/> : editing ? <Check size={16}/> : <WandSparkles size={16}/ >}{submitLabel}</button>;
   return <Modal inline={inline} className="idea-entry-card" onClose={onClose} title={editing ? tx(lang,'تعديل تفاصيل المشروع','Edit project details') : mode === 'manual' ? tx(lang, 'مساحة العمل اليدوية', 'Manual production workspace') : tx(lang, 'فكرتك إلى قصة', 'Turn your idea into a story')} subtitle={editing ? tx(lang, 'عدّل تفاصيل المشروع ومشاهده.', 'Update the project details.') : mode === 'manual' ? tx(lang, 'اكتب القصة كاملة، وإيلا تقسمها حسب أحداثها وتثبت شخصياتها.', 'Write the complete story; Ella splits it by story beats and locks character identity.') : tx(lang, 'اكتب فكرة قصيرة، ثم اختر المسار السريع أو تحكم بالمشاهد في الوضع الاحترافي.', 'Describe your idea, then choose the quick path or control each scene in Professional mode.')}>
