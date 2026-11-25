@@ -17,7 +17,7 @@ from urllib.parse import urlparse
 
 import requests
 
-API_PREFIX = "/api/kaggle-worker"
+API_PREFIX = "/api/kaggle-wan22-worker"
 MAX_UPLOAD_BYTES = 100 * 1024 * 1024
 DEFAULT_FPS = 8
 
