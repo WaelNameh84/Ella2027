@@ -101,7 +101,50 @@ router.post("/ai-team/projects/:projectId/handoff", async (req, res): Promise<vo
     return;
   }
   const body = req.body as Record<string, unknown>;
+  const checkpoint = body.checkpoint && typeof body.checkpoint === "object" && !Array.isArray(body.checkpoint)
+    ? body.checkpoint as Record<string, unknown>
+    : {};
   const fromProvider = typeof body.fromProvider === "string" ? body.fromProvider.trim() : "";
+  const stage = typeof checkpoint.stage === "string" ? checkpoint.stage.trim().slice(0, 80) : "handoff";
+  const summary = typeof checkpoint.summary === "string" ? checkpoint.summary.trim().slice(0, 12000) : "";
+  if (!summary) {
+    res.status(400).json({ error: "A non-empty checkpoint summary is required." });
+    return;
+  }
+  const lastCompletedStep = typeof checkpoint.lastCompletedStep === "string" ? checkpoint.lastCompletedStep.slice(0, 240) : null;
+  const nextStep = typeof checkpoint.nextStep === "string" ? checkpoint.nextStep.slice(0, 240) : null;
+  const completedSteps = Array.isArray(checkpoint.completedSteps)
+    ? checkpoint.completedSteps.filter((v): v is string => typeof v === "string").slice(0, 100) : [];
+  const artifacts = checkpoint.artifacts && typeof checkpoint.artifacts === "object" && !Array.isArray(checkpoint.artifacts)
+    ? checkpoint.artifacts : {};
+
+  // Save the latest checkpoint before attempting provider selection. A failed handoff
+  // must never discard edits made since the last explicit save.
+  const saved = await pool.query(
+    `INSERT INTO studio_ai_handoffs
+      (project_id, user_id, current_provider, stage, last_completed_step, next_step, summary, completed_steps, artifacts)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb)
+     ON CONFLICT (project_id) DO UPDATE SET
+       current_provider = EXCLUDED.current_provider,
+       stage = EXCLUDED.stage,
+       last_completed_step = EXCLUDED.last_completed_step,
+       next_step = EXCLUDED.next_step,
+       summary = EXCLUDED.summary,
+       completed_steps = EXCLUDED.completed_steps,
+       artifacts = EXCLUDED.artifacts,
+       revision = studio_ai_handoffs.revision + 1,
+       updated_at = now()
+     WHERE studio_ai_handoffs.user_id = EXCLUDED.user_id
+     RETURNING *`,
+    [projectId, userId, fromProvider || null, stage || "handoff", lastCompletedStep, nextStep, summary,
+      JSON.stringify(completedSteps), JSON.stringify(artifacts)],
+  );
+  const savedRow = (saved.rows as Record<string, unknown>[])[0];
+  if (!savedRow) {
+    res.status(409).json({ error: "Could not save the project checkpoint." });
+    return;
+  }
+
   const keys = await db.select().from(providerKeysTable).where(and(
     eq(providerKeysTable.userId, userId),
     eq(providerKeysTable.serviceType, "text"),
@@ -116,48 +159,30 @@ router.post("/ai-team/projects/:projectId/handoff", async (req, res): Promise<vo
   const next = candidates[0];
   if (!next) {
     res.status(409).json({
-      error: "No alternate text provider is currently available. The checkpoint is saved; wait for a provider quota reset or configure another official API key.",
-      retryAfter: "provider availability",
+      error: "Checkpoint saved, but no alternate text provider is currently available. Wait for a quota reset or configure another official API key.",
+      checkpointSaved: true,
+      state: safeState(savedRow),
     });
     return;
   }
-  const checkpoint = body.checkpoint && typeof body.checkpoint === "object"
-    ? body.checkpoint as Record<string, unknown>
-    : {};
-  const stage = typeof checkpoint.stage === "string" ? checkpoint.stage.trim().slice(0, 80) : "handoff";
-  const summary = typeof checkpoint.summary === "string" ? checkpoint.summary.trim().slice(0, 12000) : "Provider handoff requested.";
+
   const result = await pool.query(
-    `INSERT INTO studio_ai_handoffs
-      (project_id, user_id, current_provider, current_provider_key_id, stage, last_completed_step, next_step, summary, completed_steps, artifacts, handoff_count)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb,1)
-     ON CONFLICT (project_id) DO UPDATE SET
-       current_provider = EXCLUDED.current_provider,
-       current_provider_key_id = EXCLUDED.current_provider_key_id,
-       stage = EXCLUDED.stage,
-       last_completed_step = EXCLUDED.last_completed_step,
-       next_step = EXCLUDED.next_step,
-       summary = EXCLUDED.summary,
-       completed_steps = EXCLUDED.completed_steps,
-       artifacts = EXCLUDED.artifacts,
-       handoff_count = studio_ai_handoffs.handoff_count + 1,
-       revision = studio_ai_handoffs.revision + 1,
-       updated_at = now()
-     WHERE studio_ai_handoffs.user_id = EXCLUDED.user_id
+    `UPDATE studio_ai_handoffs
+     SET current_provider = $3, current_provider_key_id = $4,
+         handoff_count = handoff_count + 1, revision = revision + 1, updated_at = now()
+     WHERE project_id = $1 AND user_id = $2
      RETURNING *`,
-    [projectId, userId, next.provider, next.id, stage, checkpoint.lastCompletedStep ?? null, checkpoint.nextStep ?? null, summary,
-      JSON.stringify(Array.isArray(checkpoint.completedSteps) ? checkpoint.completedSteps.filter((v): v is string => typeof v === "string").slice(0,100) : []),
-      JSON.stringify(checkpoint.artifacts && typeof checkpoint.artifacts === "object" ? checkpoint.artifacts : {})],
+    [projectId, userId, next.provider, next.id],
   );
   const rows = result.rows as Record<string, unknown>[];
   res.json({
     selectedProvider: { id: next.id, provider: next.provider, label: next.label },
     state: safeState(rows[0]),
-    note: "The next configured API provider was selected. This endpoint does not turn consumer Free-plan accounts into API access.",
+    note: "The next configured API provider was selected. The caller must submit the saved context to that provider using its official API credential.",
   });
 });
 
-// The existing storyboard endpoint already performs provider rotation. This middleware
-// persists its progress automatically so another provider can resume from the same brief.
+// Persist storyboard generation progress so another provider can resume from the same brief.
 router.post("/projects/:projectId/generate-script", async (req, res, next): Promise<void> => {
   const projectId = String(req.params.projectId ?? "");
   const userId = userIdOf(res);
@@ -167,7 +192,7 @@ router.post("/projects/:projectId/generate-script", async (req, res, next): Prom
   }
   const sceneCount = Number((req.body as Record<string, unknown> | undefined)?.sceneCount ?? 0);
   const sceneDuration = Number((req.body as Record<string, unknown> | undefined)?.sceneDurationSeconds ?? 0);
-  const summary = `Automatic storyboard generation started. Requested scenes: ${Number.isFinite(sceneCount) ? sceneCount : "unspecified"}; seconds per scene: ${Number.isFinite(sceneDuration) ? sceneDuration : "unspecified"}. The existing generator will rotate through configured text API providers when an eligible provider fails.`;
+  const summary = `Automatic storyboard generation started. Requested scenes: ${Number.isFinite(sceneCount) ? sceneCount : "unspecified"}; seconds per scene: ${Number.isFinite(sceneDuration) ? sceneDuration : "unspecified"}.`;
   await pool.query(
     `INSERT INTO studio_ai_handoffs
       (project_id, user_id, stage, last_completed_step, next_step, summary, completed_steps)
