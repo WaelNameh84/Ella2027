@@ -1,8 +1,7 @@
 """Kaggle queue worker for ELLA VIDEO ENGINE (Wan 2.2 TI2V 5B).
 
 Uses Ella's existing lease/heartbeat/Cloudinary completion protocol.
-The existing API currently labels the lease worker 'kaggle-ltx'; this client
-keeps that compatibility while replacing the generation runtime with ELLA Wan.
+This worker uses the dedicated ELLA Wan 2.2 queue and its own lease stages.
 """
 from __future__ import annotations
 import argparse
