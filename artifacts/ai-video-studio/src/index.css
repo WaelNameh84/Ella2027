@@ -1907,38 +1907,38 @@ a[href]:active,
 .ella-studio-welcome p{max-width:660px;color:#96949a;font-size:13px;line-height:1.8;margin:0}
 .ella-welcome-meta{display:flex;flex-direction:column;align-items:flex-end;gap:9px;white-space:nowrap;color:#77757d;font-size:10px}
 .ella-live-indicator{display:flex;align-items:center;gap:8px;border:1px solid #ffffff12;background:#ffffff06;border-radius:99px;padding:8px 12px;color:#c8c3b9;font-size:9px;font-weight:800;letter-spacing:.1em}
-.ella-composer-zone{position:relative;border:1px solid #ffffff14;border-radius:23px;padding:22px;background:radial-gradient(ellipse at 80% 0%,#c49b5c12,transparent 38%),linear-gradient(145deg,#17181d,#111216 72%);box-shadow:0 24px 70px #0004,inset 0 1px #ffffff08;overflow:hidden}
-.ella-composer-label,.ella-template-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;color:#b6a17f;font-size:10px;font-weight:800;letter-spacing:.12em;margin-bottom:14px}
-.ella-composer-label small,.ella-template-heading small{font-size:9px;color:#696971;letter-spacing:.08em}
-.ella-composer .inline-project-form{border:0!important;background:transparent!important;box-shadow:none!important;padding:0!important;margin:0!important}
-.ella-composer .inline-project-form>.modal-head{display:none!important}
-.ella-composer .form-stack{gap:13px}
-.ella-composer .experience-mode-switch{display:inline-flex;width:max-content;padding:4px;background:#ffffff08;border:1px solid #ffffff12;border-radius:11px;margin-bottom:1px}
-.ella-composer .experience-mode-switch button{padding:8px 15px;border-radius:8px;font-size:11px;color:#96949b}
-.ella-composer .experience-mode-switch button.is-selected{background:linear-gradient(135deg,#d6b477,#a98045);color:#171513;box-shadow:0 4px 15px #bd965333;font-weight:800}
-.ella-composer .quick-idea-entry{display:flex;flex-direction:column;gap:10px}
-.ella-composer .field-label{font-size:11px;color:#c8c3b9;font-weight:700;margin-bottom:8px}
-.ella-composer .quick-idea-input{min-height:156px;max-height:240px;resize:vertical;background:#0c0d11!important;border:1px solid #ffffff16!important;border-radius:16px!important;padding:18px 19px!important;color:#f2eee7!important;font-size:16px!important;line-height:1.85!important;box-shadow:inset 0 2px 12px #0003;outline:none;transition:border-color .2s,box-shadow .2s}
-.ella-composer .quick-idea-input:focus{border-color:#c9a56888!important;box-shadow:0 0 0 3px #c9a56816,inset 0 2px 12px #0003}
-.ella-composer .quick-idea-input::placeholder{color:#66656d}
-.ella-composer .quick-idea-entry .writing-assistant{align-self:flex-start}
-.ella-composer .quick-toolbar{display:grid;grid-template-columns:minmax(0,1fr) minmax(150px,.42fr);gap:12px}
-.ella-composer .quick-toolbar label{min-width:0}
-.ella-composer .quick-toolbar .studio-input,.ella-composer .quick-advanced .studio-input{min-height:42px;background:#111217!important;border:1px solid #ffffff16!important;border-radius:10px!important;color:#e8e3d9!important;font-size:12px}
-.ella-composer [data-testid="button-create-project"]{width:100%;min-height:48px;justify-content:center;border-radius:12px!important;background:linear-gradient(110deg,#e2c38b,#bd9255)!important;color:#171513!important;font-size:13px;font-weight:850;box-shadow:0 8px 28px #bd925522}
-.ella-composer [data-testid="button-create-project"]:hover{filter:brightness(1.08);transform:translateY(-1px)}
-.ella-composer .quick-advanced{border-top:1px solid #ffffff10;padding-top:12px;margin-top:1px}
-.ella-composer .quick-advanced summary{display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;list-style:none;color:#d0c5b4;font-size:11px;font-weight:700}
-.ella-composer .quick-advanced summary::-webkit-details-marker{display:none}
-.ella-composer .quick-advanced summary:after{content:"＋";color:#d3ad70;font-size:16px}
-.ella-composer .quick-advanced[open] summary:after{content:"−"}
-.ella-composer .quick-advanced summary small{color:#77747b;font-size:10px;font-weight:500}
-.ella-composer .quick-advanced[open]>*:not(summary){margin-top:14px}
-.ella-composer .quick-advanced .rotation-row{background:#ffffff05;border:1px solid #ffffff10;border-radius:12px;padding:12px}
-.ella-composer .quick-advanced .service-purpose-hint{background:#ffffff06;border-color:#ffffff10;color:#aaa}
-.ella-composer .quick-advanced .form-two{gap:12px}
-.ella-composer .quick-duration-hint{color:#a99c84;font-size:10px}
-.ella-composer .plan-card,.ella-composer .film-plan-card{background:#14151a;border-color:#ffffff15}
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card-zone{position:relative;border:1px solid #ffffff14;border-radius:23px;padding:22px;background:radial-gradient(ellipse at 80% 0%,#c49b5c12,transparent 38%),linear-gradient(145deg,#17181d,#111216 72%);box-shadow:0 24px 70px #0004,inset 0 1px #ffffff08;overflow:hidden}
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card-label,.ella-template-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;color:#b6a17f;font-size:10px;font-weight:800;letter-spacing:.12em;margin-bottom:14px}
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card-label small,.ella-template-heading small{font-size:9px;color:#696971;letter-spacing:.08em}
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .inline-project-form{border:0!important;background:transparent!important;box-shadow:none!important;padding:0!important;margin:0!important}
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .inline-project-form>.modal-head{display:none!important}
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .form-stack{gap:13px}
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .experience-mode-switch{display:inline-flex;width:max-content;padding:4px;background:#ffffff08;border:1px solid #ffffff12;border-radius:11px;margin-bottom:1px}
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .experience-mode-switch button{padding:8px 15px;border-radius:8px;font-size:11px;color:#96949b}
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .experience-mode-switch button.is-selected{background:linear-gradient(135deg,#d6b477,#a98045);color:#171513;box-shadow:0 4px 15px #bd965333;font-weight:800}
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .quick-idea-entry{display:flex;flex-direction:column;gap:10px}
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .field-label{font-size:11px;color:#c8c3b9;font-weight:700;margin-bottom:8px}
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .quick-idea-input{min-height:156px;max-height:240px;resize:vertical;background:#0c0d11!important;border:1px solid #ffffff16!important;border-radius:16px!important;padding:18px 19px!important;color:#f2eee7!important;font-size:16px!important;line-height:1.85!important;box-shadow:inset 0 2px 12px #0003;outline:none;transition:border-color .2s,box-shadow .2s}
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .quick-idea-input:focus{border-color:#c9a56888!important;box-shadow:0 0 0 3px #c9a56816,inset 0 2px 12px #0003}
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .quick-idea-input::placeholder{color:#66656d}
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .quick-idea-entry .writing-assistant{align-self:flex-start}
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .quick-toolbar{display:grid;grid-template-columns:minmax(0,1fr) minmax(150px,.42fr);gap:12px}
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .quick-toolbar label{min-width:0}
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .quick-toolbar .studio-input,:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .quick-advanced .studio-input{min-height:42px;background:#111217!important;border:1px solid #ffffff16!important;border-radius:10px!important;color:#e8e3d9!important;font-size:12px}
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card [data-testid="button-create-project"]{width:100%;min-height:48px;justify-content:center;border-radius:12px!important;background:linear-gradient(110deg,#e2c38b,#bd9255)!important;color:#171513!important;font-size:13px;font-weight:850;box-shadow:0 8px 28px #bd925522}
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card [data-testid="button-create-project"]:hover{filter:brightness(1.08);transform:translateY(-1px)}
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .quick-advanced{border-top:1px solid #ffffff10;padding-top:12px;margin-top:1px}
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .quick-advanced summary{display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;list-style:none;color:#d0c5b4;font-size:11px;font-weight:700}
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .quick-advanced summary::-webkit-details-marker{display:none}
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .quick-advanced summary:after{content:"＋";color:#d3ad70;font-size:16px}
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .quick-advanced[open] summary:after{content:"−"}
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .quick-advanced summary small{color:#77747b;font-size:10px;font-weight:500}
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .quick-advanced[open]>*:not(summary){margin-top:14px}
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .quick-advanced .rotation-row{background:#ffffff05;border:1px solid #ffffff10;border-radius:12px;padding:12px}
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .quick-advanced .service-purpose-hint{background:#ffffff06;border-color:#ffffff10;color:#aaa}
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .quick-advanced .form-two{gap:12px}
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .quick-duration-hint{color:#a99c84;font-size:10px}
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .plan-card,:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .film-plan-card{background:#14151a;border-color:#ffffff15}
 .ella-template-strip{margin-top:23px;padding-top:18px;border-top:1px solid #ffffff10}
 .ella-template-heading{margin-bottom:12px;color:#aaa6a0}
 .ella-template-options{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
@@ -1996,9 +1996,9 @@ a[href]:active,
 .ella-job-dot{width:6px;height:6px;border-radius:50%;background:#d1a45f;flex:none}
 .ella-job-dot.is-completed{background:#6db78d}.ella-job-dot.is-failed{background:#cb7777}
 .ella-activity-link{white-space:nowrap;color:#c7a36c;font-size:10px}
-@media(max-width:1150px){.ella-studio-home{grid-template-columns:minmax(0,1fr) 270px;gap:15px}.ella-composer-zone{padding:18px}.ella-template-options{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:1150px){.ella-studio-home{grid-template-columns:minmax(0,1fr) 270px;gap:15px}:is(.create-studio-entry, .manual-studio-form) .idea-entry-card-zone{padding:18px}.ella-template-options{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:850px){.ella-studio-home{grid-template-columns:1fr;gap:15px}.ella-studio-main{gap:15px}.ella-studio-rail{display:grid;grid-template-columns:1fr 1fr;padding-top:0}.ella-rail-projects{grid-row:span 2}.ella-studio-welcome{padding-top:4px}.ella-activity-bar{grid-template-columns:1fr auto}.ella-activity-title{grid-column:1/-1}.ella-activity-items{grid-column:1/-1;grid-row:2}.ella-activity-link{grid-column:2;grid-row:1}}
-@media(max-width:560px){.ella-studio-home{padding-top:0;gap:12px}.ella-studio-welcome{align-items:flex-start;flex-direction:column;gap:10px;padding:5px 1px}.ella-studio-welcome h2{font-size:29px;margin:12px 0 6px}.ella-studio-welcome p{font-size:11px;line-height:1.7}.ella-welcome-meta{flex-direction:row;align-items:center;gap:10px;font-size:9px}.ella-live-indicator{padding:6px 9px}.ella-composer-zone{padding:14px 12px;border-radius:17px}.ella-composer-label{font-size:9px}.ella-composer-label small{font-size:8px}.ella-composer .experience-mode-switch{width:100%}.ella-composer .experience-mode-switch button{flex:1}.ella-composer .quick-idea-input{min-height:138px;padding:14px!important;font-size:14px!important}.ella-composer .quick-toolbar{grid-template-columns:1fr 1fr;gap:8px}.ella-composer .quick-toolbar .field-label{font-size:10px}.ella-composer [data-testid="button-create-project"]{min-height:47px}.ella-composer .quick-advanced summary{align-items:flex-start;flex-direction:column;gap:5px}.ella-composer .quick-advanced summary:after{position:absolute;inset-inline-end:16px}.ella-template-options{grid-template-columns:1fr 1fr;gap:7px}.ella-template-options button{justify-content:flex-start;padding:11px 9px;font-size:10px}.ella-trust-line{align-items:flex-start;flex-direction:column;gap:9px;font-size:9px}.ella-studio-rail{grid-template-columns:1fr}.ella-rail-projects{grid-row:auto}.ella-rail-card{padding:14px}.ella-activity-bar{grid-template-columns:1fr auto;padding:12px}.ella-activity-items{flex-direction:column}.ella-activity-items a{max-width:100%}.ella-activity-bar>p{grid-column:1/-1}.ella-activity-link{font-size:9px}}
+@media(max-width:560px){.ella-studio-home{padding-top:0;gap:12px}.ella-studio-welcome{align-items:flex-start;flex-direction:column;gap:10px;padding:5px 1px}.ella-studio-welcome h2{font-size:29px;margin:12px 0 6px}.ella-studio-welcome p{font-size:11px;line-height:1.7}.ella-welcome-meta{flex-direction:row;align-items:center;gap:10px;font-size:9px}.ella-live-indicator{padding:6px 9px}:is(.create-studio-entry, .manual-studio-form) .idea-entry-card-zone{padding:14px 12px;border-radius:17px}:is(.create-studio-entry, .manual-studio-form) .idea-entry-card-label{font-size:9px}:is(.create-studio-entry, .manual-studio-form) .idea-entry-card-label small{font-size:8px}:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .experience-mode-switch{width:100%}:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .experience-mode-switch button{flex:1}:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .quick-idea-input{min-height:138px;padding:14px!important;font-size:14px!important}:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .quick-toolbar{grid-template-columns:1fr 1fr;gap:8px}:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .quick-toolbar .field-label{font-size:10px}:is(.create-studio-entry, .manual-studio-form) .idea-entry-card [data-testid="button-create-project"]{min-height:47px}:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .quick-advanced summary{align-items:flex-start;flex-direction:column;gap:5px}:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .quick-advanced summary:after{position:absolute;inset-inline-end:16px}.ella-template-options{grid-template-columns:1fr 1fr;gap:7px}.ella-template-options button{justify-content:flex-start;padding:11px 9px;font-size:10px}.ella-trust-line{align-items:flex-start;flex-direction:column;gap:9px;font-size:9px}.ella-studio-rail{grid-template-columns:1fr}.ella-rail-projects{grid-row:auto}.ella-rail-card{padding:14px}.ella-activity-bar{grid-template-columns:1fr auto;padding:12px}.ella-activity-items{flex-direction:column}.ella-activity-items a{max-width:100%}.ella-activity-bar>p{grid-column:1/-1}.ella-activity-link{font-size:9px}}
 
 
 /* Manual Studio — focused scene authoring and review-first AI assistance */
@@ -3040,14 +3040,14 @@ a[href]:active,
 
 
 /* Professional settings dropdowns: stable grid, no overlapping popovers */
-.ella-composer .quick-dropdown-toolbar {
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .quick-dropdown-toolbar {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
   gap: 10px;
   width: 100%;
 }
-.ella-composer .quick-dropdown-toolbar .quick-setting-dropdown {
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .quick-dropdown-toolbar .quick-setting-dropdown {
   display: block;
   position: relative;
   min-width: 0;
@@ -3056,7 +3056,7 @@ a[href]:active,
   border-radius: 12px;
   background: linear-gradient(145deg, #171920, #101116);
 }
-.ella-composer .quick-dropdown-toolbar .quick-setting-dropdown > summary {
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .quick-dropdown-toolbar .quick-setting-dropdown > summary {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -3069,14 +3069,14 @@ a[href]:active,
   cursor: pointer;
   list-style: none;
 }
-.ella-composer .quick-dropdown-toolbar .quick-setting-dropdown > summary::-webkit-details-marker {
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .quick-dropdown-toolbar .quick-setting-dropdown > summary::-webkit-details-marker {
   display: none;
 }
-.ella-composer .quick-dropdown-toolbar .quick-setting-dropdown > summary > span {
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .quick-dropdown-toolbar .quick-setting-dropdown > summary > span {
   min-width: 0;
   overflow-wrap: anywhere;
 }
-.ella-composer .quick-dropdown-toolbar .quick-setting-dropdown > summary > b {
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .quick-dropdown-toolbar .quick-setting-dropdown > summary > b {
   min-width: 0;
   max-width: 58%;
   overflow: hidden;
@@ -3087,12 +3087,12 @@ a[href]:active,
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.ella-composer .quick-dropdown-toolbar .quick-setting-dropdown[open] {
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .quick-dropdown-toolbar .quick-setting-dropdown[open] {
   grid-column: 1 / -1;
   border-color: #c9a56877;
   background: #14151b;
 }
-.ella-composer .quick-dropdown-toolbar .quick-dropdown-panel {
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .quick-dropdown-toolbar .quick-dropdown-panel {
   position: static;
   display: block;
   width: 100%;
@@ -3104,26 +3104,26 @@ a[href]:active,
   box-shadow: none;
   z-index: auto;
 }
-.ella-composer .quick-dropdown-toolbar .quick-dropdown-panel label {
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .quick-dropdown-toolbar .quick-dropdown-panel label {
   display: grid;
   gap: 7px;
   width: 100%;
   min-width: 0;
 }
-.ella-composer .quick-dropdown-toolbar .quick-dropdown-panel .studio-input {
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .quick-dropdown-toolbar .quick-dropdown-panel .studio-input {
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
 }
-.ella-composer .quick-dropdown-toolbar .quick-setting-dropdown[open] > summary {
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .quick-dropdown-toolbar .quick-setting-dropdown[open] > summary {
   color: #f0dfbf;
 }
-.ella-composer .quick-composer-bottom {
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .quick-composer-bottom {
   display: grid;
   gap: 12px;
   min-width: 0;
 }
-.ella-composer .quick-duration-hint {
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card .quick-duration-hint {
   display: inline-flex;
   justify-self: start;
   padding: 7px 10px;
@@ -3133,21 +3133,21 @@ a[href]:active,
   background: #c9a5680d;
   font-size: 11px;
 }
-.ella-composer [data-testid="button-split-manual-story"] {
+:is(.create-studio-entry, .manual-studio-form) .idea-entry-card [data-testid="button-split-manual-story"] {
   width: 100%;
   min-height: 48px;
   justify-content: center;
   white-space: normal;
 }
 @media (max-width: 560px) {
-  .ella-composer .quick-dropdown-toolbar {
+  :is(.create-studio-entry, .manual-studio-form) .idea-entry-card .quick-dropdown-toolbar {
     grid-template-columns: minmax(0, 1fr);
     gap: 8px;
   }
-  .ella-composer .quick-dropdown-toolbar .quick-setting-dropdown[open] {
+  :is(.create-studio-entry, .manual-studio-form) .idea-entry-card .quick-dropdown-toolbar .quick-setting-dropdown[open] {
     grid-column: 1;
   }
-  .ella-composer .quick-dropdown-toolbar .quick-setting-dropdown > summary {
+  :is(.create-studio-entry, .manual-studio-form) .idea-entry-card .quick-dropdown-toolbar .quick-setting-dropdown > summary {
     min-height: 49px;
   }
 }
