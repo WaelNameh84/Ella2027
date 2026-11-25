@@ -60,7 +60,7 @@ router.post("/claim", async (_req, res): Promise<void> => {
       const [updated] = await tx.update(studioJobsTable).set({
         status: "running", stage: "kaggle_generating", progress: 5,
         message: "An Ella LTX worker claimed this video job.",
-        input, attempts: candidate.attempts + 1, startedAt: now, updatedAt: now,
+        input, attempts: candidate.attempts + 1, startedAt: candidate.startedAt ?? now, updatedAt: now,
       }).where(eq(studioJobsTable.id, candidate.id)).returning();
       return updated ?? null;
     });
