@@ -1095,7 +1095,9 @@ function Projects({ homePage = false, manualPage = false, createPage = false }: 
   const runAutoFilm = async (projectId: string, sceneCount: number, sceneDurationSeconds: number, sceneStyle: string, useScriptProvider: boolean, reviewBeforeRendering = false, autoScenePlan = false, autoProductionSettings = false) => {
     setAutoFilmRunning(true);
     const keys = keysQuery.data || [];
-    const videoKey = keys.find(key => key.enabled && key.serviceType === 'video' && providerSupports(key.provider, 'video') && providerKeyIsUsable(key.provider, key.status));
+    const readyVideoKey = (key: ProviderKey) => key.enabled && key.serviceType === 'video' && providerSupports(key.provider, 'video') && providerKeyIsUsable(key.provider, key.status, key.cooldownUntil);
+    const localVideoKey = keys.find(key => key.provider === 'local-video-worker' && readyVideoKey(key));
+    const videoKey = (settingsQuery.data?.freeMode ? localVideoKey : undefined) || keys.find(readyVideoKey);
     if (!videoKey && !reviewBeforeRendering) {
       const configuredVideo = keys.filter(key => key.enabled && key.serviceType === 'video');
       const detail = configuredVideo.length ? tx(lang, `المفاتيح موجودة لكن غير جاهزة: ${configuredVideo.map(key => `${key.label} (${key.status})`).join('، ')}. اختبر المفتاح من الإعدادات أولًا.`, `Video keys exist but are not ready: ${configuredVideo.map(key => `${key.label} (${key.status})`).join(', ')}. Test the key in Settings first.`) : tx(lang, 'لا يوجد مفتاح فيديو مفعّل. أضف مزوّد فيديو من الإعدادات.', 'No enabled video provider found. Add a video provider in Settings.');
@@ -1249,7 +1251,17 @@ function Projects({ homePage = false, manualPage = false, createPage = false }: 
     try {
       for (const [index, seed] of seeds.entries()) await createScene.mutateAsync({ projectId: project.id, data: { ...seed, sortOrder: index } });
       afterChange();
-      if (allowExternalProviders === true) {
+      const readyLocalVideoWorker = (keysQuery.data ?? []).some(key =>
+        key.provider === 'local-video-worker'
+        && key.enabled
+        && key.serviceType === 'video'
+        && providerSupports(key.provider, 'video')
+        && providerKeyIsUsable(key.provider, key.status, key.cooldownUntil),
+      );
+      // Quick's no-text-API fallback must still enqueue every saved scene when
+      // the user's local GPU worker is configured. The worker claims one job
+      // at a time; the remaining scene jobs stay queued in storyboard order.
+      if (allowExternalProviders === true || readyLocalVideoWorker) {
         setCreatedProjectId(project.id);
         void runAutoFilm(project.id, sceneCount, sceneDurationSeconds, data.visualStyle || 'Cinematic', false, reviewBeforeRendering).catch(error => {
           setAutoFilmRunning(false);
