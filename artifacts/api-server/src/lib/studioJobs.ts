@@ -20,7 +20,7 @@ import {
   type ProviderStatus,
 } from "./providerRegistry";
 import { renderMp4 } from "./videoExport";
-import { convertImageToWebp, downloadPublicHttps, generateNarration, generateStill, generateVideo, isProviderCallError } from "./mediaGeneration";
+import { convertImageToWebp, downloadPublicHttps, generateNarration, generateStill, generateVideo, isProviderCallError, trimGeneratedVideo } from "./mediaGeneration";
 import { isCloudinaryStorageEnabled, readGeneratedAsset, saveGeneratedAsset, validateUploadedImage } from "./studioAssets";
 import { isZeroSpendMode, ZERO_SPEND_ERROR } from "./spendingGuard";
 import { createTestImage, createTestWav } from "./freeTestProvider";
@@ -935,7 +935,7 @@ async function processVideoJob(job: typeof studioJobsTable.$inferSelect): Promis
       message: "Generating a video clip. The provider may take several minutes.",
     });
     const requestedModel = input.model?.trim() ?? "";
-    const video = await callMediaProvider(job, "video", input.providerKeyId, "provider_request", (provider, key) => {
+    const generatedVideo = await callMediaProvider(job, "video", input.providerKeyId, "provider_request", (provider, key) => {
       const falDefault = input.mode === "image"
         ? "minimax/h3-max/image-to-video"
         : "minimax/h3-max/text-to-video";
@@ -959,6 +959,7 @@ async function processVideoJob(job: typeof studioJobsTable.$inferSelect): Promis
         project.aspectRatio,
       );
     });
+    const video = await trimGeneratedVideo(generatedVideo, scene.durationSeconds);
     const savedAsset = await saveGeneratedAsset(project.id, scene.id, "video", video);
     assets = [{
       id: savedAsset.id,
