@@ -3106,16 +3106,20 @@ function ToolsPage() {
 
 function AccountSettingsPage() {
   const { lang } = useApp();
+  const { signOut } = useClerk();
   return <AppFrame title={tx(lang, 'إعدادات الحساب', 'Account settings')} crumb={tx(lang, 'الملف الشخصي والأمان', 'PROFILE & SECURITY')}>
-    <div className="page-toolbar">
-      <div>
-        <span className="eyebrow">{tx(lang, 'حسابك في مشهد', 'YOUR MASHAHED ACCOUNT')}</span>
-        <h2>{tx(lang, 'أدر ملفك الشخصي وأمان حسابك.', 'Manage your profile and account security.')}</h2>
-        <p>{tx(lang, 'تُدار بيانات الدخول والأمان مباشرةً عبر خدمة تسجيل الدخول الآمنة.', 'Your sign-in details and account security are managed by the secure sign-in service.')}</p>
+    <section className="account-settings-head panel">
+      <div className="account-settings-copy">
+        <span className="eyebrow">{tx(lang, 'حسابك في مشهد', 'YOUR MASHAHAD ACCOUNT')}</span>
+        <h2>{tx(lang, 'ملفك الشخصي وإعدادات الأمان', 'Your profile and security settings')}</h2>
+        <p>{tx(lang, 'حدّث بياناتك الشخصية والبريد وكلمة المرور من هنا.', 'Update your personal details, email address, and password here.')}</p>
       </div>
-    </div>
+      <button className="btn btn-danger account-signout" onClick={() => signOut({ redirectUrl: basePath || '/' })} data-testid="button-account-signout">
+        <LogOut size={16}/>{tx(lang, 'تسجيل الخروج', 'Sign out')}
+      </button>
+    </section>
     <section className="account-profile-wrap" aria-label={tx(lang, 'الملف الشخصي', 'User profile')}>
-      <UserProfile routing="path" path={`${basePath}/settings/account`} />
+      <UserProfile routing="hash" />
     </section>
   </AppFrame>;
 }
@@ -3358,7 +3362,7 @@ function AdminDashboard() {
   return <AppFrame title={t('إدارة الاستوديو', 'Studio administration')} crumb={t('مساحة المالك', 'OWNER WORKSPACE')}>
     {access.isLoading ? <div className="admin-loading"><SkeletonBlock className="h-28" /><SkeletonBlock className="h-48" /><SkeletonBlock className="h-64" /></div>
       : access.isError ? <StateError lang={lang} retry={() => void access.refetch()} />
-      : !isAdmin ? <section className="admin-denied panel" data-testid="status-admin-denied"><div className="admin-denied-mark"><Shield size={22}/></div><span className="eyebrow">{t('الوصول مقيّد', 'RESTRICTED AREA')}</span><h2>{t('هذه المساحة للمسؤولين فقط.', 'This workspace is for administrators only.')}</h2><p>{t('لم يتم عرض أي بيانات إدارية. إذا كنت تعتقد أن هذا خطأ، تواصل مع مالك الاستوديو.', 'No administrative data was loaded. If you believe this is a mistake, contact the studio owner.')}</p></section>
+      : !isAdmin ? <section className="admin-denied panel" data-testid="status-admin-denied"><div className="admin-denied-mark"><Shield size={22}/></div><span className="eyebrow">{t('الوصول مقيّد', 'RESTRICTED AREA')}</span><h2>{t('هذه المساحة للمسؤولين فقط.', 'This workspace is for administrators only.')}</h2><p>{t('لم يتم منح حسابك صلاحية المالك بعد. يجب أن يطابق بريد تسجيل الدخول الموثّق قيمة STUDIO_INITIAL_ADMIN_EMAIL في إعدادات Render حرفيًا. بعد ضبطه، أعد المحاولة.', 'This account has not been granted owner access yet. Your verified sign-in email must exactly match STUDIO_INITIAL_ADMIN_EMAIL in Render. Once configured, retry.')}</p><button className="btn btn-quiet mt-4" onClick={() => void access.refetch()}>{t('إعادة فحص الصلاحية', 'Check access again')}</button></section>
       : <div className="admin-page">
         <div className="admin-intro">
           <div><span className="eyebrow"><span className="signal-dot" />{t('مركز المراقبة', 'STUDIO CONTROL ROOM')}</span><h2>{t('كل شيء في مكانه.', 'A clear view of the studio.')}</h2><p>{t('راقب الوصول، استقرار الخدمات، وسير المعالجة من لوحة واحدة.', 'Monitor access, provider health, and processing reliability from one place.')}</p></div>
