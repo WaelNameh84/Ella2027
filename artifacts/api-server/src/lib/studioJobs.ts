@@ -65,6 +65,7 @@ type JobInput = {
   sceneCount?: number;
   sceneDurationSeconds?: number;
   sceneStyle?: string;
+  autoScenePlan?: boolean;
   story?: string;
   autoGenerateVideo?: boolean;
   videoProviderKeyId?: string | null;
@@ -387,16 +388,25 @@ async function processScriptJob(job: typeof studioJobsTable.$inferSelect): Promi
       `Language: ${project.language}`,
       `Audience: ${project.audience}`,
       `Visual style: ${project.visualStyle}`,
-      `Requested scene count: ${input.sceneCount ?? 6} scenes`,
-      `Exact duration for every scene: ${input.sceneDurationSeconds ?? 8} seconds`,
+      input.autoScenePlan
+        ? "AI SCENE PLAN: Choose the number of scenes yourself (between 2 and 24) from the actual story beats, not from a preset. Choose a suitable duration for each scene (normally 4–12 seconds, longer only when the action needs it). Preserve all important events and the ending. Aim for a coherent total runtime near the target duration, but story structure takes priority. Return the chosen scene count and each scene's own durationSeconds."
+        : `Requested scene count: exactly ${input.sceneCount ?? 6} scenes`,
+      input.autoScenePlan
+        ? `Target total duration: approximately ${project.durationSeconds} seconds; choose individual scene durations based on the action.`
+        : `Exact duration for every scene: ${input.sceneDurationSeconds ?? 8} seconds`,
       `Scene direction: ${input.sceneStyle ?? (project.visualStyle || "Cinematic")}`,
       `Target duration: ${project.durationSeconds} seconds`,
-      `Return exactly ${input.sceneCount ?? 6} scenes. Set durationSeconds to exactly ${input.sceneDurationSeconds ?? 8} for every scene.`,
-      "Create a character bible with stable IDs and fixed facial identity, age, hair, build, costume, palette and voice identity. Assign characterIds to each scene. Keep character, prop, location and timeline continuity across the whole film. Every scene must contain a clear shot type, camera movement, location, lighting, action, speaker-labelled dialogue/narration, and sound design notes. Internally plan multiple short visual beats per scene so the video worker can split long scenes to the model's clip limit without losing story continuity.",
+      input.autoScenePlan
+        ? "Do not force equal-length scenes. Return 2–24 scenes, each with a durationSeconds value appropriate to its narrative beat."
+        : `Return exactly ${input.sceneCount ?? 6} scenes. Set durationSeconds to exactly ${input.sceneDurationSeconds ?? 8} for every scene.`,
+      "CHARACTER IDENTITY LOCK: Build a reusable character bible with one stable ID per person and highly specific immutable visual identity: apparent age, face shape, eye shape/color, skin tone, nose, hairline/style/color, body proportions, distinguishing marks, fixed base costume, footwear, accessories, and exact color palette. Define a stable voice identity (language, accent, pitch, timbre, speaking rhythm). Reuse the exact same identity and costume in every scene unless the story explicitly changes clothing. Assign only valid characterIds to each scene. For every scene imagePrompt, repeat the assigned character's exact visual identity and costume in a dedicated CHARACTER LOCK sentence; do not use vague phrases such as 'same person'. Expressions, pose, camera angle and lighting may change; facial identity and defining traits must not. Keep props, injuries, wetness, dirt, costume damage, geography and timeline continuous. Every scene must contain shot type, camera movement, location, lighting, action, speaker-labelled dialogue/narration, and sound design notes. Internally plan short visual beats so the video worker can split long scenes without losing continuity.",
       "CRITICAL SCENE UNIQUENESS: Every requested scene must depict a different next event in the story. Never copy or paraphrase another scene's description or imagePrompt. Give every scene its own distinct physical action, composition, camera framing or movement, and visual beat while preserving character identity and chronological continuity. Scene 1 must not be repeated in scenes 2 onward. The imagePrompt must describe only that scene, not a generic film-wide prompt.",
       input.story?.trim()
-        ? "Treat the Concept as a complete source story. Preserve the main events, order, tone, characters, relationships, and ending. Divide it into the exact requested number of scenes without changing the plot. Enrich each scene with detailed action, setting, character continuity, cinematic direction, and dialogue. Put complete speaker-labeled dialogue plus any narrator voiceover in the narration field, and include suitable sound-effect suggestions in the scene description. Return the fixed character bible so the same characters remain consistent across all scenes."
-        : "Use 1 to 24 scenes. Create 1 to 8 recurring character profiles, and refer to them by their stable IDs. Keep each character's face, age, hair, body, costume, palette, and environment consistent across every scene. Make each image prompt include only the relevant character profile details, shot size, camera movement, lens feel, location, lighting, and composition. Write narration in the selected language and keep scene durations close to the target total.",
+        ? input.autoScenePlan
+          ? "Treat the Concept as the complete source story. Preserve every important event, chronological order, tone, character relationship and the original ending. Split it into a natural number of scenes based on meaningful changes of action, place, time or dramatic beat; do not impose an equal or preset scene count. Choose a duration for each scene that fits its action."
+          : "Treat the Concept as the complete source story. Preserve the main events, order, tone, characters, relationships, and ending. Divide it into exactly the requested number of scenes without changing the plot."
+        : "Create 1 to 8 recurring character profiles and refer to them by stable IDs. Keep each character's face, age, hair, body, costume, palette, voice and defining features identical across every scene. Make every image prompt repeat the relevant character's full fixed identity, plus scene-specific action, shot size, camera movement, lens feel, location, lighting and composition. Write dialogue and narration in the selected language.",
+      "If a story contains several characters, never merge them or change their names. Character descriptions must be concrete enough to recreate the same person in a separate generation. Do not put conflicting wardrobe or facial details in different scenes.",
     ].join("\n");
 
     let lastError = "All configured providers failed.";
@@ -414,7 +424,23 @@ async function processScriptJob(job: typeof studioJobsTable.$inferSelect): Promi
       }
       try {
         const response = await generateWithProvider(keyRow.provider, key, prompt);
-        const parsed = parseGeneratedJson(response);
+        const parsedResponse = parseGeneratedJson(response);
+        const characterById = new Map(parsedResponse.characters.map((character) => [character.id, character]));
+        const parsed: ScriptResult = {
+          ...parsedResponse,
+          scenes: parsedResponse.scenes.map((scene) => {
+            const assigned = scene.characterIds.filter((id) => characterById.has(id));
+            const locks = assigned.map((id) => {
+              const character = characterById.get(id)!;
+              return `LOCKED CHARACTER ${character.id} — ${character.name}: ${character.description} Fixed costume: ${character.costume}. Preserve this exact face, hair, age, body proportions and color palette; only pose, expression and camera angle may change.`;
+            });
+            return {
+              ...scene,
+              characterIds: assigned,
+              imagePrompt: [scene.imagePrompt, ...locks].join("\\n"),
+            };
+          }),
+        };
         const continuity = auditSceneContinuity(
           parsed.scenes.map((scene, index) => ({
             sceneId: `scene-${index + 1}`,
@@ -430,14 +456,16 @@ async function processScriptJob(job: typeof studioJobsTable.$inferSelect): Promi
           throw new Error(`Storyboard continuity check failed: ${blockingContinuity[0].message}`);
         }
         const expectedSceneCount = input.sceneCount ?? 6;
-        if (parsed.scenes.length !== expectedSceneCount) {
+        if (!input.autoScenePlan && parsed.scenes.length !== expectedSceneCount) {
           throw new Error(`Generated scene count mismatch: expected ${expectedSceneCount}, received ${parsed.scenes.length}.`);
         }
         generated = {
           ...parsed,
           scenes: parsed.scenes.map((scene) => ({
             ...scene,
-            durationSeconds: input.sceneDurationSeconds ?? 8,
+            durationSeconds: input.autoScenePlan
+              ? scene.durationSeconds
+              : input.sceneDurationSeconds ?? 8,
           })),
         };
         await db.transaction(async (tx) => {
@@ -584,9 +612,11 @@ async function processScriptJob(job: typeof studioJobsTable.$inferSelect): Promi
       console.info(`[studio] Queued ${queuedVideoJobs} video jobs for ${orderedScenes.length} storyboard scenes in order.`);
     }
 
+    const actualDuration = generated!.scenes.reduce((total, scene) => total + scene.durationSeconds, 0);
     await tx.update(projectsTable).set({
       status: "editing",
       progress: 45,
+      durationSeconds: Math.max(5, Math.min(3600, actualDuration)),
       characters: generated!.characters,
     })
       .where(and(eq(projectsTable.id, project.id), eq(projectsTable.userId, job.userId)));
