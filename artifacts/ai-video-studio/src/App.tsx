@@ -1973,6 +1973,16 @@ function ExportActions({ projectId, lang }: { projectId: string; lang: Lang }) {
   return <div className="flex flex-wrap gap-2 mt-3"><button className="btn btn-primary" onClick={() => void downloadVideo()} disabled={sharing}><ArrowDown size={15}/>{tx(lang, 'تنزيل على الهاتف', 'Download to phone')}</button><button className="btn btn-quiet" onClick={() => void share()} disabled={sharing}><Share2 size={15}/>{sharing ? tx(lang, 'جارٍ تجهيز المشاركة…', 'Preparing share…') : tx(lang, 'إرسال / مشاركة', 'Send / Share')}</button>{message && <small className="provider-message" role="status">{message}</small>}</div>;
 }
 
+function formatJobElapsed(milliseconds: number, lang: Lang): string {
+  const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours) return tx(lang, `${hours} س ${minutes} د ${seconds} ث`, `${hours}h ${minutes}m ${seconds}s`);
+  if (minutes) return tx(lang, `${minutes} د ${seconds} ث`, `${minutes}m ${seconds}s`);
+  return tx(lang, `${seconds} ث`, `${seconds}s`);
+}
+
 function estimateJobRemaining(job: StudioJob): string | null {
   if (!job.startedAt || job.progress < 5 || job.progress >= 100 || job.status !== 'running') return null;
   const elapsed = Date.now() - new Date(job.startedAt).getTime();
@@ -1986,10 +1996,20 @@ function estimateJobRemaining(job: StudioJob): string | null {
 function JobCard({ job, lang, retrying, onRetry }: { job: StudioJob; lang: Lang; retrying: boolean; onRetry: () => void }) {
   const typeLabel = tx(lang,({script:'سيناريو وStoryboard',export:'تصدير فيديو',image:'توليد صورة',video:'توليد فيديو',voice:'توليد صوت'})[job.jobType],({script:'Script and storyboard',export:'Video export',image:'Image generation',video:'Video generation',voice:'Voice generation'})[job.jobType]);
   const statusLabel = tx(lang,job.status==='queued'?'في الانتظار':job.status==='running'?'قيد التنفيذ':job.status==='completed'?'مكتملة':'فشلت',job.status);
+  const started = job.startedAt ? new Date(job.startedAt) : null;
+  const ended = job.completedAt ? new Date(job.completedAt) : null;
+  const elapsedMs = started ? Math.max(0, (ended ?? new Date()).getTime() - started.getTime()) : null;
+  const validElapsed = elapsedMs !== null && Number.isFinite(elapsedMs);
+  const locale = lang === 'ar' ? 'ar' : 'en';
   return <article className="job-card panel"><div className="job-progress-head"><div><b>{typeLabel}</b><span className={`job-state job-${job.status}`}>{statusLabel}</span></div><Link className="text-link" href={`/projects/${job.projectId}`}>{tx(lang,'فتح المشروع','Open project')}<ArrowLeft size={14}/></Link></div>
     {(job.status==='queued'||job.status==='running')&&<><div className="job-progress-label"><b>{Math.max(0,Math.min(100,job.progress))}%</b><span>{job.status==='queued'?tx(lang,'بانتظار بدء التنفيذ','Waiting to start'):estimateJobRemaining(job)?tx(lang,`متبقي تقريبًا ${estimateJobRemaining(job)}`,`About ${estimateJobRemaining(job)} remaining`):tx(lang,'جارٍ حساب الوقت المتبقي…','Estimating remaining time…')}</span></div><div className="job-progress-track"><span style={{width:`${Math.max(0,Math.min(100,job.progress))}%`}}/></div></>}
     {job.status==='completed'&&<div className="job-progress-label is-complete"><b>100%</b><span>{tx(lang,'اكتملت المهمة','Job completed')}</span></div>}
-    <div className="job-card-meta"><span>{job.message}</span><time>{new Date(job.createdAt).toLocaleString(lang==='ar'?'ar':'en')}</time></div>
+    <div className="job-card-meta"><span>{job.message}</span><time>{new Date(job.createdAt).toLocaleString(locale)}</time></div>
+    <div className="job-card-meta job-card-timing">
+      <span>{tx(lang,'بدأ التوليد','Started')}: {started ? started.toLocaleString(locale) : tx(lang,'لم يبدأ بعد','Not started')}</span>
+      <span>{tx(lang,'انتهى التوليد','Finished')}: {ended ? ended.toLocaleString(locale) : job.status === 'running' ? tx(lang,'قيد التنفيذ','In progress') : tx(lang,'—','—')}</span>
+      {validElapsed && <span>{tx(lang,'المدة','Duration')}: <b>{formatJobElapsed(elapsedMs!, lang)}</b></span>}
+    </div>
     {job.error&&<ErrorRecoveryPanel compact lang={lang} message={job.error}/>}
     {job.status==='completed'&&job.jobType==='export'&&<ExportActions projectId={job.projectId} lang={lang}/>}
     {job.status==='failed'&&<button className="btn btn-quiet mt-3" onClick={onRetry} disabled={retrying}><Clock3 size={15}/>{retrying?tx(lang,'جارٍ الإرسال...','Retrying...'):tx(lang,'إعادة المحاولة','Retry')}</button>}
