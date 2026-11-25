@@ -3037,3 +3037,117 @@ a[href]:active,
     animation: none;
   }
 }
+
+
+/* Professional settings dropdowns: stable grid, no overlapping popovers */
+.ella-composer .quick-dropdown-toolbar {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 10px;
+  width: 100%;
+}
+.ella-composer .quick-dropdown-toolbar .quick-setting-dropdown {
+  display: block;
+  position: relative;
+  min-width: 0;
+  overflow: visible;
+  border: 1px solid #ffffff18;
+  border-radius: 12px;
+  background: linear-gradient(145deg, #171920, #101116);
+}
+.ella-composer .quick-dropdown-toolbar .quick-setting-dropdown > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 54px;
+  padding: 10px 12px;
+  color: #aaa7a0;
+  font-size: 11px;
+  line-height: 1.4;
+  cursor: pointer;
+  list-style: none;
+}
+.ella-composer .quick-dropdown-toolbar .quick-setting-dropdown > summary::-webkit-details-marker {
+  display: none;
+}
+.ella-composer .quick-dropdown-toolbar .quick-setting-dropdown > summary > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.ella-composer .quick-dropdown-toolbar .quick-setting-dropdown > summary > b {
+  min-width: 0;
+  max-width: 58%;
+  overflow: hidden;
+  color: #e9d5ad;
+  font-size: 11px;
+  font-weight: 750;
+  text-align: end;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ella-composer .quick-dropdown-toolbar .quick-setting-dropdown[open] {
+  grid-column: 1 / -1;
+  border-color: #c9a56877;
+  background: #14151b;
+}
+.ella-composer .quick-dropdown-toolbar .quick-dropdown-panel {
+  position: static;
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 0 12px 13px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  z-index: auto;
+}
+.ella-composer .quick-dropdown-toolbar .quick-dropdown-panel label {
+  display: grid;
+  gap: 7px;
+  width: 100%;
+  min-width: 0;
+}
+.ella-composer .quick-dropdown-toolbar .quick-dropdown-panel .studio-input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.ella-composer .quick-dropdown-toolbar .quick-setting-dropdown[open] > summary {
+  color: #f0dfbf;
+}
+.ella-composer .quick-composer-bottom {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.ella-composer .quick-duration-hint {
+  display: inline-flex;
+  justify-self: start;
+  padding: 7px 10px;
+  border: 1px solid #c9a56835;
+  border-radius: 9px;
+  color: #e5c995;
+  background: #c9a5680d;
+  font-size: 11px;
+}
+.ella-composer [data-testid="button-split-manual-story"] {
+  width: 100%;
+  min-height: 48px;
+  justify-content: center;
+  white-space: normal;
+}
+@media (max-width: 560px) {
+  .ella-composer .quick-dropdown-toolbar {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+  .ella-composer .quick-dropdown-toolbar .quick-setting-dropdown[open] {
+    grid-column: 1;
+  }
+  .ella-composer .quick-dropdown-toolbar .quick-setting-dropdown > summary {
+    min-height: 49px;
+  }
+}
