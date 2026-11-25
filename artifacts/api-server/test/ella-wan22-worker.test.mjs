@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 
 test("ELLA Wan 2.2 has an isolated queue and Kaggle worker endpoint", async () => {
-  const root = new URL("../../../", import.meta.url);
   const [index, generation, jobs, route, worker] = await Promise.all([
     fs.readFile(new URL("../src/routes/index.ts", import.meta.url), "utf8"),
     fs.readFile(new URL("../src/routes/generation.ts", import.meta.url), "utf8"),
