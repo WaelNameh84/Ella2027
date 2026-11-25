@@ -1,6 +1,6 @@
 import { and, asc, eq } from "drizzle-orm";
 import { Router, type IRouter, type Response } from "express";
-import { db, projectsTable, providerKeysTable } from "@workspace/db";
+import { db, pool, projectsTable, providerKeysTable } from "@workspace/db";
 import { providerCredentialUsable, type ProviderStatus } from "../lib/providerRegistry";
 
 const router: IRouter = Router();
@@ -40,11 +40,11 @@ router.get("/ai-team/projects/:projectId/state", async (req, res): Promise<void>
     res.status(404).json({ error: "Project not found." });
     return;
   }
-  const result = await db.execute(
+  const result = await pool.query(
     `SELECT * FROM studio_ai_handoffs WHERE project_id = $1 AND user_id = $2 LIMIT 1`,
     [projectId, userId],
   );
-  const rows = (result as unknown as { rows?: Record<string, unknown>[] }).rows ?? [];
+  const rows = result.rows as Record<string, unknown>[];
   res.json({ state: safeState(rows[0]) });
 });
 
@@ -67,7 +67,7 @@ router.put("/ai-team/projects/:projectId/checkpoint", async (req, res): Promise<
     res.status(400).json({ error: "stage and summary are required to save a handoff checkpoint." });
     return;
   }
-  const result = await db.execute(
+  const result = await pool.query(
     `INSERT INTO studio_ai_handoffs
       (project_id, user_id, current_provider, stage, last_completed_step, next_step, summary, completed_steps, artifacts)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb)
@@ -85,7 +85,7 @@ router.put("/ai-team/projects/:projectId/checkpoint", async (req, res): Promise<
      RETURNING *`,
     [projectId, userId, currentProvider, stage, lastCompletedStep, nextStep, summary, JSON.stringify(completedSteps), JSON.stringify(artifacts)],
   );
-  const rows = (result as unknown as { rows?: Record<string, unknown>[] }).rows ?? [];
+  const rows = result.rows as Record<string, unknown>[];
   if (!rows[0]) {
     res.status(409).json({ error: "Could not update the project handoff state." });
     return;
