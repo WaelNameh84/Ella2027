@@ -1,6 +1,6 @@
 import { and, asc, eq } from "drizzle-orm";
 import { Router, type IRouter, type Response } from "express";
-import { db, pool, projectsTable, providerKeysTable } from "@workspace/db";
+import { db, pool, projectsTable, providerKeysTable, studioJobsTable } from "@workspace/db";
 import { providerCredentialUsable, type ProviderStatus } from "../lib/providerRegistry";
 
 const router: IRouter = Router();
@@ -242,6 +242,135 @@ router.post("/projects/:projectId/generate-script", async (req, res, next): Prom
     ).catch(() => undefined);
   });
   next();
+});
+
+
+/**
+ * Accept a storyboard generated in the user's browser through Puter.js.
+ * No server-side provider key is required. The normal durable script worker
+ * saves all scenes and, when configured, queues one video job per scene.
+ */
+router.post("/ai-team/projects/:projectId/submit-storyboard", async (req, res): Promise<void> => {
+  const projectId = String(req.params.projectId ?? "");
+  const userId = userIdOf(res);
+  const [project] = await db.select().from(projectsTable)
+    .where(and(eq(projectsTable.id, projectId), eq(projectsTable.userId, userId))).limit(1);
+  if (!project) {
+    res.status(404).json({ error: "Project not found." });
+    return;
+  }
+
+  const body = req.body as Record<string, unknown>;
+  const rawScenes = body.scenes;
+  const rawCharacters = body.characters;
+  if (!Array.isArray(rawScenes) || rawScenes.length < 1 || rawScenes.length > 24) {
+    res.status(400).json({ error: "The storyboard must contain between 1 and 24 scenes." });
+    return;
+  }
+  const characters = Array.isArray(rawCharacters) ? rawCharacters.slice(0, 8).map((value, index) => {
+    const item = value && typeof value === "object" ? value as Record<string, unknown> : {};
+    const field = (key: string, max: number, fallback = "") =>
+      (typeof item[key] === "string" ? String(item[key]).trim() : fallback).slice(0, max);
+    return {
+      id: field("id", 100, `character-${index + 1}`),
+      name: field("name", 160, `Character ${index + 1}`),
+      description: field("description", 4000),
+      costume: field("costume", 2000),
+      voiceDescription: field("voiceDescription", 1000),
+      referenceImageUrl: null,
+    };
+  }).filter((character) => character.name) : [];
+
+  const scenes = rawScenes.map((value, index) => {
+    const item = value && typeof value === "object" ? value as Record<string, unknown> : {};
+    const field = (key: string, max: number) =>
+      typeof item[key] === "string" ? String(item[key]).trim().slice(0, max) : "";
+    const duration = Number(item.durationSeconds);
+    const characterIds = Array.isArray(item.characterIds)
+      ? item.characterIds.filter((id): id is string => typeof id === "string").slice(0, 8)
+      : [];
+    return {
+      title: field("title", 160),
+      description: field("description", 6000),
+      imagePrompt: field("imagePrompt", 6000),
+      narration: field("narration", 6000),
+      durationSeconds: Number.isFinite(duration) ? Math.min(600, Math.max(1, Math.round(duration))) : 0,
+      shotType: field("shotType", 120) || "medium",
+      cameraMovement: field("cameraMovement", 160) || "slow push-in",
+      location: field("location", 500) || "Unspecified location",
+      lighting: field("lighting", 500) || "Cinematic lighting",
+      characterIds,
+    };
+  });
+  const invalidScene = scenes.findIndex((scene) =>
+    !scene.title || !scene.description || !scene.imagePrompt || scene.durationSeconds < 1,
+  );
+  if (invalidScene >= 0) {
+    res.status(400).json({ error: `Scene ${invalidScene + 1} is incomplete. No scenes were queued.` });
+    return;
+  }
+
+  const videoProviderKeyId = typeof body.videoProviderKeyId === "string" ? body.videoProviderKeyId : "";
+  const videoModel = typeof body.videoModel === "string" ? body.videoModel.trim().slice(0, 200) : "";
+  const autoGenerateVideo = body.autoGenerateVideo === true;
+  let videoKey: typeof providerKeysTable.$inferSelect | undefined;
+  if (autoGenerateVideo) {
+    if (!videoProviderKeyId || !videoModel || body.approveVideoCharges !== true) {
+      res.status(400).json({ error: "Choose a saved video worker/model and confirm video generation." });
+      return;
+    }
+    const [found] = await db.select().from(providerKeysTable).where(and(
+      eq(providerKeysTable.id, videoProviderKeyId),
+      eq(providerKeysTable.userId, userId),
+      eq(providerKeysTable.serviceType, "video"),
+      eq(providerKeysTable.enabled, true),
+    )).limit(1);
+    const supported = ["replicate", "fal", "agnes", "magic-hour", "local-video-worker"];
+    if (!found || !supported.includes(found.provider)
+      || !providerCredentialUsable(found.provider, found.status as ProviderStatus)
+      || (found.cooldownUntil && found.cooldownUntil.getTime() > Date.now())) {
+      res.status(409).json({ error: "The saved video provider is unavailable or cooling down. Select another enabled provider." });
+      return;
+    }
+    videoKey = found;
+  }
+
+  const existingScenes = await db.select({ id: projectsTable.id }).from(projectsTable)
+    .where(and(eq(projectsTable.id, projectId), eq(projectsTable.userId, userId))).limit(1);
+  if (!existingScenes.length) {
+    res.status(404).json({ error: "Project not found." });
+    return;
+  }
+  const [job] = await db.insert(studioJobsTable).values({
+    userId,
+    projectId,
+    jobType: "script",
+    input: {
+      approvePotentialCharges: true,
+      allowRotation: false,
+      sceneCount: scenes.length,
+      sceneDurationSeconds: scenes[0].durationSeconds,
+      autoGenerateVideo,
+      ...(autoGenerateVideo && videoKey ? {
+        videoProviderKeyId: videoKey.id,
+        videoModel,
+        approveVideoCharges: true,
+      } : {}),
+    },
+    result: { scenes, characters },
+    message: "Puter storyboard received. Preparing every scene in order.",
+  }).returning();
+  await db.update(projectsTable).set({ status: "scripting", progress: 5 })
+    .where(and(eq(projectsTable.id, projectId), eq(projectsTable.userId, userId)));
+  res.status(202).json({
+    id: job.id,
+    projectId: job.projectId,
+    jobType: job.jobType,
+    status: job.status,
+    stage: job.stage,
+    progress: job.progress,
+    message: job.message,
+  });
 });
 
 export default router;
