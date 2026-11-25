@@ -6,11 +6,13 @@ on:
       - feature/ella-wan22-engine
     paths:
       - "services/ella-wan-engine/**"
+      - "services/kaggle-wan22-worker/**"
       - "notebooks/ELLA_WAN_ENGINE_KAGGLE.ipynb"
       - ".github/workflows/ella-wan-engine-tests.yml"
   pull_request:
     paths:
       - "services/ella-wan-engine/**"
+      - "services/kaggle-wan22-worker/**"
       - "notebooks/ELLA_WAN_ENGINE_KAGGLE.ipynb"
 
 jobs:
