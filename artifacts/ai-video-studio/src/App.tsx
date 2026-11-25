@@ -667,7 +667,7 @@ function buildFreeTemplateScenes(templateId:string,idea:string,lang:Lang,visualS
   const ar=lang==='ar';
   const explicitScenes=extractExplicitSceneBeats(idea);
   if(explicitScenes.length){
-    const firstHeading=/(?:^|\\n)\\s*(?:المشهد|مشهد|scene)\\s*(?:\\d+|الأول|الثاني|الثالث|الرابع|الخامس|السادس)?/i.exec(idea);
+    const firstHeading=/(?:^|\n)\s*(?:المشهد|مشهد|scene)\s*(?:\d+|الأول|الثاني|الثالث|الرابع|الخامس|السادس)?/i.exec(idea);
     const sharedContext=firstHeading?idea.slice(0,firstHeading.index).trim():'';
     return explicitScenes.map((scene,index)=>{
       const continuity=ar?'ثبات الشخصيات إلزامي: حافظ على الوجه والشعر والعمر والبنية والملابس والألوان نفسها في كل المشاهد؛ غيّر الحركة والتعبير وزاوية الكاميرا فقط.':'Character continuity is mandatory: preserve the same face, hair, age, build, costume and color palette in every scene; only action, expression and camera angle may change.';
