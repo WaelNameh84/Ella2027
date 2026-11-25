@@ -1329,7 +1329,7 @@ function Projects({ homePage = false, manualPage = false, createPage = false }: 
     const requestedMode = params.get('mode') === 'quick' ? 'quick' : 'pro';
     return <AppFrame title={tx(lang, requestedMode === 'quick' ? 'الإنشاء السريع' : 'الاستوديو الاحترافي', requestedMode === 'quick' ? 'Quick creation' : 'Pro Studio')} crumb={requestedMode === 'quick' ? 'QUICK AUTO WORKFLOW' : 'PRO PRODUCTION WORKSPACE'}>
       <div className="create-studio-entry" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
-        <div className="create-studio-heading"><button type="button" className="btn btn-quiet" onClick={() => setLocation('/dashboard')}><ArrowLeft size={15}/>{tx(lang,'العودة للاستوديو','Back to studio')}</button><span className="ella-overline">{requestedMode === 'quick' ? 'QUICK AUTO' : 'PRO STUDIO'}</span></div>
+        <div className="create-studio-heading"><button type="button" className="btn btn-quiet" onClick={() => setLocation('/dashboard')}><ArrowLeft size={15}/>{tx(lang,'العودة للاستوديو','Back to studio')}</button><Link href="/autopilot" className="btn btn-primary"><WandSparkles size={15}/>{tx(lang,'اكتب الفكرة ودع Ella ينفّذ','Write an idea — Ella does the rest')}</Link><span className="ella-overline">{requestedMode === 'quick' ? 'QUICK AUTO' : 'PRO STUDIO'}</span></div>
         {projectForm(true, 'auto', requestedMode)}
       </div>
     </AppFrame>;
@@ -3055,6 +3055,9 @@ function AiTeamPage() {
   const [autoVideo, setAutoVideo] = useState(true);
   const [puterStatus, setPuterStatus] = useState("");
   useEffect(() => {
+    if (!projectId && projects.data?.length) setProjectId(projects.data[0].id);
+  }, [projects.data, projectId]);
+  useEffect(() => {
     let active = true;
     setState(null);
     setStage("planning");
@@ -3391,6 +3394,7 @@ function Router() {
         <Route path="/media" component={MediaPage}/>
         <Route path="/settings/providers" component={ProvidersPage}/>
         <Route path="/settings/ai-team" component={AiTeamPage}/>
+        <Route path="/autopilot" component={AiTeamPage}/>
         <Route path="/settings/tools" component={ToolsPage}/>
         <Route path="/settings/account/*?" component={AccountSettingsPage}/>
         <Route path="/admin" component={AdminDashboard}/>
