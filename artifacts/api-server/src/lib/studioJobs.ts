@@ -327,9 +327,9 @@ async function updateJob(
 
 function getExplicitQuickConstraints(story: string): { sceneCount?: number; durationSeconds?: number } {
   const value = story.toLowerCase().replace(/[٠-٩]/g, (digit) => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)));
-  const sceneCount = /(?:مشهد\\s+(?:واحد|واحدة)|one\\s+scene|single\\s+scene|only\\s+one\\s+scene)/i.test(value) ? 1 : undefined;
-  const numeric = value.match(/(\\d{1,3})\\s*(?:ثانية|ثواني|ث|seconds?|secs?)/i);
-  const wordFive = /(?:خمس|خمسة)\\s*(?:ثواني|ثانية)/i.test(value) || /five\\s+seconds?/i.test(value);
+  const sceneCount = /(?:مشهد\s+(?:واحد|واحدة)|one\s+scene|single\s+scene|only\s+one\s+scene)/i.test(value) ? 1 : undefined;
+  const numeric = value.match(/(\d{1,3})\s*(?:ثانية|ثواني|ث|seconds?|secs?)/i);
+  const wordFive = /(?:خمس|خمسة)\s*(?:ثواني|ثانية)/i.test(value) || /five\s+seconds?/i.test(value);
   const duration = numeric ? Number(numeric[1]) : wordFive ? 5 : undefined;
   return { ...(sceneCount ? { sceneCount } : {}), ...(duration && duration >= 1 && duration <= 600 ? { durationSeconds: duration } : {}) };
 }
@@ -419,7 +419,7 @@ async function processScriptJob(job: typeof studioJobsTable.$inferSelect): Promi
       `Scene direction: ${input.sceneStyle ?? (project.visualStyle || "Cinematic")}`,
       input.autoProductionSettings ? "Do not assume a preset total duration; choose the target runtime and set production.targetDurationSeconds to the sum of the scene durations." : `Target duration: ${project.durationSeconds} seconds`,
       input.autoScenePlan
-        ? "Do not force equal-length scenes. Return 2–24 scenes, each with a durationSeconds value appropriate to its narrative beat."
+        ? explicitQuickConstraints.sceneCount || explicitQuickConstraints.durationSeconds ? "Return exactly the explicit scene count and exact duration requested by the user. These constraints override automatic planning." : "Do not force equal-length scenes. Return 1–24 scenes, each with a durationSeconds value appropriate to its narrative beat."
         : `Return exactly ${input.sceneCount ?? 6} scenes. Set durationSeconds to exactly ${input.sceneDurationSeconds ?? 8} for every scene.`,
       "CHARACTER IDENTITY LOCK: Build a reusable character bible with one stable ID per person and highly specific immutable visual identity: apparent age, face shape, eye shape/color, skin tone, nose, hairline/style/color, body proportions, distinguishing marks, fixed base costume, footwear, accessories, and exact color palette. Define a stable voice identity (language, accent, pitch, timbre, speaking rhythm). Reuse the exact same identity and costume in every scene unless the story explicitly changes clothing. Assign only valid characterIds to each scene. For every scene imagePrompt, repeat the assigned character's exact visual identity and costume in a dedicated CHARACTER LOCK sentence; do not use vague phrases such as 'same person'. Expressions, pose, camera angle and lighting may change; facial identity and defining traits must not. Keep props, injuries, wetness, dirt, costume damage, geography and timeline continuous. Every scene must contain shot type, camera movement, location, lighting, action, speaker-labelled dialogue/narration, and sound design notes. Internally plan short visual beats so the video worker can split long scenes without losing continuity.",
       "CRITICAL SCENE UNIQUENESS: Every requested scene must depict a different next event in the story. Never copy or paraphrase another scene's description or imagePrompt. Give every scene its own distinct physical action, composition, camera framing or movement, and visual beat while preserving character identity and chronological continuity. Scene 1 must not be repeated in scenes 2 onward. The imagePrompt must describe only that scene, not a generic film-wide prompt.",
