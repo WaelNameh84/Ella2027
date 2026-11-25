@@ -408,7 +408,7 @@ async function processScriptJob(job: typeof studioJobsTable.$inferSelect): Promi
         ? `Target total duration: approximately ${project.durationSeconds} seconds; choose individual scene durations based on the action.`
         : `Exact duration for every scene: ${input.sceneDurationSeconds ?? 8} seconds`,
       `Scene direction: ${input.sceneStyle ?? (project.visualStyle || "Cinematic")}`,
-      `Target duration: ${project.durationSeconds} seconds`,
+      input.autoProductionSettings ? "Do not assume a preset total duration; choose the target runtime and set production.targetDurationSeconds to the sum of the scene durations." : `Target duration: ${project.durationSeconds} seconds`,
       input.autoScenePlan
         ? "Do not force equal-length scenes. Return 2–24 scenes, each with a durationSeconds value appropriate to its narrative beat."
         : `Return exactly ${input.sceneCount ?? 6} scenes. Set durationSeconds to exactly ${input.sceneDurationSeconds ?? 8} for every scene.`,
@@ -629,7 +629,7 @@ async function processScriptJob(job: typeof studioJobsTable.$inferSelect): Promi
     await tx.update(projectsTable).set({
       status: "editing",
       progress: 45,
-      durationSeconds: Math.max(5, Math.min(3600, generated!.production?.targetDurationSeconds ?? actualDuration)),
+      durationSeconds: Math.max(5, Math.min(3600, actualDuration)),
       ...(input.autoProductionSettings ? {
         ...(generated!.production?.videoType ? { videoType: generated!.production.videoType } : {}),
         ...(generated!.production?.aspectRatio ? { aspectRatio: generated!.production.aspectRatio } : {}),
