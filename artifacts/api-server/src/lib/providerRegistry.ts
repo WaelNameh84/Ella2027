@@ -193,10 +193,12 @@ export const providerDefinitions: Record<string, ProviderDefinition> = {
   },
   "local-video-worker": {
     label: "ELLA VIDEO ENGINE — Wan 2.2",
-    officialUrl: "https://github.com/Wan-Video/Wan2.2",
+    officialUrl: "https://huggingface.co/Wan-AI/Wan2.2-TI2V-5B",
     testUrl: () => {
-      const base = process.env.LOCAL_VIDEO_WORKER_URL?.trim().replace(/\/$/, "");
-      return base ? `${base}/health` : "";
+      const base = (process.env.ELLA_API_BASE_URL?.trim()
+        || process.env.RENDER_EXTERNAL_URL?.trim()
+        || "https://ella2027.onrender.com").replace(/\/$/, "");
+      return `${base}/api/kaggle-wan22-worker/health`;
     },
     testHeaders: (key) => ({ Authorization: `Bearer ${key}` }),
   },
