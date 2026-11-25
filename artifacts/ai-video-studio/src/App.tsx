@@ -780,6 +780,20 @@ function ProjectForm({ onClose, initial, initialMode = 'auto', initialExperience
   const quickPlannedDuration = quickSceneCount * quickSceneDuration;
   const makePlan = () => buildFilmPlan({ idea: form.idea, videoType: form.videoType, sceneCount: experienceMode === 'quick' ? quickSceneCount : sceneCount, sceneDurationSeconds: experienceMode === 'quick' ? quickSceneDuration : sceneDurationSeconds, visualStyle: form.visualStyle || selectedTemplate?.visualStyle, lang, providerReady: Boolean(allowExternalProviders && textProviderReady) });
   const submit = async (planConfirmed = false, splitStory = splitManualStory) => {
+    if (!editing && mode === 'manual' && splitStory) {
+      if (manualFullStory.trim().length < 20) {
+        setSubmitError(tx(lang, 'اكتب قصة لا تقل عن 20 حرفًا قبل التوليد.', 'Enter a story of at least 20 characters before generation.'));
+        return;
+      }
+      if (!allowExternalProviders || !textProviderReady) {
+        setSubmitError(tx(lang, 'فعّل مزوّد كتابة جاهز من الإعدادات قبل توليد مشاهد القصة.', 'Enable a ready writing provider in Settings before generating story scenes.'));
+        return;
+      }
+      if (!approvePotentialCharges) {
+        setSubmitError(tx(lang, 'وافق على إرسال القصة إلى مزوّد الكتابة قبل التوليد.', 'Approve sending the story to the writing provider before generation.'));
+        return;
+      }
+    }
     if (!editing && mode === 'auto' && experienceMode === 'pro') {
       if (!allowExternalProviders || !textProviderReady) {
         setSubmitError(tx(lang, 'فعّل مزوّد كتابة جاهز من الإعدادات، ثم أعد المحاولة.', 'Enable a ready writing provider in Settings, then try again.'));
@@ -840,7 +854,7 @@ function ProjectForm({ onClose, initial, initialMode = 'auto', initialExperience
   const submitLabel = editing ? tx(lang,'حفظ التعديلات','Save changes') : pending ? projectCreated ? tx(lang,'جارٍ إنشاء الفيلم…','Creating film…') : tx(lang,'جارٍ إنشاء المشروع…','Creating project…') : experienceMode === 'quick' ? generationError ? tx(lang,'إعادة المحاولة','Retry') : tx(lang,'أنشئ الفيلم','Create film') : mode === 'manual' ? tx(lang,'أنشئ المشروع والمشاهد','Create project and scenes') : useTextProvider ? generationError ? tx(lang,'إعادة محاولة التأليف','Retry story generation') : tx(lang,'اكتب القصة','Write the story') : tx(lang,'أنشئ المشاهد تلقائيًا','Create scenes automatically');
   const submitButton = <button type="submit" disabled={pending || !canSubmit} className="btn btn-primary" data-testid="button-create-project">{pending ? <LoaderCircle className="animate-spin" size={16}/> : editing ? <Check size={16}/> : <WandSparkles size={16}/ >}{submitLabel}</button>;
   return <Modal inline={inline} className="idea-entry-card" onClose={onClose} title={editing ? tx(lang,'تعديل تفاصيل المشروع','Edit project details') : mode === 'manual' ? tx(lang, 'مساحة العمل اليدوية', 'Manual production workspace') : tx(lang, 'فكرتك إلى قصة', 'Turn your idea into a story')} subtitle={editing ? tx(lang, 'عدّل تفاصيل المشروع ومشاهده.', 'Update the project details.') : mode === 'manual' ? tx(lang, 'اكتب القصة كاملة، وإيلا تقسمها حسب أحداثها وتثبت شخصياتها.', 'Write the complete story; Ella splits it by story beats and locks character identity.') : tx(lang, 'اكتب فكرة قصيرة، ثم اختر المسار السريع أو تحكم بالمشاهد في الوضع الاحترافي.', 'Describe your idea, then choose the quick path or control each scene in Professional mode.')}>
-    <form onSubmit={e => { e.preventDefault(); void submit(); }} className="form-stack">
+    <form onSubmit={e => { e.preventDefault(); void submit(false, mode === 'manual' ? true : splitManualStory); }} className="form-stack">
       {!editing && inline && <div className="experience-mode-switch" role="tablist" aria-label={tx(lang,'مستوى التحكم','Experience mode')}>
         <button type="button" role="tab" aria-selected={experienceMode==='quick'} className={experienceMode==='quick'?'is-selected':''} onClick={()=>chooseExperienceMode('quick')} disabled={projectCreated}>{tx(lang,'سريع','Quick')}</button>
         <button type="button" role="tab" aria-selected={experienceMode==='pro' && mode==='auto'} className={experienceMode==='pro' && mode==='auto'?'is-selected':''} onClick={()=>chooseExperienceMode('pro')} disabled={projectCreated}>{tx(lang,'احترافي','Professional')}</button>
