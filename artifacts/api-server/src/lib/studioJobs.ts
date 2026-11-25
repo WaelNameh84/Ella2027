@@ -42,7 +42,7 @@ type SceneDraft = {
 
 export const FREE_TEST_PROVIDER_KEY = "00000000-0000-4000-8000-000000000000";
 
-type ScriptResult = { scenes: SceneDraft[]; characters: StudioCharacter[] };
+type ScriptResult = { scenes: SceneDraft[]; characters: StudioCharacter[]; production?: { videoType?: string; aspectRatio?: string; visualStyle?: string; targetDurationSeconds?: number } };
 
 type JobInput = {
   providerKeyId?: string | null;
@@ -66,6 +66,7 @@ type JobInput = {
   sceneDurationSeconds?: number;
   sceneStyle?: string;
   autoScenePlan?: boolean;
+  autoProductionSettings?: boolean;
   story?: string;
   autoGenerateVideo?: boolean;
   videoProviderKeyId?: string | null;
@@ -86,7 +87,7 @@ function parseGeneratedJson(text: string): ScriptResult {
   } catch {
     throw new Error("The provider response was not valid JSON.");
   }
-  const response = data as { scenes?: unknown; characters?: unknown };
+  const response = data as { scenes?: unknown; characters?: unknown; production?: unknown };
   const scenes = response.scenes;
   if (!Array.isArray(scenes) || scenes.length < 1 || scenes.length > 24) {
     throw new Error("The provider returned an invalid number of scenes.");
@@ -106,8 +107,17 @@ function parseGeneratedJson(text: string): ScriptResult {
       };
     }).filter((character) => character.name)
     : [];
+  const rawProduction = response.production && typeof response.production === "object" ? response.production as Record<string, unknown> : {};
+  const allowedRatios = ["16:9", "9:16", "1:1", "4:5", "4:3", "3:2"];
+  const production = {
+    videoType: typeof rawProduction.videoType === "string" ? rawProduction.videoType.slice(0, 120) : undefined,
+    aspectRatio: typeof rawProduction.aspectRatio === "string" && allowedRatios.includes(rawProduction.aspectRatio) ? rawProduction.aspectRatio : undefined,
+    visualStyle: typeof rawProduction.visualStyle === "string" ? rawProduction.visualStyle.slice(0, 200) : undefined,
+    targetDurationSeconds: Number.isFinite(Number(rawProduction.targetDurationSeconds)) ? Math.max(5, Math.min(3600, Math.round(Number(rawProduction.targetDurationSeconds)))) : undefined,
+  };
   return {
     characters,
+    production,
     scenes: scenes.map((scene, index) => {
     const item = scene as Record<string, unknown>;
     const title = typeof item.title === "string" ? item.title.trim() : "";
@@ -333,6 +343,7 @@ async function processScriptJob(job: typeof studioJobsTable.$inferSelect): Promi
       characters: Array.isArray(job.result?.characters)
         ? job.result.characters as StudioCharacter[]
         : project.characters ?? [],
+      production: job.result?.production && typeof job.result.production === "object" ? job.result.production as ScriptResult["production"] : undefined,
     };
   } else {
     const currentScenes = await db.select({ id: scenesTable.id })
@@ -382,12 +393,14 @@ async function processScriptJob(job: typeof studioJobsTable.$inferSelect): Promi
     const prompt = [
       "Analyze the premise and create a production-ready film script, character bible, and storyboard. Return only valid JSON with this shape:",
       buildDirectorContinuityRules(),
-      '{"characters":[{"id":"character-1","name":"...","description":"fixed visual identity","costume":"fixed costume","voiceDescription":"..."}],"scenes":[{"title":"...","description":"...","imagePrompt":"...","narration":"...","durationSeconds":8,"shotType":"wide","cameraMovement":"slow push-in","location":"...","lighting":"...","characterIds":["character-1"]}]}',
+      '{"production":{"videoType":"...","aspectRatio":"9:16","visualStyle":"...","targetDurationSeconds":30},"characters":[{"id":"character-1","name":"...","description":"fixed visual identity","costume":"fixed costume","voiceDescription":"..."}],"scenes":[{"title":"...","description":"...","imagePrompt":"...","narration":"...","durationSeconds":8,"shotType":"wide","cameraMovement":"slow push-in","location":"...","lighting":"...","characterIds":["character-1"]}]}',
       `Concept: ${input.story?.trim() || project.idea}`,
-      `Video type: ${project.videoType}`,
+      input.autoProductionSettings
+        ? "AI PRODUCTION DECISION: Choose the best video type, aspect ratio (16:9, 9:16, 1:1, 4:5, 4:3 or 3:2), visual style and total runtime for the concept and likely publishing platform. Return these choices in the top-level production object. Respect explicit format or duration constraints written by the user in the Concept; otherwise decide intelligently."
+        : `Video type: ${project.videoType}`,
       `Language: ${project.language}`,
       `Audience: ${project.audience}`,
-      `Visual style: ${project.visualStyle}`,
+      input.autoProductionSettings ? "Choose a visual style that serves the concept and include it in production.visualStyle." : `Visual style: ${project.visualStyle}`,
       input.autoScenePlan
         ? "AI SCENE PLAN: Choose the number of scenes yourself (between 2 and 24) from the actual story beats, not from a preset. Choose a suitable duration for each scene (normally 4–12 seconds, longer only when the action needs it). Preserve all important events and the ending. Aim for a coherent total runtime near the target duration, but story structure takes priority. Return the chosen scene count and each scene's own durationSeconds."
         : `Requested scene count: exactly ${input.sceneCount ?? 6} scenes`,
@@ -616,7 +629,12 @@ async function processScriptJob(job: typeof studioJobsTable.$inferSelect): Promi
     await tx.update(projectsTable).set({
       status: "editing",
       progress: 45,
-      durationSeconds: Math.max(5, Math.min(3600, actualDuration)),
+      durationSeconds: Math.max(5, Math.min(3600, generated!.production?.targetDurationSeconds ?? actualDuration)),
+      ...(input.autoProductionSettings ? {
+        ...(generated!.production?.videoType ? { videoType: generated!.production.videoType } : {}),
+        ...(generated!.production?.aspectRatio ? { aspectRatio: generated!.production.aspectRatio } : {}),
+        ...(generated!.production?.visualStyle ? { visualStyle: generated!.production.visualStyle } : {}),
+      } : {}),
       characters: generated!.characters,
     })
       .where(and(eq(projectsTable.id, project.id), eq(projectsTable.userId, job.userId)));
