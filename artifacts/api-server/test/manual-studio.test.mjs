@@ -54,6 +54,15 @@ test("Puter image provider uses browser auth, no-credit test mode, and saves out
   assert.match(app, /AI Horde — anonymous, free, low priority/);
 });
 
+test("Quick mode can create a no-key storyboard and split explicitly numbered scenes", async () => {
+  const fs = await import("node:fs/promises");
+  const app = await fs.readFile(new URL("../../ai-video-studio/src/App.tsx", import.meta.url), "utf8");
+  assert.match(app, /function extractExplicitSceneBeats/);
+  assert.match(app, /experienceMode === 'quick' \\|\\| \\(allowExternalProviders && textProviderReady && approvePotentialCharges\\)/);
+  assert.match(app, /Character continuity is mandatory/);
+  assert.match(app, /ثبات الشخصيات إلزامي/);
+});
+
 test("Quick and Professional converge on the same scene production engine", async () => {
   const fs = await import("node:fs/promises");
   const app = await fs.readFile(new URL("../../ai-video-studio/src/App.tsx", import.meta.url), "utf8");
