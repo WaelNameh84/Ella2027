@@ -3211,3 +3211,21 @@ a[href]:active,
     box-sizing: border-box !important;
   }
 }
+
+
+/* Critical: flow-redesign.css sets display:grid on panels, overriding the
+   browser's default hidden behavior for children of closed <details>. */
+.app-shell[data-route="workspace"] .create-studio-entry .inline-project-form.idea-entry-card .quick-dropdown-toolbar details.quick-setting-dropdown:not([open]) > .quick-dropdown-panel {
+  display: none !important;
+}
+.app-shell[data-route="workspace"] .create-studio-entry .inline-project-form.idea-entry-card .quick-dropdown-toolbar details.quick-setting-dropdown[open] > .quick-dropdown-panel {
+  display: grid !important;
+  position: static !important;
+  inset: auto !important;
+  transform: none !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  margin: 6px 0 0 !important;
+  box-sizing: border-box !important;
+}
