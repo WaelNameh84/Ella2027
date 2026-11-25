@@ -402,7 +402,7 @@ async function processScriptJob(job: typeof studioJobsTable.$inferSelect): Promi
       `Audience: ${project.audience}`,
       input.autoProductionSettings ? "Choose a visual style that serves the concept and include it in production.visualStyle." : `Visual style: ${project.visualStyle}`,
       input.autoScenePlan
-        ? "AI SCENE PLAN: Choose the number of scenes yourself (between 2 and 24) from the actual story beats, not from a preset. Choose a suitable duration for each scene (normally 4–12 seconds, longer only when the action needs it). Preserve all important events and the ending. Aim for a coherent total runtime near the target duration, but story structure takes priority. Return the chosen scene count and each scene's own durationSeconds."
+        ? "AI SCENE PLAN: Choose 1–24 scenes from the story beats. Respect any explicit scene count and per-scene duration stated in the Concept exactly; never override them. If the user gives no exact count or duration, choose suitable values automatically. Preserve all important events and the ending."
         : `Requested scene count: exactly ${input.sceneCount ?? 6} scenes`,
       input.autoScenePlan
         ? `Target total duration: approximately ${project.durationSeconds} seconds; choose individual scene durations based on the action.`
