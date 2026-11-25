@@ -190,6 +190,20 @@ router.post("/projects/:projectId/generate-script", async (req, res, next): Prom
     next();
     return;
   }
+  // A provider chosen during handoff becomes the first provider for the next
+  // storyboard request. The existing generator still handles quota/error rotation.
+  const handoffResult = await pool.query(
+    `SELECT current_provider_key_id FROM studio_ai_handoffs
+     WHERE project_id = $1 AND user_id = $2 LIMIT 1`,
+    [projectId, userId],
+  );
+  const handoffRow = (handoffResult.rows as Record<string, unknown>[])[0];
+  const requestedBody = req.body && typeof req.body === "object"
+    ? req.body as Record<string, unknown>
+    : {};
+  if (typeof handoffRow?.current_provider_key_id === "string" && !requestedBody.providerKeyId) {
+    req.body = { ...requestedBody, providerKeyId: handoffRow.current_provider_key_id };
+  }
   const sceneCount = Number((req.body as Record<string, unknown> | undefined)?.sceneCount ?? 0);
   const sceneDuration = Number((req.body as Record<string, unknown> | undefined)?.sceneDurationSeconds ?? 0);
   const summary = `Automatic storyboard generation started. Requested scenes: ${Number.isFinite(sceneCount) ? sceneCount : "unspecified"}; seconds per scene: ${Number.isFinite(sceneDuration) ? sceneDuration : "unspecified"}.`;
