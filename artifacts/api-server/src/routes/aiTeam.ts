@@ -1,6 +1,6 @@
 import { and, asc, eq } from "drizzle-orm";
 import { Router, type IRouter, type Response } from "express";
-import { db, pool, projectsTable, providerKeysTable, studioJobsTable } from "@workspace/db";
+import { db, pool, projectsTable, providerKeysTable, scenesTable, studioJobsTable } from "@workspace/db";
 import { providerCredentialUsable, type ProviderStatus } from "../lib/providerRegistry";
 
 const router: IRouter = Router();
@@ -335,10 +335,19 @@ router.post("/ai-team/projects/:projectId/submit-storyboard", async (req, res): 
     videoKey = found;
   }
 
-  const existingScenes = await db.select({ id: projectsTable.id }).from(projectsTable)
-    .where(and(eq(projectsTable.id, projectId), eq(projectsTable.userId, userId))).limit(1);
-  if (!existingScenes.length) {
-    res.status(404).json({ error: "Project not found." });
+  const existingScenes = await db.select({ id: scenesTable.id }).from(scenesTable)
+    .where(and(eq(scenesTable.projectId, projectId), eq(scenesTable.userId, userId))).limit(1);
+  if (existingScenes.length) {
+    res.status(409).json({ error: "This project already has scenes. Choose an empty project or remove its scenes first." });
+    return;
+  }
+  const activeJobs = await db.select({ id: studioJobsTable.id }).from(studioJobsTable).where(and(
+    eq(studioJobsTable.userId, userId),
+    eq(studioJobsTable.projectId, projectId),
+    eq(studioJobsTable.jobType, "script"),
+  ));
+  if (activeJobs.length) {
+    res.status(409).json({ error: "A storyboard job is already active for this project." });
     return;
   }
   const [job] = await db.insert(studioJobsTable).values({
