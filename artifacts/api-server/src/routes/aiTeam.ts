@@ -156,4 +156,53 @@ router.post("/ai-team/projects/:projectId/handoff", async (req, res): Promise<vo
   });
 });
 
+// The existing storyboard endpoint already performs provider rotation. This middleware
+// persists its progress automatically so another provider can resume from the same brief.
+router.post("/projects/:projectId/generate-script", async (req, res, next): Promise<void> => {
+  const projectId = String(req.params.projectId ?? "");
+  const userId = userIdOf(res);
+  if (!await ownedProject(projectId, userId)) {
+    next();
+    return;
+  }
+  const sceneCount = Number((req.body as Record<string, unknown> | undefined)?.sceneCount ?? 0);
+  const sceneDuration = Number((req.body as Record<string, unknown> | undefined)?.sceneDurationSeconds ?? 0);
+  const summary = `Automatic storyboard generation started. Requested scenes: ${Number.isFinite(sceneCount) ? sceneCount : "unspecified"}; seconds per scene: ${Number.isFinite(sceneDuration) ? sceneDuration : "unspecified"}. The existing generator will rotate through configured text API providers when an eligible provider fails.`;
+  await pool.query(
+    `INSERT INTO studio_ai_handoffs
+      (project_id, user_id, stage, last_completed_step, next_step, summary, completed_steps)
+     VALUES ($1,$2,'script_generation','Project and request received','Generate storyboard using configured providers',$3,'["project selected","generation request accepted"]'::jsonb)
+     ON CONFLICT (project_id) DO UPDATE SET
+       stage = EXCLUDED.stage,
+       last_completed_step = EXCLUDED.last_completed_step,
+       next_step = EXCLUDED.next_step,
+       summary = EXCLUDED.summary,
+       completed_steps = EXCLUDED.completed_steps,
+       revision = studio_ai_handoffs.revision + 1,
+       updated_at = now()
+     WHERE studio_ai_handoffs.user_id = EXCLUDED.user_id`,
+    [projectId, userId, summary],
+  );
+  res.once("finish", () => {
+    const succeeded = res.statusCode >= 200 && res.statusCode < 300;
+    const stage = succeeded ? "script_completed" : "script_failed";
+    const lastStep = succeeded ? "Storyboard generated and saved to project scenes" : "Generation request ended without a successful storyboard";
+    const nextStep = succeeded ? "Review scenes and continue to media generation" : "Review provider status and retry when a configured provider is available";
+    const finalSummary = succeeded
+      ? `${summary} Result: storyboard generation succeeded and scenes were saved.`
+      : `${summary} Result: generation ended with HTTP ${res.statusCode}. The saved request brief is available for a retry or provider handoff.`;
+    void pool.query(
+      `UPDATE studio_ai_handoffs
+       SET stage = $3, last_completed_step = $4, next_step = $5, summary = $6,
+           completed_steps = CASE WHEN $3 = 'script_completed'
+             THEN completed_steps || '["storyboard saved"]'::jsonb
+             ELSE completed_steps || '["generation attempt failed"]'::jsonb END,
+           revision = revision + 1, updated_at = now()
+       WHERE project_id = $1 AND user_id = $2`,
+      [projectId, userId, stage, lastStep, nextStep, finalSummary],
+    ).catch(() => undefined);
+  });
+  next();
+});
+
 export default router;
