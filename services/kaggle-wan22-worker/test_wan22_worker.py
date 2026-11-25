@@ -5,7 +5,7 @@ from wan22_worker import api_url, dimensions_for_ratio
 
 
 def test_api_url_uses_existing_ella_queue():
-    assert api_url("https://ella2027.onrender.com/", "/claim") == "https://ella2027.onrender.com/api/kaggle-worker/claim"
+    assert api_url("https://ella2027.onrender.com/", "/claim") == "https://ella2027.onrender.com/api/kaggle-wan22-worker/claim"
 
 
 def test_supported_aspect_ratios():
