@@ -650,17 +650,17 @@ const freeTemplateBeats: Record<string, { ar: FreeTemplateBeat[]; en: FreeTempla
   },
 };
 function extractExplicitSceneBeats(idea:string) {
-  const heading=/(?:^|\\n)\\s*(?:المشهد|مشهد|scene)\\s*(\\d+|الأول|الثاني|الثالث|الرابع|الخامس|السادس)?\\s*(?:\\((\\d+)\\s*(?:ثانية|ثوانٍ|ثواني|seconds?|sec|s)\\))?\\s*[:：\\-–—]?\\s*/gi;
+  const heading=/(?:^|\n)\s*(?:المشهد|مشهد|scene)\s*(\d+|الأول|الثاني|الثالث|الرابع|الخامس|السادس)?\s*(?:\((\d+)\s*(?:ثانية|ثوانٍ|ثواني|seconds?|sec|s)\))?\s*[:：\-–—]?\s*/gi;
   const matches=[...idea.matchAll(heading)];
   if(!matches.length)return [];
   return matches.slice(0,24).map((match,index)=>{
     const start=(match.index??0)+match[0].length;
     const end=index+1<matches.length?(matches[index+1].index??idea.length):idea.length;
-    const raw=idea.slice(start,end).trim().replace(/^[\\s:：\\-–—]+|[\\s\\-–—]+$/g,'');
-    const durationInText=raw.match(/(?:^|\\s)(\\d+)\\s*(?:ثانية|ثوانٍ|ثواني|seconds?|sec)\\b?/i);
+    const raw=idea.slice(start,end).trim().replace(/^[\s:：\-–—]+|[\s\-–—]+$/g,'');
+    const durationInText=raw.match(/(?:^|\s)(\d+)\s*(?:ثانية|ثوانٍ|ثواني|seconds?|sec)/i);
     const duration=Number(match[2]||durationInText?.[1]);
     const title=match[1] ? `المشهد ${match[1]}` : `المشهد ${index+1}`;
-    return {title,description:raw.replace(/^\\(?\\d+\\s*(?:ثانية|ثوانٍ|ثواني|seconds?|sec)\\)?\\s*[:：\\-–—]?/i,'').trim(),durationSeconds:Number.isFinite(duration)&&duration>0?Math.min(600,Math.max(1,Math.round(duration))):undefined};
+    return {title,description:raw.replace(/^\(?\d+\s*(?:ثانية|ثوانٍ|ثواني|seconds?|sec)\)?\s*[:：\-–—]?/i,'').trim(),durationSeconds:Number.isFinite(duration)&&duration>0?Math.min(600,Math.max(1,Math.round(duration))):undefined};
   }).filter(scene=>scene.description.length>0);
 }
 function buildFreeTemplateScenes(templateId:string,idea:string,lang:Lang,visualStyle:string,sceneCount:number,sceneDurationSeconds:number) {
