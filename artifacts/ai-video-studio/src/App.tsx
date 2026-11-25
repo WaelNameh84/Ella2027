@@ -3038,6 +3038,7 @@ function AiTeamPage() {
   const { lang } = useApp();
   const projects = useListProjects();
   const providerKeys = useListProviderKeys();
+  const emptyProjects = (projects.data ?? []).filter(project => (project.sceneCount ?? 0) === 0);
   const [projectId, setProjectId] = useState("");
   const [state, setState] = useState<Record<string, unknown> | null>(null);
   const [stage, setStage] = useState("planning");
@@ -3055,7 +3056,7 @@ function AiTeamPage() {
   const [autoVideo, setAutoVideo] = useState(true);
   const [puterStatus, setPuterStatus] = useState("");
   useEffect(() => {
-    if (!projectId && projects.data?.length) setProjectId(projects.data[0].id);
+    if (!projectId && emptyProjects.length) setProjectId(emptyProjects[0].id);
   }, [projects.data, projectId]);
   useEffect(() => {
     let active = true;
@@ -3183,7 +3184,7 @@ function AiTeamPage() {
   return <AppFrame title={tx(lang, "فريق الذكاء الاصطناعي", "AI team & shared memory")} crumb="GPT + CLAUDE · SHARED HANDOFF">
     <div className="page-toolbar"><div><span className="eyebrow">{tx(lang, "ذاكرة مشتركة دائمة", "PERSISTENT SHARED MEMORY")}</span><h2>{tx(lang, "لا تبدأ من الصفر عند تبديل المزوّد.", "Keep project context when providers change.")}</h2><p>{tx(lang, "احفظ آخر خطوة مكتملة والخطوة التالية وملخص العمل ليتمكن مزوّد آخر من استلام السياق.", "Save completed work, the next step, and a project summary so another configured provider can pick up the context.")}</p></div></div>
     <section className="panel provider-list grid gap-3">
-      <label className="grid gap-2"><b>{tx(lang, "المشروع", "Project")}</b><select className="studio-input" value={projectId} onChange={event => setProjectId(event.target.value)}><option value="">{tx(lang, "اختر مشروعاً", "Choose a project")}</option>{(projects.data ?? []).map(project => <option key={project.id} value={project.id}>{project.title}</option>)}</select></label>
+      <label className="grid gap-2"><b>{tx(lang, "المشروع", "Project")}</b><select className="studio-input" value={projectId} onChange={event => setProjectId(event.target.value)}><option value="">{tx(lang, "اختر مشروعاً فارغاً", "Choose an empty project")}</option>{emptyProjects.map(project => <option key={project.id} value={project.id}>{project.title}</option>)}</select></label>
       {projectId ? <>
         <div className="border border-emerald-200/30 rounded-xl p-4 grid gap-3">
           <div><span className="eyebrow">{tx(lang, "إنشاء تلقائي — اكتب الفكرة فقط", "AUTOPILOT — WRITE ONLY YOUR IDEA")}</span><h3 className="text-lg font-semibold">{tx(lang, "من الفكرة إلى طابور الفيديو", "From idea to video queue")}</h3><p className="text-sm text-muted-foreground">{tx(lang, "يكتب Puter السيناريو، يحافظ على الشخصيات، ثم يرسل كل المشاهد دفعة واحدة إلى مهام Ella.", "Puter writes the storyboard, preserves character continuity, then submits every scene to Ella's job queue in one action.")}</p></div>
@@ -3212,7 +3213,7 @@ function AiTeamPage() {
         </div>
         <div className="flex flex-wrap gap-2"><button className="btn btn-primary" disabled={busy || !summary.trim()} onClick={() => void saveCheckpoint()}>{busy ? <LoaderCircle size={15} className="animate-spin"/> : <CheckCircle2 size={15}/>} {tx(lang, "حفظ نقطة التوقف", "Save checkpoint")}</button><button className="btn btn-quiet" disabled={busy || !summary.trim()} onClick={() => void handoff()}><ArrowRight size={15}/>{tx(lang, "تسليم للمزوّد الآخر", "Hand off to alternate provider")}</button></div>
         {state && <div className="resource-notice panel"><Activity size={17}/><p>{tx(lang, "الإصدار", "Revision")}: {String(state.revision ?? "—")} · {tx(lang, "عمليات التسليم", "Handoffs")}: {String(state.handoffCount ?? 0)} · {tx(lang, "آخر تحديث", "Updated")}: {state.updatedAt ? new Date(String(state.updatedAt)).toLocaleString() : "—"}</p></div>}
-      </> : <p className="provider-purpose-description">{tx(lang, "اختر مشروعاً لعرض ذاكرته المشتركة أو حفظ نقطة توقف جديدة.", "Choose a project to view its shared memory or save a new checkpoint.")}</p>}
+      </> : <div className="grid gap-2"><p className="provider-purpose-description">{tx(lang, "أنشئ مشروعاً فارغاً أولاً، أو اختر مشروعاً فارغاً من القائمة. المشاريع التي تحتوي مشاهد لن يتم استبدالها.", "Create a new empty project first, or choose an empty project from the list. Projects that already contain scenes will not be overwritten.")}</p><Link href="/create?mode=quick" className="btn btn-primary w-fit"><Plus size={15}/>{tx(lang, "إنشاء مشروع جديد", "Create a new project")}</Link></div>}
       {feedback && <p className="text-sm" role="status">{feedback}</p>}
     </section>
     <div className="resource-notice panel mt-3"><ShieldCheck size={18}/><p>{tx(lang, "مهم: الذاكرة والتسليم يعملان مع مفاتيح API الرسمية المضافة إلى Ella2027. اشتراكات ChatGPT Free وClaude Free على موقعيهما لا تمنح التطبيق API تلقائياً، ولا يمكن تجاوز حدود الخطط المجانية.", "Important: shared memory and handoff operate with official API keys configured in Ella2027. ChatGPT Free and Claude Free website subscriptions do not automatically provide API access, and plan limits cannot be bypassed.")}</p></div>
