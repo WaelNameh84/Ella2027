@@ -94,14 +94,14 @@ async function enqueueSceneJob(
   )) {
     return null;
   }
-  const isKaggleLtx = jobType === "video" && Boolean(input.providerKeyId) && (await db.select({ provider: providerKeysTable.provider }).from(providerKeysTable).where(and(eq(providerKeysTable.id, String(input.providerKeyId)), eq(providerKeysTable.userId, userId), eq(providerKeysTable.serviceType, "video"), eq(providerKeysTable.enabled, true))).limit(1))[0]?.provider === "local-video-worker";
+  const isEllaWan22 = jobType === "video" && Boolean(input.providerKeyId) && (await db.select({ provider: providerKeysTable.provider }).from(providerKeysTable).where(and(eq(providerKeysTable.id, String(input.providerKeyId)), eq(providerKeysTable.userId, userId), eq(providerKeysTable.serviceType, "video"), eq(providerKeysTable.enabled, true))).limit(1))[0]?.provider === "local-video-worker";
   const [job] = await db.insert(studioJobsTable).values({
     userId,
     projectId,
     jobType,
-    stage: isKaggleLtx ? "kaggle_waiting" : "queued",
-    input: { ...input, sceneId, ...(isKaggleLtx ? { worker: "kaggle-ltx" } : {}) },
-    message: isKaggleLtx ? "Waiting for the Kaggle LTX worker." : "Waiting in the queue.",
+    stage: isEllaWan22 ? "wan22_waiting" : "queued",
+    input: { ...input, sceneId, ...(isEllaWan22 ? { worker: "kaggle-wan22" } : {}) },
+    message: isEllaWan22 ? "Waiting for the ELLA Wan 2.2 Kaggle GPU worker." : "Waiting in the queue.",
   }).returning();
   return job;
 }
