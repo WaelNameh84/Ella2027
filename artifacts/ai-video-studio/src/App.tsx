@@ -704,7 +704,7 @@ function ManualSceneImagePicker({sceneNumber,file,disabled,lang,onChange,onError
     {file&&<button type="button" className="btn btn-quiet manual-scene-image-remove" disabled={disabled} onClick={()=>{onChange(null);onError('');}}><Trash2 size={14}/>{tx(lang,'إزالة الصورة','Remove image')}</button>}
   </div>;
 }
-function ProjectForm({ onClose, initial, initialMode = 'auto', initialExperienceMode, initialTemplateId = '', onSave, pending, freeMode = true, textProviderReady = false, checkingProvider = false, generationError = false, projectCreated = false, onOpenCreated, inline = false }: { onClose: () => void; initial?: Partial<ProjectInput>; initialTemplateId?: string; onSave: (data: ProjectInput, approvePotentialCharges?: boolean, templateId?: string, mode?: 'auto' | 'manual', sceneCount?: number, sceneDurationSeconds?: number, allowExternalProviders?: boolean, manualScenes?: ManualSceneDraft[], manualFullStory?: string, splitManualStory?: boolean, reviewBeforeRendering?: boolean, autoScenePlan?: boolean) => void | Promise<void>; pending: boolean; freeMode?: boolean; textProviderReady?: boolean; checkingProvider?: boolean; generationError?: boolean; projectCreated?: boolean; onOpenCreated?: () => void; initialMode?: 'auto' | 'manual'; initialExperienceMode?: 'quick' | 'pro'; inline?: boolean }) {
+function ProjectForm({ onClose, initial, initialMode = 'auto', initialExperienceMode, initialTemplateId = '', onSave, pending, freeMode = true, textProviderReady = false, checkingProvider = false, generationError = false, projectCreated = false, onOpenCreated, inline = false }: { onClose: () => void; initial?: Partial<ProjectInput>; initialTemplateId?: string; onSave: (data: ProjectInput, approvePotentialCharges?: boolean, templateId?: string, mode?: 'auto' | 'manual', sceneCount?: number, sceneDurationSeconds?: number, allowExternalProviders?: boolean, manualScenes?: ManualSceneDraft[], manualFullStory?: string, splitManualStory?: boolean, reviewBeforeRendering?: boolean, autoScenePlan?: boolean, autoProductionSettings?: boolean) => void | Promise<void>; pending: boolean; freeMode?: boolean; textProviderReady?: boolean; checkingProvider?: boolean; generationError?: boolean; projectCreated?: boolean; onOpenCreated?: () => void; initialMode?: 'auto' | 'manual'; initialExperienceMode?: 'quick' | 'pro'; inline?: boolean }) {
   const { lang } = useApp();
   const initialPreset = projectTemplates.find(item => item.id === initialTemplateId);
   const [form, setForm] = useState<ProjectInput>(() => ({ ...blankProject, language: lang, ...initial, ...(initialPreset ? { videoType: initialPreset.videoType, aspectRatio: initialPreset.aspectRatio, visualStyle: initialPreset.visualStyle, audience: lang === 'ar' ? 'الجمهور العام' : initialPreset.audience } : {}) }));
@@ -771,7 +771,7 @@ function ProjectForm({ onClose, initial, initialMode = 'auto', initialExperience
     }
     try {
       const useTextProvider = !editing && mode === 'auto' && allowExternalProviders && textProviderReady;
-      await onSave(payload, useTextProvider && approvePotentialCharges || splitStory && approvePotentialCharges, !editing ? selectedTemplate?.id : undefined, mode, effectiveSceneCount, effectiveSceneDuration, !editing && (mode === 'auto' || splitStory) ? allowExternalProviders : undefined, mode === 'manual' ? manualScenes : undefined, splitStory ? manualFullStory.trim() : undefined, splitStory, reviewBeforeRendering, experienceMode === 'quick' || (mode === 'manual' && splitStory));
+      await onSave(payload, useTextProvider && approvePotentialCharges || splitStory && approvePotentialCharges, !editing ? selectedTemplate?.id : undefined, mode, effectiveSceneCount, effectiveSceneDuration, !editing && (mode === 'auto' || splitStory) ? allowExternalProviders : undefined, mode === 'manual' ? manualScenes : undefined, splitStory ? manualFullStory.trim() : undefined, splitStory, reviewBeforeRendering, experienceMode === 'quick' || (mode === 'manual' && splitStory), experienceMode === 'quick');
       setSubmitError('');
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : tx(lang, 'تعذر حفظ إعدادات المشروع.', 'Could not save project settings.'));
@@ -1050,7 +1050,7 @@ function Projects({ homePage = false, manualPage = false, createPage = false }: 
       setBackupImporting(false);
     }
   };
-  const startStory = (projectId: string, sceneCount: number, sceneDurationSeconds: number, sceneStyle: string, story?: string, autoScenePlan = false) => generate.mutate({ projectId, data: { providerKeyId: null, allowRotation: true, approvePotentialCharges: true, sceneCount, sceneDurationSeconds, sceneStyle, autoScenePlan, ...(story ? { story } : {}) } }, {
+  const startStory = (projectId: string, sceneCount: number, sceneDurationSeconds: number, sceneStyle: string, story?: string, autoScenePlan = false, autoProductionSettings = false) => generate.mutate({ projectId, data: { providerKeyId: null, allowRotation: true, approvePotentialCharges: true, sceneCount, sceneDurationSeconds, sceneStyle, autoScenePlan, autoProductionSettings, ...(story ? { story } : {}) } }, {
     onSuccess: () => {
       afterChange();
       setOpen(false);
@@ -1058,7 +1058,7 @@ function Projects({ homePage = false, manualPage = false, createPage = false }: 
       setLocation(`/projects/${projectId}`);
     },
   });
-  const runAutoFilm = async (projectId: string, sceneCount: number, sceneDurationSeconds: number, sceneStyle: string, useScriptProvider: boolean, reviewBeforeRendering = false, autoScenePlan = false) => {
+  const runAutoFilm = async (projectId: string, sceneCount: number, sceneDurationSeconds: number, sceneStyle: string, useScriptProvider: boolean, reviewBeforeRendering = false, autoScenePlan = false, autoProductionSettings = false) => {
     setAutoFilmRunning(true);
     const keys = keysQuery.data || [];
     const videoKey = keys.find(key => key.enabled && key.serviceType === 'video' && providerSupports(key.provider, 'video') && providerKeyIsUsable(key.provider, key.status));
@@ -1082,7 +1082,7 @@ function Projects({ homePage = false, manualPage = false, createPage = false }: 
       throw new Error(`${label} timed out.`);
     };
     if (useScriptProvider) {
-      const scriptResponse = await fetch(`${basePath}/api/projects/${projectId}/jobs/script`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ providerKeyId: null, allowRotation: true, approvePotentialCharges: true, sceneCount, sceneDurationSeconds, sceneStyle, autoScenePlan }) });
+      const scriptResponse = await fetch(`${basePath}/api/projects/${projectId}/jobs/script`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ providerKeyId: null, allowRotation: true, approvePotentialCharges: true, sceneCount, sceneDurationSeconds, sceneStyle, autoScenePlan, autoProductionSettings }) });
       if (!scriptResponse.ok) throw new Error((await scriptResponse.json().catch(() => null))?.error || 'Could not start the script stage.');
       await waitFor(jobs => jobs.some(job => job.jobType === 'script' && job.status === 'completed'), tx(lang, 'تأليف السيناريو', 'Script generation'), job => job.jobType === 'script');
     }
@@ -1140,10 +1140,10 @@ function Projects({ homePage = false, manualPage = false, createPage = false }: 
     const result = await response.json().catch(() => ({})) as { error?: string };
     if (!response.ok) throw new Error(result.error || tx(lang, 'تعذر رفع صورة المشهد.', 'Could not upload the scene image.'));
   };
-  const saveProjectAndWriteStory = async (data: ProjectInput, approvePotentialCharges = false, templateId?: string, mode: 'auto' | 'manual' = 'auto', sceneCount = 5, sceneDurationSeconds = 8, allowExternalProviders?: boolean, manualScenes?: ManualSceneDraft[], manualFullStory?: string, splitManualStory = false, reviewBeforeRendering = false, autoScenePlan = false) => {
+  const saveProjectAndWriteStory = async (data: ProjectInput, approvePotentialCharges = false, templateId?: string, mode: 'auto' | 'manual' = 'auto', sceneCount = 5, sceneDurationSeconds = 8, allowExternalProviders?: boolean, manualScenes?: ManualSceneDraft[], manualFullStory?: string, splitManualStory = false, reviewBeforeRendering = false, autoScenePlan = false, autoProductionSettings = false) => {
     if (createdProjectId) {
       if (!approvePotentialCharges || allowExternalProviders !== true) throw new Error(tx(lang, 'أكّد السماح بالمزوّدات والموافقة على الرسوم المحتملة قبل إعادة المحاولة.', 'Confirm external providers and possible charges before retrying.'));
-      startStory(createdProjectId, sceneCount, sceneDurationSeconds, data.visualStyle || 'Cinematic', mode === 'manual' && splitManualStory ? manualFullStory : undefined, autoScenePlan);
+      startStory(createdProjectId, sceneCount, sceneDurationSeconds, data.visualStyle || 'Cinematic', mode === 'manual' && splitManualStory ? manualFullStory : undefined, autoScenePlan, autoProductionSettings);
       return;
     }
     if (mode === 'auto' && allowExternalProviders !== undefined) {
@@ -1159,7 +1159,7 @@ function Projects({ homePage = false, manualPage = false, createPage = false }: 
       if (splitManualStory && manualFullStory?.trim()) {
         if (!allowExternalProviders || !approvePotentialCharges || !textProviderReady) throw new Error(tx(lang, 'فعّل مزوّد الكتابة ووافق على الطلب قبل تقسيم القصة.', 'Enable a writing provider and approve the request before splitting the story.'));
         setCreatedProjectId(project.id);
-        startStory(project.id, sceneCount, sceneDurationSeconds, data.visualStyle || 'Cinematic', manualFullStory.trim(), true);
+        startStory(project.id, sceneCount, sceneDurationSeconds, data.visualStyle || 'Cinematic', manualFullStory.trim(), true, false);
         return;
       }
       setCreatedProjectId(project.id);
@@ -1202,7 +1202,7 @@ function Projects({ homePage = false, manualPage = false, createPage = false }: 
     const useTextProvider = allowExternalProviders === true && textProviderReady && approvePotentialCharges;
     if (useTextProvider) {
       setCreatedProjectId(project.id);
-      void runAutoFilm(project.id, sceneCount, sceneDurationSeconds, data.visualStyle || 'Cinematic', true, reviewBeforeRendering, autoScenePlan).catch(error => {
+      void runAutoFilm(project.id, sceneCount, sceneDurationSeconds, data.visualStyle || 'Cinematic', true, reviewBeforeRendering, autoScenePlan, autoProductionSettings).catch(error => {
         setAutoFilmRunning(false);
         setCreatedProjectId(null);
         setOpen(false);
