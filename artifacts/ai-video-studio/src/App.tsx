@@ -3044,8 +3044,16 @@ function AiTeamPage() {
   const [feedback, setFeedback] = useState("");
   const [busy, setBusy] = useState(false);
   useEffect(() => {
-    if (!projectId) { setState(null); return; }
     let active = true;
+    setState(null);
+    setStage("planning");
+    setSummary("");
+    setLastCompletedStep("");
+    setNextStep("");
+    setCurrentProvider("");
+    setFeedback("");
+    if (!projectId) { setBusy(false); return () => { active = false; }; }
+    setBusy(true);
     fetch(basePath + "/api/ai-team/projects/" + projectId + "/state", { credentials: "include" })
       .then(async response => { if (!response.ok) throw new Error("Could not load shared memory."); return response.json(); })
       .then(data => {
@@ -3058,7 +3066,8 @@ function AiTeamPage() {
         setNextStep(typeof next?.nextStep === "string" ? next.nextStep : "");
         setCurrentProvider(typeof next?.currentProvider === "string" ? next.currentProvider : "");
       })
-      .catch(error => { if (active) setFeedback(error instanceof Error ? error.message : "Could not load shared memory."); });
+      .catch(error => { if (active) setFeedback(error instanceof Error ? error.message : "Could not load shared memory."); })
+      .finally(() => { if (active) setBusy(false); });
     return () => { active = false; };
   }, [projectId]);
   const saveCheckpoint = async () => {
