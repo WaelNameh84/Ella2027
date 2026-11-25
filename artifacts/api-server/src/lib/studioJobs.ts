@@ -291,7 +291,7 @@ async function claimNextJob() {
     const [candidate] = await tx
       .select()
       .from(studioJobsTable)
-      .where(and(eq(studioJobsTable.status, "queued"), notInArray(studioJobsTable.stage, ["kaggle_waiting", "kaggle_generating"])))
+      .where(and(eq(studioJobsTable.status, "queued"), notInArray(studioJobsTable.stage, ["kaggle_waiting", "kaggle_generating", "wan22_waiting", "wan22_generating"])))
       .orderBy(asc(studioJobsTable.createdAt))
       .limit(1)
       .for("update", { skipLocked: true });
@@ -609,16 +609,16 @@ async function processScriptJob(job: typeof studioJobsTable.$inferSelect): Promi
           userId: job.userId,
           projectId: project.id,
           jobType: "video",
-          stage: localWorker ? "kaggle_waiting" : "queued",
+          stage: localWorker ? "wan22_waiting" : "queued",
           input: {
             sceneId: scene.id,
             providerKeyId: videoKey.id,
             model: input.videoModel!.trim(),
             mode: "text",
             approvePotentialCharges: true,
-            ...(localWorker ? { worker: "kaggle-ltx" } : {}),
+            ...(localWorker ? { worker: "kaggle-wan22" } : {}),
           },
-          message: localWorker ? "Queued automatically; waiting for the Kaggle LTX worker." : "Queued automatically from the storyboard.",
+          message: localWorker ? "Queued automatically; waiting for the ELLA Wan 2.2 Kaggle GPU worker." : "Queued automatically from the storyboard.",
           createdAt: new Date(queueTime + index),
           updatedAt: new Date(queueTime + index),
         }).returning({ id: studioJobsTable.id });
