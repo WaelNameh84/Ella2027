@@ -3181,7 +3181,7 @@ function AiTeamPage() {
     } catch (error) { setFeedback(error instanceof Error ? error.message : "Handoff failed."); }
     finally { setBusy(false); }
   };
-  return <AppFrame title={tx(lang, "فريق الذكاء الاصطناعي", "AI team & shared memory")} crumb="GPT + CLAUDE · SHARED HANDOFF">
+  return <AppFrame title={tx(lang, "Ella — الإنشاء التلقائي", "Ella — Autopilot")} crumb="PUTER AUTOPILOT · SHARED MEMORY">
     <div className="page-toolbar"><div><span className="eyebrow">{tx(lang, "ذاكرة مشتركة دائمة", "PERSISTENT SHARED MEMORY")}</span><h2>{tx(lang, "لا تبدأ من الصفر عند تبديل المزوّد.", "Keep project context when providers change.")}</h2><p>{tx(lang, "احفظ آخر خطوة مكتملة والخطوة التالية وملخص العمل ليتمكن مزوّد آخر من استلام السياق.", "Save completed work, the next step, and a project summary so another configured provider can pick up the context.")}</p></div></div>
     <section className="panel provider-list grid gap-3">
       <label className="grid gap-2"><b>{tx(lang, "المشروع", "Project")}</b><select className="studio-input" value={projectId} onChange={event => setProjectId(event.target.value)}><option value="">{tx(lang, "اختر مشروعاً فارغاً", "Choose an empty project")}</option>{emptyProjects.map(project => <option key={project.id} value={project.id}>{project.title}</option>)}</select></label>
@@ -3216,7 +3216,7 @@ function AiTeamPage() {
       </> : <div className="grid gap-2"><p className="provider-purpose-description">{tx(lang, "أنشئ مشروعاً فارغاً أولاً، أو اختر مشروعاً فارغاً من القائمة. المشاريع التي تحتوي مشاهد لن يتم استبدالها.", "Create a new empty project first, or choose an empty project from the list. Projects that already contain scenes will not be overwritten.")}</p><Link href="/create?mode=quick" className="btn btn-primary w-fit"><Plus size={15}/>{tx(lang, "إنشاء مشروع جديد", "Create a new project")}</Link></div>}
       {feedback && <p className="text-sm" role="status">{feedback}</p>}
     </section>
-    <div className="resource-notice panel mt-3"><ShieldCheck size={18}/><p>{tx(lang, "مهم: الذاكرة والتسليم يعملان مع مفاتيح API الرسمية المضافة إلى Ella2027. اشتراكات ChatGPT Free وClaude Free على موقعيهما لا تمنح التطبيق API تلقائياً، ولا يمكن تجاوز حدود الخطط المجانية.", "Important: shared memory and handoff operate with official API keys configured in Ella2027. ChatGPT Free and Claude Free website subscriptions do not automatically provide API access, and plan limits cannot be bypassed.")}</p></div>
+    <div className="resource-notice panel mt-3"><ShieldCheck size={18}/><p>{tx(lang, "الإنشاء التلقائي يستخدم تسجيل دخول Puter مرة واحدة ولا يحتاج مفاتيح API داخل Ella. الحصة المجانية محدودة بحساب Puter وقد يطلب ترقية عند نفادها. ميزة تسليم الذاكرة بين مزوّدي API تستخدم المفاتيح المحفوظة في الإعدادات.", "Autopilot uses a one-time Puter sign-in and needs no API keys inside Ella. Free usage is limited by your Puter account and may require an upgrade when exhausted. Shared handoff between API providers uses credentials saved in Settings.")}</p></div>
   </AppFrame>;
 }
 
