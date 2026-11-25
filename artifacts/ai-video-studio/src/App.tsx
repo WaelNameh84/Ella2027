@@ -3110,13 +3110,13 @@ function AiTeamPage() {
         "EXACT SCENE COUNT: " + sceneCount,
         "EXACT DURATION PER SCENE: " + sceneDuration + " seconds",
         "Return exactly " + sceneCount + " scenes. Set durationSeconds to exactly " + sceneDuration + " for every scene. Provide 1-8 recurring characters with stable IDs and assign characterIds correctly. Each scene needs a distinct action, shot type, camera movement, location, lighting, detailed imagePrompt, and dialogue/narration."
-      ].join("\\n");
+      ].join("\n");
       const response = await sdk.ai.chat(prompt, { model: "gpt-5.4-nano", temperature: 0.7 });
       const content = response.message?.content;
       const text = typeof content === "string" ? content
-        : Array.isArray(content) ? content.filter(part => part.type === "text").map(part => part.text ?? "").join("\\n")
+        : Array.isArray(content) ? content.filter(part => part.type === "text").map(part => part.text ?? "").join("\n")
         : "";
-      const normalized = text.replace(/\\x60\\x60\\x60(?:json)?/gi, "").trim();
+      const normalized = text.replace(/```(?:json)?/gi, "").trim();
       const first = normalized.indexOf("{");
       const last = normalized.lastIndexOf("}");
       if (first < 0 || last <= first) throw new Error("The AI did not return a valid storyboard. Please retry.");
