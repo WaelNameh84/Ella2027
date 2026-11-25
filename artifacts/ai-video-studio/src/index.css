@@ -3153,3 +3153,61 @@ a[href]:active,
 }
 
 
+
+
+/* Mobile Pro Studio: keep the settings in a balanced two-column grid.
+   Expanded native details panels stay in document flow and span both columns. */
+@media (max-width: 767px) {
+  .app-shell[data-route="workspace"] .create-studio-entry .inline-project-form.idea-entry-card .quick-dropdown-toolbar {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    align-items: start !important;
+    gap: 8px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+  .app-shell[data-route="workspace"] .create-studio-entry .inline-project-form.idea-entry-card .quick-dropdown-toolbar > details.quick-setting-dropdown {
+    display: block !important;
+    position: relative !important;
+    float: none !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    grid-column: auto !important;
+    align-self: start !important;
+    overflow: visible !important;
+    box-sizing: border-box !important;
+  }
+  .app-shell[data-route="workspace"] .create-studio-entry .inline-project-form.idea-entry-card .quick-dropdown-toolbar > details.quick-setting-dropdown[open] {
+    grid-column: 1 / -1 !important;
+    z-index: 2 !important;
+  }
+  .app-shell[data-route="workspace"] .create-studio-entry .inline-project-form.idea-entry-card .quick-dropdown-toolbar > details.quick-setting-dropdown > .quick-dropdown-panel {
+    display: grid !important;
+    position: static !important;
+    inset: auto !important;
+    transform: none !important;
+    float: none !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    margin: 6px 0 0 !important;
+    box-sizing: border-box !important;
+    grid-column: 1 / -1 !important;
+    overflow: visible !important;
+  }
+  .app-shell[data-route="workspace"] .create-studio-entry .inline-project-form.idea-entry-card .quick-dropdown-toolbar > details.quick-setting-dropdown > .quick-dropdown-panel label,
+  .app-shell[data-route="workspace"] .create-studio-entry .inline-project-form.idea-entry-card .quick-dropdown-toolbar > details.quick-setting-dropdown > .quick-dropdown-panel .studio-input {
+    display: grid !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  .app-shell[data-route="workspace"] .create-studio-entry .inline-project-form.idea-entry-card .quick-dropdown-toolbar > details.quick-setting-dropdown > summary {
+    min-width: 0 !important;
+    width: 100% !important;
+    min-height: 46px !important;
+    box-sizing: border-box !important;
+  }
+}
