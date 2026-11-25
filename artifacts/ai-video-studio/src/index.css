@@ -3229,3 +3229,7 @@ a[href]:active,
   margin: 6px 0 0 !important;
   box-sizing: border-box !important;
 }
+
+/* Keep the job's start/end timestamps readable on narrow screens. */
+.job-card-timing { flex-wrap: wrap; justify-content: flex-start; gap: 6px 16px; margin-top: 4px; }
+.job-card-timing span { min-width: 0; }
