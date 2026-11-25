@@ -126,7 +126,7 @@ router.post("/ai-team/projects/:projectId/handoff", async (req, res): Promise<vo
     : {};
   const stage = typeof checkpoint.stage === "string" ? checkpoint.stage.trim().slice(0, 80) : "handoff";
   const summary = typeof checkpoint.summary === "string" ? checkpoint.summary.trim().slice(0, 12000) : "Provider handoff requested.";
-  const result = await db.execute(
+  const result = await pool.query(
     `INSERT INTO studio_ai_handoffs
       (project_id, user_id, current_provider, current_provider_key_id, stage, last_completed_step, next_step, summary, completed_steps, artifacts, handoff_count)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb,1)
@@ -148,7 +148,7 @@ router.post("/ai-team/projects/:projectId/handoff", async (req, res): Promise<vo
       JSON.stringify(Array.isArray(checkpoint.completedSteps) ? checkpoint.completedSteps.filter((v): v is string => typeof v === "string").slice(0,100) : []),
       JSON.stringify(checkpoint.artifacts && typeof checkpoint.artifacts === "object" ? checkpoint.artifacts : {})],
   );
-  const rows = (result as unknown as { rows?: Record<string, unknown>[] }).rows ?? [];
+  const rows = result.rows as Record<string, unknown>[];
   res.json({
     selectedProvider: { id: next.id, provider: next.provider, label: next.label },
     state: safeState(rows[0]),
