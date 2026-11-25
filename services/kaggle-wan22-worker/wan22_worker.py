@@ -210,9 +210,10 @@ def run_forever(base_url: str, token: str, runner_path: Path, model_dir: Path,
                 completed += 1
             else:
                 time.sleep(max(5, idle_seconds))
-        except requests.RequestException as exc:
-            print(f"[ELLA][API RETRY] {exc}", flush=True)
-            time.sleep(max(10, idle_seconds))
+        except Exception as exc:
+            # A failed scene is reported to Ella by process_one; keep the worker alive.
+            print(f"[ELLA][JOB ERROR] {exc}", flush=True)
+            time.sleep(max(5, idle_seconds))
 
 
 def main():
