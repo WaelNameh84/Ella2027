@@ -794,16 +794,8 @@ function ProjectForm({ onClose, initial, initialMode = 'auto', initialExperience
         return;
       }
     }
-    if (!editing && mode === 'auto' && experienceMode === 'pro') {
-      if (!allowExternalProviders || !textProviderReady) {
-        setSubmitError(tx(lang, 'فعّل مزوّد كتابة جاهز من الإعدادات، ثم أعد المحاولة.', 'Enable a ready writing provider in Settings, then try again.'));
-        return;
-      }
-      if (!approvePotentialCharges) {
-        setSubmitError(tx(lang, 'وافق على احتمال رسوم مزوّد الكتابة قبل المتابعة.', 'Approve possible writing-provider charges before continuing.'));
-        return;
-      }
-    }
+    // Pro mode can create a local storyboard when no text provider is enabled.
+    // External writing is used only when a ready provider and explicit consent are both present.
     const idea = (splitStory && manualFullStory.trim() ? manualFullStory.trim().slice(0, 12000) : form.idea.trim());
     const firstLine = idea.split(/\r?\n/, 1)[0]?.trim() || idea;
     const firstSentence = firstLine.split(/[.!؟?]/, 1)[0]?.trim() || firstLine;
@@ -980,7 +972,7 @@ function ProjectForm({ onClose, initial, initialMode = 'auto', initialExperience
           <div className="form-two"><label><span className="field-label">{tx(lang,'مدة كل مشهد بالثواني','Seconds per scene')}</span><input type="number" min={minSceneDuration} max={maxSceneDuration} step="1" className="studio-input" value={sceneDurationSeconds} disabled={projectCreated} onChange={e=>{const raw=e.target.value;setSceneDurationSeconds(raw===''?0:Math.max(1,Math.min(maxSceneDuration,Number(raw)||1)));}} data-testid="input-scene-duration" /></label><div className="service-purpose-hint"><b>{tx(lang,'المدة الإجمالية المحسوبة','Calculated total duration')}</b><span>{tx(lang,`${totalDurationSeconds} ثانية (${sceneCount} × ${sceneDurationSeconds})`,`${totalDurationSeconds} seconds (${sceneCount} × ${sceneDurationSeconds})`)}</span></div></div>
           <label className="rotation-row"><span><b>{tx(lang,'السماح بالمزوّدات الخارجية (قد تكون مدفوعة)','Allow external providers (may cost)')}</b><small>{tx(lang,'عند تشغيله يمكن استخدام مفاتيحك للنص والفيديو. سيطلب التطبيق موافقتك قبل إرسال كل طلب قد يكلّف.','When enabled, your text/video provider keys can be used. The app still asks before each request that may incur a charge.')}</small></span><input type="checkbox" checked={allowExternalProviders} disabled={pending||projectCreated} onChange={e=>setAllowExternalProviders(e.target.checked)} data-testid="checkbox-allow-external-providers" /></label>
           {selectedTemplate && <div className="service-purpose-hint"><b>{tx(lang,'القالب مرجع بصري فقط','Template as creative guidance')}</b><span>{tx(lang,'سيستخدم الذكاء الاصطناعي القالب كمرجع، وسيكتب المشاهد والشخصيات فعليًا.','AI uses this template as guidance and still writes the scenes and characters.')}</span></div>}
-          {!useTextProvider && <div className="service-purpose-hint is-unavailable"><b>{tx(lang,'يلزم مزوّد كتابة AI','An AI writing provider is required')}</b><span>{tx(lang,'لن ينشئ Ella قالبًا محليًا بدلًا من الذكاء الاصطناعي. أضف مزوّد كتابة وفعّله ثم وافق على الطلب.','Ella will not substitute a local template for AI. Add and enable a text provider, then approve the request.')}</span></div>}
+          {!useTextProvider && <div className="service-purpose-hint"><b>{tx(lang,'التأليف المحلي متاح','Local storyboard is available')}</b><span>{tx(lang,'بدون مزوّد كتابة وموافقة صريحة، سينشئ Ella مخطط مشاهد محليًا دون إرسال طلب خارجي أو رسوم.','Without a writing provider and explicit approval, Ella creates a local scene outline without external requests or charges.')}</span></div>}
           {allowExternalProviders && checkingProvider && <Busy text={tx(lang,'جارٍ التحقق من مفتاح الكتابة…','Checking your writing key…')} />}
           {allowExternalProviders && !checkingProvider && !textProviderReady && <div className="service-purpose-hint is-unavailable"><b>{tx(lang,'لا يوجد مفتاح كتابة جاهز بعد','No text-generation key is ready yet')}</b><span>{tx(lang,'يمكنك إنشاء Storyboard محلي الآن، أو إضافة مفتاح نص من الإعدادات لاحقًا.','You can create a local storyboard now, or add a text provider key in Settings later.')}</span><Link href="/settings/providers" className="text-link">{tx(lang,'إعداد مفاتيح الخدمات','Set up provider keys')}<ArrowLeft size={14}/></Link></div>}
           {useTextProvider && <label className="checkline charge-consent"><input type="checkbox" checked={approvePotentialCharges} disabled={projectCreated && !generationError} onChange={e=>setApprovePotentialCharges(e.target.checked)} data-testid="checkbox-story-charge-consent"/>{tx(lang,'أوافق على إرسال الفكرة إلى مزوّد نص واحد؛ قد تُحتسب رسوم حسب خطتي. لا يُفعّل تدوير المزوّدات، وكل إعادة محاولة تحتاج موافقة جديدة.','I approve sending this idea to one text provider; charges may apply. Provider rotation is off and every retry needs fresh approval.')}</label>}
