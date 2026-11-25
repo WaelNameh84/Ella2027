@@ -729,6 +729,21 @@ async function localVideoWorkerPrediction(
   throw new Error("Local Video Worker is still processing. Check its job status before submitting another request.");
 }
 
+export async function trimGeneratedVideo(bytes: Buffer, durationSeconds: number): Promise<Buffer> {
+  const target = Math.max(1, Math.min(600, Number.isFinite(durationSeconds) ? durationSeconds : 5));
+  if (!bytes.length || bytes.length > 250 * 1024 * 1024) throw new Error("Generated video is empty or too large to trim.");
+  return await new Promise<Buffer>((resolvePromise, rejectPromise) => {
+    const child = spawn("ffmpeg", ["-hide_banner", "-loglevel", "error", "-nostdin", "-i", "pipe:0", "-t", String(target), "-map", "0:v:0", "-map", "0:a?", "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-c:a", "aac", "-movflags", "frag_keyframe+empty_moov", "-f", "mp4", "pipe:1"], { stdio: ["pipe", "pipe", "pipe"] });
+    const chunks: Buffer[] = []; let total = 0; let errorText = ""; let settled = false;
+    const finish = (error?: Error) => { if (settled) return; settled = true; clearTimeout(timeout); if (error) { child.kill("SIGKILL"); rejectPromise(error); } else { const output = Buffer.concat(chunks); if (!output.length) rejectPromise(new Error("Could not trim the generated video to the requested duration.")); else resolvePromise(output); } };
+    const timeout = setTimeout(() => finish(new Error("Video duration correction timed out.")), 180_000);
+    child.stdout.on("data", (chunk: Buffer) => { total += chunk.length; if (total > 250 * 1024 * 1024) { finish(new Error("Trimmed video exceeds the allowed file size.")); return; } chunks.push(chunk); });
+    child.stderr.on("data", (chunk: Buffer) => { errorText = (errorText + String(chunk)).slice(-2000); });
+    child.once("error", () => finish(new Error("FFmpeg is unavailable for enforcing the requested video duration.")));
+    child.once("close", (code) => { if (settled) return; if (code !== 0) finish(new Error("Could not enforce the requested video duration: " + errorText)); else finish(); });
+    child.stdin.on("error", () => undefined); child.stdin.end(bytes);
+  });
+}
 export async function generateVideo(
   provider: string,
   key: string,
