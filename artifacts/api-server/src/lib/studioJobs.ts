@@ -325,6 +325,14 @@ async function updateJob(
     .where(eq(studioJobsTable.id, jobId));
 }
 
+function getExplicitQuickConstraints(story: string): { sceneCount?: number; durationSeconds?: number } {
+  const value = story.toLowerCase().replace(/[٠-٩]/g, (digit) => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)));
+  const sceneCount = /(?:مشهد\\s+(?:واحد|واحدة)|one\\s+scene|single\\s+scene|only\\s+one\\s+scene)/i.test(value) ? 1 : undefined;
+  const numeric = value.match(/(\\d{1,3})\\s*(?:ثانية|ثواني|ث|seconds?|secs?)/i);
+  const wordFive = /(?:خمس|خمسة)\\s*(?:ثواني|ثانية)/i.test(value) || /five\\s+seconds?/i.test(value);
+  const duration = numeric ? Number(numeric[1]) : wordFive ? 5 : undefined;
+  return { ...(sceneCount ? { sceneCount } : {}), ...(duration && duration >= 1 && duration <= 600 ? { durationSeconds: duration } : {}) };
+}
 async function processScriptJob(job: typeof studioJobsTable.$inferSelect): Promise<void> {
   const input = job.input as JobInput;
   if (input.approvePotentialCharges !== true) {
@@ -390,6 +398,7 @@ async function processScriptJob(job: typeof studioJobsTable.$inferSelect): Promi
     if (!rotate) ordered = ordered.slice(0, 1);
     if (!ordered.length) throw new Error("No usable text provider is configured. Add and test a provider key.");
 
+    const explicitQuickConstraints = input.autoScenePlan ? getExplicitQuickConstraints(input.story?.trim() || project.idea) : {};
     const prompt = [
       "Analyze the premise and create a production-ready film script, character bible, and storyboard. Return only valid JSON with this shape:",
       buildDirectorContinuityRules(),
@@ -405,7 +414,7 @@ async function processScriptJob(job: typeof studioJobsTable.$inferSelect): Promi
         ? "AI SCENE PLAN: Choose 1–24 scenes from the story beats. Respect any explicit scene count and per-scene duration stated in the Concept exactly; never override them. If the user gives no exact count or duration, choose suitable values automatically. Preserve all important events and the ending."
         : `Requested scene count: exactly ${input.sceneCount ?? 6} scenes`,
       input.autoScenePlan
-        ? `Target total duration: approximately ${project.durationSeconds} seconds; choose individual scene durations based on the action.`
+        ? `Target total duration: ${explicitQuickConstraints.sceneCount && explicitQuickConstraints.durationSeconds ? explicitQuickConstraints.sceneCount * explicitQuickConstraints.durationSeconds : project.durationSeconds} seconds; respect explicit user duration constraints.`
         : `Exact duration for every scene: ${input.sceneDurationSeconds ?? 8} seconds`,
       `Scene direction: ${input.sceneStyle ?? (project.visualStyle || "Cinematic")}`,
       input.autoProductionSettings ? "Do not assume a preset total duration; choose the target runtime and set production.targetDurationSeconds to the sum of the scene durations." : `Target duration: ${project.durationSeconds} seconds`,
@@ -475,11 +484,9 @@ async function processScriptJob(job: typeof studioJobsTable.$inferSelect): Promi
         }
         generated = {
           ...parsed,
-          scenes: parsed.scenes.map((scene) => ({
+          scenes: (input.autoScenePlan && explicitQuickConstraints.sceneCount ? parsed.scenes.slice(0, explicitQuickConstraints.sceneCount) : parsed.scenes).map((scene) => ({
             ...scene,
-            durationSeconds: input.autoScenePlan
-              ? scene.durationSeconds
-              : input.sceneDurationSeconds ?? 8,
+            durationSeconds: input.autoScenePlan ? explicitQuickConstraints.durationSeconds ?? scene.durationSeconds : input.sceneDurationSeconds ?? 8,
           })),
         };
         await db.transaction(async (tx) => {
