@@ -868,6 +868,24 @@ async function processImageJob(job: typeof studioJobsTable.$inferSelect): Promis
       });
     }
     const asset = await saveGeneratedAsset(project.id, scene.id, "image", bytes);
+    // The first clean single-character still becomes that character's reusable visual reference.
+    const sceneCharacterIds = Array.isArray(scene.characterIds) ? scene.characterIds : [];
+    if (sceneCharacterIds.length === 1) {
+      const [characterId] = sceneCharacterIds;
+      const currentCharacters = project.characters ?? [];
+      let changed = false;
+      const updatedCharacters = currentCharacters.map((character) => {
+        if (character.id !== characterId || character.referenceImageUrl?.trim()) return character;
+        changed = true;
+        return { ...character, referenceImageUrl: asset.url };
+      });
+      if (changed) {
+        await db.update(projectsTable).set({ characters: updatedCharacters }).where(and(
+          eq(projectsTable.id, project.id),
+          eq(projectsTable.userId, job.userId),
+        ));
+      }
+    }
     const saved = {
       id: asset.id,
       url: asset.url,
