@@ -2904,7 +2904,7 @@ function ProvidersPage() {
     lang={lang}/>;
   useEffect(()=>{if(settingsQ.data)setPrefs(settingsQ.data)},[settingsQ.data]);
   return <AppFrame title={tx(lang,'مزوّدو الخدمة','Provider settings')} crumb="CREDENTIALS & ROTATION">
-    <div className="page-toolbar"><div><span className="eyebrow">{tx(lang,'المفاتيح والاعتمادية','KEYS & RELIABILITY')}</span><h2>{tx(lang,'أدواتك، تحت سيطرتك.', 'Your tools, on your terms.')}</h2><p>{tx(lang,'المفاتيح المحفوظة لا تظهر مجددًا وتُرسل للخادم مباشرة. خدمات AI Horde وPiper لا تُسجّل كمفاتيح API؛ ستجدهما مدمجتين تحت قسمي الصور والصوت.', 'Saved keys are never shown again and are sent directly to the server. AI Horde and Piper do not create API-key records; find them as built-in services under Image and Voice.')}</p></div><button className="btn btn-primary" onClick={()=>openAdd('text')} data-testid="button-add-provider"><Plus size={16}/>{tx(lang,'إضافة مفتاح','Add a key')}</button></div>
+    <div className="page-toolbar"><div><span className="eyebrow">{tx(lang,'المفاتيح والاعتمادية','KEYS & RELIABILITY')}</span><h2>{tx(lang,'أدواتك، تحت سيطرتك.', 'Your tools, on your terms.')}</h2><p>{tx(lang,'المفاتيح المحفوظة لا تظهر مجددًا وتُرسل للخادم مباشرة. خدمات AI Horde وPiper لا تُسجّل كمفاتيح API؛ ستجدهما مدمجتين تحت قسمي الصور والصوت.', 'Saved keys are never shown again and are sent directly to the server. AI Horde and Piper do not create API-key records; find them as built-in services under Image and Voice.')}</p></div><div className="flex flex-wrap gap-2"><Link href="/settings/ai-team" className="btn btn-quiet"><Users size={15}/>{tx(lang,'فريق الذكاء الاصطناعي','AI team memory')}</Link><button className="btn btn-primary" onClick={()=>openAdd('text')} data-testid="button-add-provider"><Plus size={16}/>{tx(lang,'إضافة مفتاح','Add a key')}</button></div></div>
     <div className="resource-notice panel"><ShieldCheck size={18}/><p>{tx(lang,'أضفنا NVIDIA NIM وCohere للكتابة بمستويات تجريبية مجانية وحدود استخدام. توليد الفيديو ليس مجانياً عبر واجهات API المستضافة؛ مزوّدا fal.ai وReplicate قد يحاسبان حسب النموذج، ويظل كل طلب فيديو خلف موافقتك الصريحة.', 'NVIDIA NIM and Cohere are available for script writing with free prototype/trial limits. Hosted video-generation APIs are not free: fal.ai and Replicate may charge by model, and every video request remains behind your explicit approval.')}</p></div>
     <div className={`resource-notice panel ${prefs?.freeMode !== false ? 'is-unavailable' : ''}`} role="status"><ShieldCheck size={18}/><p>{prefs?.freeMode !== false ? tx(lang,'المزوّدات المدفوعة متوقفة؛ تبقى AI Horde للصور وPiper للصوت متاحتين بلا مفتاح شخصي. لتشغيل مزوّد مدفوع، فعّله أدناه بعد إضافة مفتاحه. وستظل موافقتك مطلوبة قبل كل طلب قد يكلّف.','Paid external providers are off; built-in AI Horde images and Piper narration remain available without a personal key. Add and enable a paid provider below only if you choose, and approve every potentially chargeable request.') : tx(lang,'المزوّدات الخارجية مسموحة. قد يستهلك استخدامها رصيدًا أو يسبب رسومًا، لكن التطبيق سيطلب موافقتك قبل كل مهمة مولّدة.','External providers are enabled. They may use credits or incur charges, but the app asks before every generation job.')}</p></div>
     {keys.isError&&<StateError lang={lang} retry={()=>keys.refetch()} />}
@@ -3031,6 +3031,88 @@ function AccountSettingsPage() {
     </section>
   </AppFrame>;
 }
+function AiTeamPage() {
+  const { lang } = useApp();
+  const projects = useListProjects();
+  const [projectId, setProjectId] = useState("");
+  const [state, setState] = useState<Record<string, unknown> | null>(null);
+  const [stage, setStage] = useState("planning");
+  const [summary, setSummary] = useState("");
+  const [lastCompletedStep, setLastCompletedStep] = useState("");
+  const [nextStep, setNextStep] = useState("");
+  const [currentProvider, setCurrentProvider] = useState("");
+  const [feedback, setFeedback] = useState("");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (!projectId) { setState(null); return; }
+    let active = true;
+    fetch(basePath + "/api/ai-team/projects/" + projectId + "/state", { credentials: "include" })
+      .then(async response => { if (!response.ok) throw new Error("Could not load shared memory."); return response.json(); })
+      .then(data => {
+        if (!active) return;
+        const next = data.state as Record<string, unknown> | null;
+        setState(next);
+        setStage(typeof next?.stage === "string" ? next.stage : "planning");
+        setSummary(typeof next?.summary === "string" ? next.summary : "");
+        setLastCompletedStep(typeof next?.lastCompletedStep === "string" ? next.lastCompletedStep : "");
+        setNextStep(typeof next?.nextStep === "string" ? next.nextStep : "");
+        setCurrentProvider(typeof next?.currentProvider === "string" ? next.currentProvider : "");
+      })
+      .catch(error => { if (active) setFeedback(error instanceof Error ? error.message : "Could not load shared memory."); });
+    return () => { active = false; };
+  }, [projectId]);
+  const saveCheckpoint = async () => {
+    if (!projectId || !summary.trim() || !stage.trim()) return;
+    setBusy(true); setFeedback("");
+    try {
+      const response = await fetch(basePath + "/api/ai-team/projects/" + projectId + "/checkpoint", {
+        method: "PUT", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stage, summary, lastCompletedStep, nextStep, currentProvider, completedSteps: Array.isArray(state?.completedSteps) ? state.completedSteps : [], artifacts: state?.artifacts ?? {} }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not save checkpoint.");
+      setState(data.state); setFeedback(tx(lang, "تم حفظ ذاكرة المشروع.", "Project memory saved."));
+    } catch (error) { setFeedback(error instanceof Error ? error.message : "Save failed."); }
+    finally { setBusy(false); }
+  };
+  const handoff = async () => {
+    if (!projectId) return;
+    setBusy(true); setFeedback("");
+    try {
+      const response = await fetch(basePath + "/api/ai-team/projects/" + projectId + "/handoff", {
+        method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fromProvider: currentProvider, checkpoint: { stage, summary, lastCompletedStep, nextStep, completedSteps: Array.isArray(state?.completedSteps) ? state.completedSteps : [], artifacts: state?.artifacts ?? {} } }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "No alternate provider is ready.");
+      setState(data.state); setCurrentProvider(data.selectedProvider.provider);
+      setFeedback(tx(lang, "تم تسليم الذاكرة إلى " + data.selectedProvider.label + ". استخدم مفتاح API الخاص به لمتابعة الطلب.", "Checkpoint handed to " + data.selectedProvider.label + ". Use its configured API key to continue."));
+    } catch (error) { setFeedback(error instanceof Error ? error.message : "Handoff failed."); }
+    finally { setBusy(false); }
+  };
+  return <AppFrame title={tx(lang, "فريق الذكاء الاصطناعي", "AI team & shared memory")} crumb="GPT + CLAUDE · SHARED HANDOFF">
+    <div className="page-toolbar"><div><span className="eyebrow">{tx(lang, "ذاكرة مشتركة دائمة", "PERSISTENT SHARED MEMORY")}</span><h2>{tx(lang, "لا تبدأ من الصفر عند تبديل المزوّد.", "Keep project context when providers change.")}</h2><p>{tx(lang, "احفظ آخر خطوة مكتملة والخطوة التالية وملخص العمل ليتمكن مزوّد آخر من استلام السياق.", "Save completed work, the next step, and a project summary so another configured provider can pick up the context.")}</p></div></div>
+    <section className="panel provider-list grid gap-3">
+      <label className="grid gap-2"><b>{tx(lang, "المشروع", "Project")}</b><select className="studio-input" value={projectId} onChange={event => setProjectId(event.target.value)}><option value="">{tx(lang, "اختر مشروعاً", "Choose a project")}</option>{(projects.data ?? []).map(project => <option key={project.id} value={project.id}>{project.title}</option>)}</select></label>
+      {projectId ? <>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <label className="grid gap-1"><span>{tx(lang, "مرحلة العمل", "Current stage")}</span><input className="studio-input" value={stage} onChange={event => setStage(event.target.value)} maxLength={80}/></label>
+          <label className="grid gap-1"><span>{tx(lang, "المزوّد الحالي", "Current provider")}</span><select className="studio-input" value={currentProvider} onChange={event => setCurrentProvider(event.target.value)}><option value="">—</option><option value="openai">OpenAI / GPT API</option><option value="anthropic">Anthropic / Claude API</option></select></label>
+        </div>
+        <label className="grid gap-1"><span>{tx(lang, "ملخص ما تم إنجازه", "Work completed / shared summary")}</span><textarea className="studio-input min-h-36" value={summary} onChange={event => setSummary(event.target.value)} maxLength={12000} placeholder={tx(lang, "اكتب ما أنجزه المزوّد والقرارات التي يجب الحفاظ عليها…", "Describe completed work, decisions, constraints, and context…")}/></label>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <label className="grid gap-1"><span>{tx(lang, "آخر خطوة مكتملة", "Last completed step")}</span><input className="studio-input" value={lastCompletedStep} onChange={event => setLastCompletedStep(event.target.value)} maxLength={240}/></label>
+          <label className="grid gap-1"><span>{tx(lang, "الخطوة التالية", "Next step")}</span><input className="studio-input" value={nextStep} onChange={event => setNextStep(event.target.value)} maxLength={240}/></label>
+        </div>
+        <div className="flex flex-wrap gap-2"><button className="btn btn-primary" disabled={busy || !summary.trim()} onClick={() => void saveCheckpoint()}>{busy ? <LoaderCircle size={15} className="animate-spin"/> : <CheckCircle2 size={15}/>} {tx(lang, "حفظ نقطة التوقف", "Save checkpoint")}</button><button className="btn btn-quiet" disabled={busy || !summary.trim()} onClick={() => void handoff()}><ArrowRight size={15}/>{tx(lang, "تسليم للمزوّد الآخر", "Hand off to alternate provider")}</button></div>
+        {state && <div className="resource-notice panel"><Activity size={17}/><p>{tx(lang, "الإصدار", "Revision")}: {String(state.revision ?? "—")} · {tx(lang, "عمليات التسليم", "Handoffs")}: {String(state.handoffCount ?? 0)} · {tx(lang, "آخر تحديث", "Updated")}: {state.updatedAt ? new Date(String(state.updatedAt)).toLocaleString() : "—"}</p></div>}
+      </> : <p className="provider-purpose-description">{tx(lang, "اختر مشروعاً لعرض ذاكرته المشتركة أو حفظ نقطة توقف جديدة.", "Choose a project to view its shared memory or save a new checkpoint.")}</p>}
+      {feedback && <p className="text-sm" role="status">{feedback}</p>}
+    </section>
+    <div className="resource-notice panel mt-3"><ShieldCheck size={18}/><p>{tx(lang, "مهم: الذاكرة والتسليم يعملان مع مفاتيح API الرسمية المضافة إلى Ella2027. اشتراكات ChatGPT Free وClaude Free على موقعيهما لا تمنح التطبيق API تلقائياً، ولا يمكن تجاوز حدود الخطط المجانية.", "Important: shared memory and handoff operate with official API keys configured in Ella2027. ChatGPT Free and Claude Free website subscriptions do not automatically provide API access, and plan limits cannot be bypassed.")}</p></div>
+  </AppFrame>;
+}
+
 function SettingsRedirect() { return <Redirect to="/settings/providers" />; }
 function AdminDashboard() {
   const { lang } = useApp();
@@ -3205,6 +3287,7 @@ function Router() {
         <Route path="/jobs" component={JobsPage}/>
         <Route path="/media" component={MediaPage}/>
         <Route path="/settings/providers" component={ProvidersPage}/>
+        <Route path="/settings/ai-team" component={AiTeamPage}/>
         <Route path="/settings/tools" component={ToolsPage}/>
         <Route path="/settings/account/*?" component={AccountSettingsPage}/>
         <Route path="/admin" component={AdminDashboard}/>
