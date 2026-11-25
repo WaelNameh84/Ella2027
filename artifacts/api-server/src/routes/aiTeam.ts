@@ -341,12 +341,12 @@ router.post("/ai-team/projects/:projectId/submit-storyboard", async (req, res): 
     res.status(409).json({ error: "This project already has scenes. Choose an empty project or remove its scenes first." });
     return;
   }
-  const activeJobs = await db.select({ id: studioJobsTable.id }).from(studioJobsTable).where(and(
+  const existingScriptJobs = await db.select({ id: studioJobsTable.id, status: studioJobsTable.status }).from(studioJobsTable).where(and(
     eq(studioJobsTable.userId, userId),
     eq(studioJobsTable.projectId, projectId),
     eq(studioJobsTable.jobType, "script"),
   ));
-  if (activeJobs.length) {
+  if (existingScriptJobs.some((job) => job.status === "queued" || job.status === "running")) {
     res.status(409).json({ error: "A storyboard job is already active for this project." });
     return;
   }
