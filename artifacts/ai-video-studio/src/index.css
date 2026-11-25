@@ -3141,7 +3141,7 @@ a[href]:active,
 }
 @media (max-width: 560px) {
   :is(.create-studio-entry, .manual-studio-form) .idea-entry-card .quick-dropdown-toolbar {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
   }
   :is(.create-studio-entry, .manual-studio-form) .idea-entry-card .quick-dropdown-toolbar .quick-setting-dropdown[open] {
@@ -3153,57 +3153,3 @@ a[href]:active,
 }
 
 
-/* Final mobile layout guard for the actual inline ProjectForm root */
-@media (max-width: 767px) {
-  .create-studio-entry,
-  .manual-studio-entry,
-  .manual-studio-form {
-    width: 100%;
-    max-width: 100%;
-    min-width: 0;
-    overflow-x: clip;
-    box-sizing: border-box;
-  }
-  .create-studio-entry .inline-project-form.idea-entry-card,
-  .manual-studio-form .inline-project-form.idea-entry-card {
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-    margin: 0 !important;
-    padding: 12px !important;
-    box-sizing: border-box !important;
-    overflow: visible !important;
-  }
-  .create-studio-entry .inline-project-form.idea-entry-card *,
-  .manual-studio-form .inline-project-form.idea-entry-card * {
-    min-width: 0;
-    box-sizing: border-box;
-  }
-  .create-studio-entry .inline-project-form.idea-entry-card .quick-toolbar,
-  .create-studio-entry .inline-project-form.idea-entry-card .quick-dropdown-toolbar,
-  .manual-studio-form .inline-project-form.idea-entry-card .quick-toolbar,
-  .manual-studio-form .inline-project-form.idea-entry-card .quick-dropdown-toolbar {
-    display: grid !important;
-    grid-template-columns: minmax(0, 1fr) !important;
-    width: 100% !important;
-    gap: 9px !important;
-  }
-  .create-studio-entry .inline-project-form.idea-entry-card .quick-setting-dropdown,
-  .manual-studio-form .inline-project-form.idea-entry-card .quick-setting-dropdown {
-    width: 100% !important;
-    min-width: 0 !important;
-    grid-column: 1 !important;
-  }
-  .create-studio-entry .inline-project-form.idea-entry-card .form-two,
-  .manual-studio-form .inline-project-form.idea-entry-card .form-two {
-    grid-template-columns: minmax(0, 1fr) !important;
-  }
-  .create-studio-entry .inline-project-form.idea-entry-card [data-testid="button-create-project"],
-  .manual-studio-form .inline-project-form.idea-entry-card [data-testid="button-create-project"] {
-    display: flex !important;
-    width: 100% !important;
-    min-height: 52px !important;
-    pointer-events: auto !important;
-    touch-action: manipulation;
-  }
-}
