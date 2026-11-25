@@ -42,7 +42,7 @@ type SceneDraft = {
 
 export const FREE_TEST_PROVIDER_KEY = "00000000-0000-4000-8000-000000000000";
 
-type ScriptResult = { scenes: SceneDraft[]; characters: StudioCharacter[] };
+type ScriptResult = { scenes: SceneDraft[]; characters: StudioCharacter[]; production?: { videoType?: string; aspectRatio?: string; visualStyle?: string; targetDurationSeconds?: number } };
 
 type JobInput = {
   providerKeyId?: string | null;
@@ -65,6 +65,8 @@ type JobInput = {
   sceneCount?: number;
   sceneDurationSeconds?: number;
   sceneStyle?: string;
+  autoScenePlan?: boolean;
+  autoProductionSettings?: boolean;
   story?: string;
   autoGenerateVideo?: boolean;
   videoProviderKeyId?: string | null;
@@ -85,7 +87,7 @@ function parseGeneratedJson(text: string): ScriptResult {
   } catch {
     throw new Error("The provider response was not valid JSON.");
   }
-  const response = data as { scenes?: unknown; characters?: unknown };
+  const response = data as { scenes?: unknown; characters?: unknown; production?: unknown };
   const scenes = response.scenes;
   if (!Array.isArray(scenes) || scenes.length < 1 || scenes.length > 24) {
     throw new Error("The provider returned an invalid number of scenes.");
@@ -105,8 +107,17 @@ function parseGeneratedJson(text: string): ScriptResult {
       };
     }).filter((character) => character.name)
     : [];
+  const rawProduction = response.production && typeof response.production === "object" ? response.production as Record<string, unknown> : {};
+  const allowedRatios = ["16:9", "9:16", "1:1", "4:5", "4:3", "3:2"];
+  const production = {
+    videoType: typeof rawProduction.videoType === "string" ? rawProduction.videoType.slice(0, 120) : undefined,
+    aspectRatio: typeof rawProduction.aspectRatio === "string" && allowedRatios.includes(rawProduction.aspectRatio) ? rawProduction.aspectRatio : undefined,
+    visualStyle: typeof rawProduction.visualStyle === "string" ? rawProduction.visualStyle.slice(0, 200) : undefined,
+    targetDurationSeconds: Number.isFinite(Number(rawProduction.targetDurationSeconds)) ? Math.max(5, Math.min(3600, Math.round(Number(rawProduction.targetDurationSeconds)))) : undefined,
+  };
   return {
     characters,
+    production,
     scenes: scenes.map((scene, index) => {
     const item = scene as Record<string, unknown>;
     const title = typeof item.title === "string" ? item.title.trim() : "";
@@ -332,6 +343,7 @@ async function processScriptJob(job: typeof studioJobsTable.$inferSelect): Promi
       characters: Array.isArray(job.result?.characters)
         ? job.result.characters as StudioCharacter[]
         : project.characters ?? [],
+      production: job.result?.production && typeof job.result.production === "object" ? job.result.production as ScriptResult["production"] : undefined,
     };
   } else {
     const currentScenes = await db.select({ id: scenesTable.id })
@@ -381,22 +393,33 @@ async function processScriptJob(job: typeof studioJobsTable.$inferSelect): Promi
     const prompt = [
       "Analyze the premise and create a production-ready film script, character bible, and storyboard. Return only valid JSON with this shape:",
       buildDirectorContinuityRules(),
-      '{"characters":[{"id":"character-1","name":"...","description":"fixed visual identity","costume":"fixed costume","voiceDescription":"..."}],"scenes":[{"title":"...","description":"...","imagePrompt":"...","narration":"...","durationSeconds":8,"shotType":"wide","cameraMovement":"slow push-in","location":"...","lighting":"...","characterIds":["character-1"]}]}',
+      '{"production":{"videoType":"...","aspectRatio":"9:16","visualStyle":"...","targetDurationSeconds":30},"characters":[{"id":"character-1","name":"...","description":"fixed visual identity","costume":"fixed costume","voiceDescription":"..."}],"scenes":[{"title":"...","description":"...","imagePrompt":"...","narration":"...","durationSeconds":8,"shotType":"wide","cameraMovement":"slow push-in","location":"...","lighting":"...","characterIds":["character-1"]}]}',
       `Concept: ${input.story?.trim() || project.idea}`,
-      `Video type: ${project.videoType}`,
+      input.autoProductionSettings
+        ? "AI PRODUCTION DECISION: Choose the best video type, aspect ratio (16:9, 9:16, 1:1, 4:5, 4:3 or 3:2), visual style and total runtime for the concept and likely publishing platform. Return these choices in the top-level production object. Respect explicit format or duration constraints written by the user in the Concept; otherwise decide intelligently."
+        : `Video type: ${project.videoType}`,
       `Language: ${project.language}`,
       `Audience: ${project.audience}`,
-      `Visual style: ${project.visualStyle}`,
-      `Requested scene count: ${input.sceneCount ?? 6} scenes`,
-      `Exact duration for every scene: ${input.sceneDurationSeconds ?? 8} seconds`,
+      input.autoProductionSettings ? "Choose a visual style that serves the concept and include it in production.visualStyle." : `Visual style: ${project.visualStyle}`,
+      input.autoScenePlan
+        ? "AI SCENE PLAN: Choose the number of scenes yourself (between 2 and 24) from the actual story beats, not from a preset. Choose a suitable duration for each scene (normally 4–12 seconds, longer only when the action needs it). Preserve all important events and the ending. Aim for a coherent total runtime near the target duration, but story structure takes priority. Return the chosen scene count and each scene's own durationSeconds."
+        : `Requested scene count: exactly ${input.sceneCount ?? 6} scenes`,
+      input.autoScenePlan
+        ? `Target total duration: approximately ${project.durationSeconds} seconds; choose individual scene durations based on the action.`
+        : `Exact duration for every scene: ${input.sceneDurationSeconds ?? 8} seconds`,
       `Scene direction: ${input.sceneStyle ?? (project.visualStyle || "Cinematic")}`,
-      `Target duration: ${project.durationSeconds} seconds`,
-      `Return exactly ${input.sceneCount ?? 6} scenes. Set durationSeconds to exactly ${input.sceneDurationSeconds ?? 8} for every scene.`,
-      "Create a character bible with stable IDs and fixed facial identity, age, hair, build, costume, palette and voice identity. Assign characterIds to each scene. Keep character, prop, location and timeline continuity across the whole film. Every scene must contain a clear shot type, camera movement, location, lighting, action, speaker-labelled dialogue/narration, and sound design notes. Internally plan multiple short visual beats per scene so the video worker can split long scenes to the model's clip limit without losing story continuity.",
+      input.autoProductionSettings ? "Do not assume a preset total duration; choose the target runtime and set production.targetDurationSeconds to the sum of the scene durations." : `Target duration: ${project.durationSeconds} seconds`,
+      input.autoScenePlan
+        ? "Do not force equal-length scenes. Return 2–24 scenes, each with a durationSeconds value appropriate to its narrative beat."
+        : `Return exactly ${input.sceneCount ?? 6} scenes. Set durationSeconds to exactly ${input.sceneDurationSeconds ?? 8} for every scene.`,
+      "CHARACTER IDENTITY LOCK: Build a reusable character bible with one stable ID per person and highly specific immutable visual identity: apparent age, face shape, eye shape/color, skin tone, nose, hairline/style/color, body proportions, distinguishing marks, fixed base costume, footwear, accessories, and exact color palette. Define a stable voice identity (language, accent, pitch, timbre, speaking rhythm). Reuse the exact same identity and costume in every scene unless the story explicitly changes clothing. Assign only valid characterIds to each scene. For every scene imagePrompt, repeat the assigned character's exact visual identity and costume in a dedicated CHARACTER LOCK sentence; do not use vague phrases such as 'same person'. Expressions, pose, camera angle and lighting may change; facial identity and defining traits must not. Keep props, injuries, wetness, dirt, costume damage, geography and timeline continuous. Every scene must contain shot type, camera movement, location, lighting, action, speaker-labelled dialogue/narration, and sound design notes. Internally plan short visual beats so the video worker can split long scenes without losing continuity.",
       "CRITICAL SCENE UNIQUENESS: Every requested scene must depict a different next event in the story. Never copy or paraphrase another scene's description or imagePrompt. Give every scene its own distinct physical action, composition, camera framing or movement, and visual beat while preserving character identity and chronological continuity. Scene 1 must not be repeated in scenes 2 onward. The imagePrompt must describe only that scene, not a generic film-wide prompt.",
       input.story?.trim()
-        ? "Treat the Concept as a complete source story. Preserve the main events, order, tone, characters, relationships, and ending. Divide it into the exact requested number of scenes without changing the plot. Enrich each scene with detailed action, setting, character continuity, cinematic direction, and dialogue. Put complete speaker-labeled dialogue plus any narrator voiceover in the narration field, and include suitable sound-effect suggestions in the scene description. Return the fixed character bible so the same characters remain consistent across all scenes."
-        : "Use 1 to 24 scenes. Create 1 to 8 recurring character profiles, and refer to them by their stable IDs. Keep each character's face, age, hair, body, costume, palette, and environment consistent across every scene. Make each image prompt include only the relevant character profile details, shot size, camera movement, lens feel, location, lighting, and composition. Write narration in the selected language and keep scene durations close to the target total.",
+        ? input.autoScenePlan
+          ? "Treat the Concept as the complete source story. Preserve every important event, chronological order, tone, character relationship and the original ending. Split it into a natural number of scenes based on meaningful changes of action, place, time or dramatic beat; do not impose an equal or preset scene count. Choose a duration for each scene that fits its action."
+          : "Treat the Concept as the complete source story. Preserve the main events, order, tone, characters, relationships, and ending. Divide it into exactly the requested number of scenes without changing the plot."
+        : "Create 1 to 8 recurring character profiles and refer to them by stable IDs. Keep each character's face, age, hair, body, costume, palette, voice and defining features identical across every scene. Make every image prompt repeat the relevant character's full fixed identity, plus scene-specific action, shot size, camera movement, lens feel, location, lighting and composition. Write dialogue and narration in the selected language.",
+      "If a story contains several characters, never merge them or change their names. Character descriptions must be concrete enough to recreate the same person in a separate generation. Do not put conflicting wardrobe or facial details in different scenes.",
     ].join("\n");
 
     let lastError = "All configured providers failed.";
@@ -414,7 +437,23 @@ async function processScriptJob(job: typeof studioJobsTable.$inferSelect): Promi
       }
       try {
         const response = await generateWithProvider(keyRow.provider, key, prompt);
-        const parsed = parseGeneratedJson(response);
+        const parsedResponse = parseGeneratedJson(response);
+        const characterById = new Map(parsedResponse.characters.map((character) => [character.id, character]));
+        const parsed: ScriptResult = {
+          ...parsedResponse,
+          scenes: parsedResponse.scenes.map((scene) => {
+            const assigned = scene.characterIds.filter((id) => characterById.has(id));
+            const locks = assigned.map((id) => {
+              const character = characterById.get(id)!;
+              return `LOCKED CHARACTER ${character.id} — ${character.name}: ${character.description} Fixed costume: ${character.costume}. Preserve this exact face, hair, age, body proportions and color palette; only pose, expression and camera angle may change.`;
+            });
+            return {
+              ...scene,
+              characterIds: assigned,
+              imagePrompt: [scene.imagePrompt, ...locks].join("\\n"),
+            };
+          }),
+        };
         const continuity = auditSceneContinuity(
           parsed.scenes.map((scene, index) => ({
             sceneId: `scene-${index + 1}`,
@@ -430,14 +469,16 @@ async function processScriptJob(job: typeof studioJobsTable.$inferSelect): Promi
           throw new Error(`Storyboard continuity check failed: ${blockingContinuity[0].message}`);
         }
         const expectedSceneCount = input.sceneCount ?? 6;
-        if (parsed.scenes.length !== expectedSceneCount) {
+        if (!input.autoScenePlan && parsed.scenes.length !== expectedSceneCount) {
           throw new Error(`Generated scene count mismatch: expected ${expectedSceneCount}, received ${parsed.scenes.length}.`);
         }
         generated = {
           ...parsed,
           scenes: parsed.scenes.map((scene) => ({
             ...scene,
-            durationSeconds: input.sceneDurationSeconds ?? 8,
+            durationSeconds: input.autoScenePlan
+              ? scene.durationSeconds
+              : input.sceneDurationSeconds ?? 8,
           })),
         };
         await db.transaction(async (tx) => {
@@ -584,9 +625,16 @@ async function processScriptJob(job: typeof studioJobsTable.$inferSelect): Promi
       console.info(`[studio] Queued ${queuedVideoJobs} video jobs for ${orderedScenes.length} storyboard scenes in order.`);
     }
 
+    const actualDuration = generated!.scenes.reduce((total, scene) => total + scene.durationSeconds, 0);
     await tx.update(projectsTable).set({
       status: "editing",
       progress: 45,
+      durationSeconds: Math.max(5, Math.min(3600, actualDuration)),
+      ...(input.autoProductionSettings ? {
+        ...(generated!.production?.videoType ? { videoType: generated!.production.videoType } : {}),
+        ...(generated!.production?.aspectRatio ? { aspectRatio: generated!.production.aspectRatio } : {}),
+        ...(generated!.production?.visualStyle ? { visualStyle: generated!.production.visualStyle } : {}),
+      } : {}),
       characters: generated!.characters,
     })
       .where(and(eq(projectsTable.id, project.id), eq(projectsTable.userId, job.userId)));
@@ -820,6 +868,24 @@ async function processImageJob(job: typeof studioJobsTable.$inferSelect): Promis
       });
     }
     const asset = await saveGeneratedAsset(project.id, scene.id, "image", bytes);
+    // The first clean single-character still becomes that character's reusable visual reference.
+    const sceneCharacterIds = Array.isArray(scene.characterIds) ? scene.characterIds : [];
+    if (sceneCharacterIds.length === 1) {
+      const [characterId] = sceneCharacterIds;
+      const currentCharacters = project.characters ?? [];
+      let changed = false;
+      const updatedCharacters = currentCharacters.map((character) => {
+        if (character.id !== characterId || character.referenceImageUrl?.trim()) return character;
+        changed = true;
+        return { ...character, referenceImageUrl: asset.url };
+      });
+      if (changed) {
+        await db.update(projectsTable).set({ characters: updatedCharacters }).where(and(
+          eq(projectsTable.id, project.id),
+          eq(projectsTable.userId, job.userId),
+        ));
+      }
+    }
     const saved = {
       id: asset.id,
       url: asset.url,

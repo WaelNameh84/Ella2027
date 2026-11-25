@@ -11,6 +11,8 @@ export interface ScriptGenerationInput {
   providerKeyId?: string | null;
   allowRotation: boolean;
   approvePotentialCharges: boolean;
+  autoScenePlan?: boolean;
+  autoProductionSettings?: boolean;
   /**
      * @minimum 1
      * @maximum 24
