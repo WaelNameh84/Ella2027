@@ -91,7 +91,10 @@ const FREE_TEST_KEYS: ProviderKey[] = [
 
 type PuterSdk = {
   auth: { isSignedIn: () => boolean; signIn: () => Promise<unknown> };
-  ai: { txt2img: (prompt: string, options?: Record<string, unknown>) => Promise<HTMLImageElement> };
+  ai: {
+    txt2img: (prompt: string, options?: Record<string, unknown>) => Promise<HTMLImageElement>;
+    chat: (prompt: string, options?: Record<string, unknown>) => Promise<{ message?: { content?: string | Array<{ type?: string; text?: string }> } }>;
+  };
 };
 declare global { interface Window { puter?: PuterSdk } }
 let puterSdkPromise: Promise<PuterSdk> | null = null;
@@ -1326,7 +1329,7 @@ function Projects({ homePage = false, manualPage = false, createPage = false }: 
     const requestedMode = params.get('mode') === 'quick' ? 'quick' : 'pro';
     return <AppFrame title={tx(lang, requestedMode === 'quick' ? 'الإنشاء السريع' : 'الاستوديو الاحترافي', requestedMode === 'quick' ? 'Quick creation' : 'Pro Studio')} crumb={requestedMode === 'quick' ? 'QUICK AUTO WORKFLOW' : 'PRO PRODUCTION WORKSPACE'}>
       <div className="create-studio-entry" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
-        <div className="create-studio-heading"><button type="button" className="btn btn-quiet" onClick={() => setLocation('/dashboard')}><ArrowLeft size={15}/>{tx(lang,'العودة للاستوديو','Back to studio')}</button><span className="ella-overline">{requestedMode === 'quick' ? 'QUICK AUTO' : 'PRO STUDIO'}</span></div>
+        <div className="create-studio-heading"><button type="button" className="btn btn-quiet" onClick={() => setLocation('/dashboard')}><ArrowLeft size={15}/>{tx(lang,'العودة للاستوديو','Back to studio')}</button><Link href="/autopilot" className="btn btn-primary"><WandSparkles size={15}/>{tx(lang,'اكتب الفكرة ودع Ella ينفّذ','Write an idea — Ella does the rest')}</Link><span className="ella-overline">{requestedMode === 'quick' ? 'QUICK AUTO' : 'PRO STUDIO'}</span></div>
         {projectForm(true, 'auto', requestedMode)}
       </div>
     </AppFrame>;
@@ -2904,7 +2907,7 @@ function ProvidersPage() {
     lang={lang}/>;
   useEffect(()=>{if(settingsQ.data)setPrefs(settingsQ.data)},[settingsQ.data]);
   return <AppFrame title={tx(lang,'مزوّدو الخدمة','Provider settings')} crumb="CREDENTIALS & ROTATION">
-    <div className="page-toolbar"><div><span className="eyebrow">{tx(lang,'المفاتيح والاعتمادية','KEYS & RELIABILITY')}</span><h2>{tx(lang,'أدواتك، تحت سيطرتك.', 'Your tools, on your terms.')}</h2><p>{tx(lang,'المفاتيح المحفوظة لا تظهر مجددًا وتُرسل للخادم مباشرة. خدمات AI Horde وPiper لا تُسجّل كمفاتيح API؛ ستجدهما مدمجتين تحت قسمي الصور والصوت.', 'Saved keys are never shown again and are sent directly to the server. AI Horde and Piper do not create API-key records; find them as built-in services under Image and Voice.')}</p></div><button className="btn btn-primary" onClick={()=>openAdd('text')} data-testid="button-add-provider"><Plus size={16}/>{tx(lang,'إضافة مفتاح','Add a key')}</button></div>
+    <div className="page-toolbar"><div><span className="eyebrow">{tx(lang,'المفاتيح والاعتمادية','KEYS & RELIABILITY')}</span><h2>{tx(lang,'أدواتك، تحت سيطرتك.', 'Your tools, on your terms.')}</h2><p>{tx(lang,'المفاتيح المحفوظة لا تظهر مجددًا وتُرسل للخادم مباشرة. خدمات AI Horde وPiper لا تُسجّل كمفاتيح API؛ ستجدهما مدمجتين تحت قسمي الصور والصوت.', 'Saved keys are never shown again and are sent directly to the server. AI Horde and Piper do not create API-key records; find them as built-in services under Image and Voice.')}</p></div><div className="flex flex-wrap gap-2"><Link href="/settings/ai-team" className="btn btn-quiet"><Users size={15}/>{tx(lang,'فريق الذكاء الاصطناعي','AI team memory')}</Link><button className="btn btn-primary" onClick={()=>openAdd('text')} data-testid="button-add-provider"><Plus size={16}/>{tx(lang,'إضافة مفتاح','Add a key')}</button></div></div>
     <div className="resource-notice panel"><ShieldCheck size={18}/><p>{tx(lang,'أضفنا NVIDIA NIM وCohere للكتابة بمستويات تجريبية مجانية وحدود استخدام. توليد الفيديو ليس مجانياً عبر واجهات API المستضافة؛ مزوّدا fal.ai وReplicate قد يحاسبان حسب النموذج، ويظل كل طلب فيديو خلف موافقتك الصريحة.', 'NVIDIA NIM and Cohere are available for script writing with free prototype/trial limits. Hosted video-generation APIs are not free: fal.ai and Replicate may charge by model, and every video request remains behind your explicit approval.')}</p></div>
     <div className={`resource-notice panel ${prefs?.freeMode !== false ? 'is-unavailable' : ''}`} role="status"><ShieldCheck size={18}/><p>{prefs?.freeMode !== false ? tx(lang,'المزوّدات المدفوعة متوقفة؛ تبقى AI Horde للصور وPiper للصوت متاحتين بلا مفتاح شخصي. لتشغيل مزوّد مدفوع، فعّله أدناه بعد إضافة مفتاحه. وستظل موافقتك مطلوبة قبل كل طلب قد يكلّف.','Paid external providers are off; built-in AI Horde images and Piper narration remain available without a personal key. Add and enable a paid provider below only if you choose, and approve every potentially chargeable request.') : tx(lang,'المزوّدات الخارجية مسموحة. قد يستهلك استخدامها رصيدًا أو يسبب رسومًا، لكن التطبيق سيطلب موافقتك قبل كل مهمة مولّدة.','External providers are enabled. They may use credits or incur charges, but the app asks before every generation job.')}</p></div>
     {keys.isError&&<StateError lang={lang} retry={()=>keys.refetch()} />}
@@ -3031,6 +3034,192 @@ function AccountSettingsPage() {
     </section>
   </AppFrame>;
 }
+function AiTeamPage() {
+  const { lang } = useApp();
+  const projects = useListProjects();
+  const providerKeys = useListProviderKeys();
+  const emptyProjects = (projects.data ?? []).filter(project => (project.sceneCount ?? 0) === 0);
+  const [projectId, setProjectId] = useState("");
+  const [state, setState] = useState<Record<string, unknown> | null>(null);
+  const [stage, setStage] = useState("planning");
+  const [summary, setSummary] = useState("");
+  const [lastCompletedStep, setLastCompletedStep] = useState("");
+  const [nextStep, setNextStep] = useState("");
+  const [currentProvider, setCurrentProvider] = useState("");
+  const [feedback, setFeedback] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [idea, setIdea] = useState("");
+  const [sceneCount, setSceneCount] = useState(5);
+  const [sceneDuration, setSceneDuration] = useState(8);
+  const [videoProviderKeyId, setVideoProviderKeyId] = useState("");
+  const [videoModel, setVideoModel] = useState("ltx2_25_22B_distilled");
+  const [autoVideo, setAutoVideo] = useState(true);
+  const [puterStatus, setPuterStatus] = useState("");
+  useEffect(() => {
+    if (!projectId && emptyProjects.length) setProjectId(emptyProjects[0].id);
+  }, [projects.data, projectId]);
+  useEffect(() => {
+    let active = true;
+    setState(null);
+    setStage("planning");
+    setSummary("");
+    setLastCompletedStep("");
+    setNextStep("");
+    setCurrentProvider("");
+    setFeedback("");
+    if (!projectId) { setBusy(false); return () => { active = false; }; }
+    setBusy(true);
+    fetch(basePath + "/api/ai-team/projects/" + projectId + "/state", { credentials: "include" })
+      .then(async response => { if (!response.ok) throw new Error("Could not load shared memory."); return response.json(); })
+      .then(data => {
+        if (!active) return;
+        const next = data.state as Record<string, unknown> | null;
+        setState(next);
+        setStage(typeof next?.stage === "string" ? next.stage : "planning");
+        setSummary(typeof next?.summary === "string" ? next.summary : "");
+        setLastCompletedStep(typeof next?.lastCompletedStep === "string" ? next.lastCompletedStep : "");
+        setNextStep(typeof next?.nextStep === "string" ? next.nextStep : "");
+        setCurrentProvider(typeof next?.currentProvider === "string" ? next.currentProvider : "");
+      })
+      .catch(error => { if (active) setFeedback(error instanceof Error ? error.message : "Could not load shared memory."); })
+      .finally(() => { if (active) setBusy(false); });
+    return () => { active = false; };
+  }, [projectId]);
+  useEffect(() => {
+    const available = (providerKeys.data ?? []).filter(key => key.serviceType === "video" && key.enabled);
+    if (!videoProviderKeyId && available.length) {
+      const preferred = available.find(key => key.provider === "local-video-worker") ?? available[0];
+      setVideoProviderKeyId(preferred.id);
+      setVideoModel(defaultVideoModel(preferred.provider, "text") || "");
+    }
+  }, [providerKeys.data, videoProviderKeyId]);
+  const generateEverything = async () => {
+    if (!projectId || !idea.trim() || busy) return;
+    setBusy(true);
+    setFeedback("");
+    try {
+      const sdk = await loadPuterSdk();
+      if (!sdk.auth.isSignedIn()) {
+        setPuterStatus(tx(lang, "سجّل الدخول إلى Puter مرة واحدة فقط…", "Sign in to Puter once…"));
+        await sdk.auth.signIn();
+      }
+      setPuterStatus(tx(lang, "يكتب السيناريو ويقسّم المشاهد…", "Writing the storyboard and splitting scenes…"));
+      const prompt = [
+        "You are Ella's autonomous film director. Return ONLY valid JSON, no markdown, with this exact structure:",
+        '{"characters":[{"id":"character-1","name":"...","description":"fixed face, age, hair, build and identifying traits","costume":"fixed costume and colors","voiceDescription":"voice identity"}],"scenes":[{"title":"...","description":"detailed action and sound design","imagePrompt":"cinematic generation prompt with exact character continuity, framing, lens, action and environment","narration":"complete speaker-labelled dialogue and narration","durationSeconds":8,"shotType":"wide","cameraMovement":"slow push-in","location":"...","lighting":"...","characterIds":["character-1"]}]}',
+        "Create a production-ready, coherent cinematic sequence. Every scene must be a different chronological event with no repeated descriptions or image prompts. Maintain fixed character identity, costume, props and locations. Include Arabic dialogue and narration if the user writes Arabic. Image prompts must be written in English for better generation quality, while dialogue follows the requested language.",
+        "USER IDEA: " + idea.trim(),
+        "PROJECT LANGUAGE: " + (projects.data ?? []).find(project => project.id === projectId)?.language,
+        "VISUAL STYLE: " + (projects.data ?? []).find(project => project.id === projectId)?.visualStyle,
+        "EXACT SCENE COUNT: " + sceneCount,
+        "EXACT DURATION PER SCENE: " + sceneDuration + " seconds",
+        "Return exactly " + sceneCount + " scenes. Set durationSeconds to exactly " + sceneDuration + " for every scene. Provide 1-8 recurring characters with stable IDs and assign characterIds correctly. Each scene needs a distinct action, shot type, camera movement, location, lighting, detailed imagePrompt, and dialogue/narration."
+      ].join("\n");
+      const response = await sdk.ai.chat(prompt, { model: "gpt-5.4-nano", temperature: 0.7 });
+      const content = response.message?.content;
+      const text = typeof content === "string" ? content
+        : Array.isArray(content) ? content.filter(part => part.type === "text").map(part => part.text ?? "").join("\n")
+        : "";
+      const normalized = text.replace(/```(?:json)?/gi, "").trim();
+      const first = normalized.indexOf("{");
+      const last = normalized.lastIndexOf("}");
+      if (first < 0 || last <= first) throw new Error("The AI did not return a valid storyboard. Please retry.");
+      const storyboard = JSON.parse(normalized.slice(first, last + 1));
+      if (!Array.isArray(storyboard.scenes) || storyboard.scenes.length !== sceneCount) {
+        throw new Error("The AI returned the wrong number of scenes. Nothing was queued.");
+      }
+      setPuterStatus(tx(lang, "تمت كتابة المشاهد. جارٍ إرسالها إلى طابور Ella…", "Storyboard ready. Sending all scenes to Ella's queue…"));
+      const responseSave = await fetch(basePath + "/api/ai-team/projects/" + projectId + "/submit-storyboard", {
+        method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          characters: storyboard.characters,
+          scenes: storyboard.scenes.map((scene: Record<string, unknown>) => ({ ...scene, durationSeconds: sceneDuration })),
+          autoGenerateVideo: autoVideo,
+          videoProviderKeyId,
+          videoModel,
+          approveVideoCharges: autoVideo,
+        }),
+      });
+      const result = await responseSave.json();
+      if (!responseSave.ok) throw new Error(result.error || "Could not queue the storyboard.");
+      setPuterStatus("");
+      setFeedback(tx(lang, "تم إرسال " + storyboard.scenes.length + " مشاهد إلى قائمة المهام. ستُنفّذ بالتتابع تلقائياً.", storyboard.scenes.length + " scenes were queued. They will run sequentially automatically."));
+      setIdea("");
+    } catch (error) {
+      setPuterStatus("");
+      setFeedback(error instanceof Error ? error.message : "Automatic generation failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const saveCheckpoint = async () => {
+    if (!projectId || !summary.trim() || !stage.trim()) return;
+    setBusy(true); setFeedback("");
+    try {
+      const response = await fetch(basePath + "/api/ai-team/projects/" + projectId + "/checkpoint", {
+        method: "PUT", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stage, summary, lastCompletedStep, nextStep, currentProvider, completedSteps: Array.isArray(state?.completedSteps) ? state.completedSteps : [], artifacts: state?.artifacts ?? {} }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not save checkpoint.");
+      setState(data.state); setFeedback(tx(lang, "تم حفظ ذاكرة المشروع.", "Project memory saved."));
+    } catch (error) { setFeedback(error instanceof Error ? error.message : "Save failed."); }
+    finally { setBusy(false); }
+  };
+  const handoff = async () => {
+    if (!projectId) return;
+    setBusy(true); setFeedback("");
+    try {
+      const response = await fetch(basePath + "/api/ai-team/projects/" + projectId + "/handoff", {
+        method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fromProvider: currentProvider, checkpoint: { stage, summary, lastCompletedStep, nextStep, completedSteps: Array.isArray(state?.completedSteps) ? state.completedSteps : [], artifacts: state?.artifacts ?? {} } }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "No alternate provider is ready.");
+      setState(data.state); setCurrentProvider(data.selectedProvider.provider);
+      setFeedback(tx(lang, "تم تسليم الذاكرة إلى " + data.selectedProvider.label + ". استخدم مفتاح API الخاص به لمتابعة الطلب.", "Checkpoint handed to " + data.selectedProvider.label + ". Use its configured API key to continue."));
+    } catch (error) { setFeedback(error instanceof Error ? error.message : "Handoff failed."); }
+    finally { setBusy(false); }
+  };
+  return <AppFrame title={tx(lang, "Ella — الإنشاء التلقائي", "Ella — Autopilot")} crumb="PUTER AUTOPILOT · SHARED MEMORY">
+    <div className="page-toolbar"><div><span className="eyebrow">{tx(lang, "ذاكرة مشتركة دائمة", "PERSISTENT SHARED MEMORY")}</span><h2>{tx(lang, "لا تبدأ من الصفر عند تبديل المزوّد.", "Keep project context when providers change.")}</h2><p>{tx(lang, "احفظ آخر خطوة مكتملة والخطوة التالية وملخص العمل ليتمكن مزوّد آخر من استلام السياق.", "Save completed work, the next step, and a project summary so another configured provider can pick up the context.")}</p></div></div>
+    <section className="panel provider-list grid gap-3">
+      <label className="grid gap-2"><b>{tx(lang, "المشروع", "Project")}</b><select className="studio-input" value={projectId} onChange={event => setProjectId(event.target.value)}><option value="">{tx(lang, "اختر مشروعاً فارغاً", "Choose an empty project")}</option>{emptyProjects.map(project => <option key={project.id} value={project.id}>{project.title}</option>)}</select></label>
+      {projectId ? <>
+        <div className="border border-emerald-200/30 rounded-xl p-4 grid gap-3">
+          <div><span className="eyebrow">{tx(lang, "إنشاء تلقائي — اكتب الفكرة فقط", "AUTOPILOT — WRITE ONLY YOUR IDEA")}</span><h3 className="text-lg font-semibold">{tx(lang, "من الفكرة إلى طابور الفيديو", "From idea to video queue")}</h3><p className="text-sm text-muted-foreground">{tx(lang, "يكتب Puter السيناريو، يحافظ على الشخصيات، ثم يرسل كل المشاهد دفعة واحدة إلى مهام Ella.", "Puter writes the storyboard, preserves character continuity, then submits every scene to Ella's job queue in one action.")}</p></div>
+          <textarea className="studio-input min-h-28" value={idea} onChange={event => setIdea(event.target.value)} maxLength={12000} placeholder={tx(lang, "اكتب المشهد أو فكرة الفيديو… مثال: مطاردة ليلية في إسطنبول بين مليارديرين.", "Describe a scene or video idea… e.g. a night chase in Istanbul between two billionaires.")}/>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="grid gap-1 text-sm"><span>{tx(lang, "عدد المشاهد", "Scenes")}</span><select className="studio-input" value={sceneCount} onChange={event => setSceneCount(Number(event.target.value))}>{[1,2,3,4,5,6,8,10,12,16,20,24].map(value => <option key={value} value={value}>{value}</option>)}</select></label>
+            <label className="grid gap-1 text-sm"><span>{tx(lang, "ثواني لكل مشهد", "Seconds per scene")}</span><input className="studio-input" type="number" min={1} max={600} value={sceneDuration} onChange={event => setSceneDuration(Math.max(1, Math.min(600, Number(event.target.value) || 1)))}/></label>
+          </div>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={autoVideo} onChange={event => setAutoVideo(event.target.checked)}/>{tx(lang, "توليد الفيديو تلقائياً بعد كتابة المشاهد", "Automatically generate video after the storyboard")}</label>
+          {autoVideo && <>
+            <label className="grid gap-1 text-sm"><span>{tx(lang, "محرك الفيديو المحفوظ", "Saved video engine")}</span><select className="studio-input" value={videoProviderKeyId} onChange={event => { const key = (providerKeys.data ?? []).find(item => item.id === event.target.value); setVideoProviderKeyId(event.target.value); if (key) setVideoModel(defaultVideoModel(key.provider, "text")); }}><option value="">{tx(lang, "اختر محركاً محفوظاً", "Choose a saved engine")}</option>{(providerKeys.data ?? []).filter(key => key.serviceType === "video" && key.enabled).map(key => <option key={key.id} value={key.id}>{key.label} · {key.provider}</option>)}</select></label>
+            <label className="grid gap-1 text-sm"><span>{tx(lang, "النموذج", "Model")}</span><input className="studio-input" value={videoModel} onChange={event => setVideoModel(event.target.value)} placeholder="ltx2_25_22B_distilled"/></label>
+          </>}
+          <button className="btn btn-primary" disabled={busy || !idea.trim() || (autoVideo && (!videoProviderKeyId || !videoModel.trim()))} onClick={() => void generateEverything()}>{busy ? <LoaderCircle size={16} className="animate-spin"/> : <WandSparkles size={16}/>} {tx(lang, "اكتب ونفّذ كل شيء", "Write & run everything")}</button>
+          {puterStatus && <p className="text-sm" role="status">{puterStatus}</p>}
+          <p className="text-xs text-muted-foreground">{tx(lang, "تسجيل Puter مرة واحدة. الاستخدام المجاني محدود بحصة الحساب؛ قد يطلب Puter ترقية عند نفادها. توليد الفيديو يستخدم المحرك المحفوظ لديك.", "Puter sign-in is one-time. Free usage is limited by your account allowance; Puter may offer an upgrade when it runs out. Video uses your saved engine.")}</p>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <label className="grid gap-1"><span>{tx(lang, "مرحلة العمل", "Current stage")}</span><input className="studio-input" value={stage} onChange={event => setStage(event.target.value)} maxLength={80}/></label>
+          <label className="grid gap-1"><span>{tx(lang, "المزوّد الحالي", "Current provider")}</span><select className="studio-input" value={currentProvider} onChange={event => setCurrentProvider(event.target.value)}><option value="">—</option><option value="openai">OpenAI / GPT API</option><option value="anthropic">Anthropic / Claude API</option></select></label>
+        </div>
+        <label className="grid gap-1"><span>{tx(lang, "ملخص ما تم إنجازه", "Work completed / shared summary")}</span><textarea className="studio-input min-h-36" value={summary} onChange={event => setSummary(event.target.value)} maxLength={12000} placeholder={tx(lang, "اكتب ما أنجزه المزوّد والقرارات التي يجب الحفاظ عليها…", "Describe completed work, decisions, constraints, and context…")}/></label>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <label className="grid gap-1"><span>{tx(lang, "آخر خطوة مكتملة", "Last completed step")}</span><input className="studio-input" value={lastCompletedStep} onChange={event => setLastCompletedStep(event.target.value)} maxLength={240}/></label>
+          <label className="grid gap-1"><span>{tx(lang, "الخطوة التالية", "Next step")}</span><input className="studio-input" value={nextStep} onChange={event => setNextStep(event.target.value)} maxLength={240}/></label>
+        </div>
+        <div className="flex flex-wrap gap-2"><button className="btn btn-primary" disabled={busy || !summary.trim()} onClick={() => void saveCheckpoint()}>{busy ? <LoaderCircle size={15} className="animate-spin"/> : <CheckCircle2 size={15}/>} {tx(lang, "حفظ نقطة التوقف", "Save checkpoint")}</button><button className="btn btn-quiet" disabled={busy || !summary.trim()} onClick={() => void handoff()}><ArrowRight size={15}/>{tx(lang, "تسليم للمزوّد الآخر", "Hand off to alternate provider")}</button></div>
+        {state && <div className="resource-notice panel"><Activity size={17}/><p>{tx(lang, "الإصدار", "Revision")}: {String(state.revision ?? "—")} · {tx(lang, "عمليات التسليم", "Handoffs")}: {String(state.handoffCount ?? 0)} · {tx(lang, "آخر تحديث", "Updated")}: {state.updatedAt ? new Date(String(state.updatedAt)).toLocaleString() : "—"}</p></div>}
+      </> : <div className="grid gap-2"><p className="provider-purpose-description">{tx(lang, "أنشئ مشروعاً فارغاً أولاً، أو اختر مشروعاً فارغاً من القائمة. المشاريع التي تحتوي مشاهد لن يتم استبدالها.", "Create a new empty project first, or choose an empty project from the list. Projects that already contain scenes will not be overwritten.")}</p><Link href="/create?mode=quick" className="btn btn-primary w-fit"><Plus size={15}/>{tx(lang, "إنشاء مشروع جديد", "Create a new project")}</Link></div>}
+      {feedback && <p className="text-sm" role="status">{feedback}</p>}
+    </section>
+    <div className="resource-notice panel mt-3"><ShieldCheck size={18}/><p>{tx(lang, "الإنشاء التلقائي يستخدم تسجيل دخول Puter مرة واحدة ولا يحتاج مفاتيح API داخل Ella. الحصة المجانية محدودة بحساب Puter وقد يطلب ترقية عند نفادها. ميزة تسليم الذاكرة بين مزوّدي API تستخدم المفاتيح المحفوظة في الإعدادات.", "Autopilot uses a one-time Puter sign-in and needs no API keys inside Ella. Free usage is limited by your Puter account and may require an upgrade when exhausted. Shared handoff between API providers uses credentials saved in Settings.")}</p></div>
+  </AppFrame>;
+}
+
 function SettingsRedirect() { return <Redirect to="/settings/providers" />; }
 function AdminDashboard() {
   const { lang } = useApp();
@@ -3205,6 +3394,8 @@ function Router() {
         <Route path="/jobs" component={JobsPage}/>
         <Route path="/media" component={MediaPage}/>
         <Route path="/settings/providers" component={ProvidersPage}/>
+        <Route path="/settings/ai-team" component={AiTeamPage}/>
+        <Route path="/autopilot" component={AiTeamPage}/>
         <Route path="/settings/tools" component={ToolsPage}/>
         <Route path="/settings/account/*?" component={AccountSettingsPage}/>
         <Route path="/admin" component={AdminDashboard}/>
