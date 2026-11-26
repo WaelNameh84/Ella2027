@@ -184,7 +184,17 @@ def _generate(job: dict[str, Any], runner_path: Path, model_dir: Path,
                 raise RuntimeError("Could not extract the last frame for the next continuation chunk: " + extracted.stdout[-1200:])
 
     if len(segment_paths) == 1:
-        segment_paths[0].replace(output)
+        # Wan's temporal VAE emits 4*k+1 frames, which can be slightly longer
+        # than the requested wall-clock duration. Trim the single-chunk path too.
+        trimmed = job_dir / "ella_scene_trimmed.mp4"
+        trim_result = subprocess.run([
+            "ffmpeg", "-y", "-i", str(segment_paths[0]), "-t", str(duration),
+            "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
+            "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(trimmed),
+        ], text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        if trim_result.returncode or not trimmed.is_file() or trimmed.stat().st_size == 0:
+            raise RuntimeError("Could not trim the Wan result to the requested scene duration: " + trim_result.stdout[-1600:])
+        trimmed.replace(output)
     else:
         concat_file = job_dir / "segments.txt"
         concat_file.write_text(
