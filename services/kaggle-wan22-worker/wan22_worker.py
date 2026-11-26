@@ -61,6 +61,22 @@ def download_reference(url: str, target: Path) -> Path:
     return target
 
 
+def download_audio_asset(url: str, target: Path) -> Path:
+    parsed = urlparse(url)
+    if parsed.scheme != "https" or parsed.hostname != "res.cloudinary.com":
+        raise ValueError("Audio assets must be HTTPS Cloudinary URLs.")
+    response = requests.get(url, timeout=(20, 120), allow_redirects=False)
+    response.raise_for_status()
+    content_type = response.headers.get("content-type", "").lower()
+    if not (content_type.startswith("audio/") or content_type.startswith("video/") or content_type == "application/octet-stream"):
+        raise ValueError("Configured sound asset URL did not return an audio-compatible file.")
+    if not response.content or len(response.content) > 40 * 1024 * 1024:
+        raise ValueError("Audio asset is empty or exceeds 40 MiB.")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(response.content)
+    return target
+
+
 def _heartbeat_loop(base_url: str, token: str, job_id: str, lease: str,
                     stop: threading.Event, state: dict[str, Any]) -> None:
     headers = {"Authorization": f"Bearer {token}"}
@@ -185,6 +201,42 @@ def _generate(job: dict[str, Any], runner_path: Path, model_dir: Path,
 
     if not output.is_file() or output.stat().st_size == 0:
         raise RuntimeError("ELLA did not produce a final MP4 file.")
+
+    audio_plan = job.get("audioPlan")
+    if isinstance(audio_plan, dict):
+        import json
+        plan = dict(audio_plan)
+        if plan.get("musicUrl"):
+            plan["music"] = str(download_audio_asset(str(plan.pop("musicUrl")), job_dir / "music_asset"))
+        if plan.get("ambienceUrl"):
+            plan["ambience"] = str(download_audio_asset(str(plan.pop("ambienceUrl")), job_dir / "ambience_asset"))
+        subtitle = plan.pop("subtitleText", None)
+        if isinstance(subtitle, dict) and str(subtitle.get("text") or "").strip():
+            plan["subtitle_lines"] = [{
+                "text": str(subtitle["text"]),
+                "start": float(subtitle.get("start", 0)),
+                "end": float(subtitle.get("end", duration)),
+            }]
+        plan_path = job_dir / "audio_plan.json"
+        plan_path.write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
+        finished = job_dir / "ella_scene_finished.mp4"
+        args = runner.parser().parse_args(["--prompt", str(job.get("prompt") or ""), "--audio-plan", str(plan_path)])
+        args.sd_cli = sd_cli
+        args.diffusion_model = model_dir / "Wan2.2-TI2V-5B-Q4_K_S.gguf"
+        args.vae = model_dir / "wan2.2_vae.safetensors"
+        args.text_encoder = model_dir / "umt5-xxl-encoder-Q4_K_M.gguf"
+        args.output = output
+        # The runner's post-production path is intentionally invoked through its CLI
+        # helper so this stage does not trigger a second Wan generation.
+        finishing_script = runner_path.with_name("audio_postprocess.py")
+        completed = subprocess.run([
+            sys.executable, str(finishing_script), "--video", str(output),
+            "--output", str(finished), "--plan", str(plan_path),
+        ], text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        print(completed.stdout, flush=True)
+        if completed.returncode or not finished.is_file():
+            raise RuntimeError("ELLA audio/video finishing failed; silent source MP4 was retained.")
+        finished.replace(output)
     return output
 
 def process_one(base_url: str, token: str, runner_path: Path, model_dir: Path,
