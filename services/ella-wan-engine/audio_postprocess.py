@@ -26,7 +26,8 @@ def write_srt(dialogue: list[dict[str, Any]], destination: Path, language: str) 
         ms=max(0,round(seconds*1000)); h,ms=divmod(ms,3600000); m,ms=divmod(ms,60000); s,ms=divmod(ms,1000)
         return f"{h:02}:{m:02}:{s:02},{ms:03}"
     blocks=[]
-    for item in dialogue:
+    entries = list(dialogue) + list(plan.get("subtitle_lines") or [])
+    for item in entries:
         lang=str(item.get("language","ar")).lower()
         text=str(item.get("arabic") if language=="ar" and item.get("arabic") else item.get("english") if language=="en" and item.get("english") else item.get("text","")).strip()
         if not text: continue
