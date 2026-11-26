@@ -21,12 +21,12 @@ def probe_duration(path: Path) -> float:
     raw = run_checked(["ffprobe","-v","error","-show_entries","format=duration","-of","default=noprint_wrappers=1:nokey=1",str(path)], "ffprobe")
     return float(raw.strip())
 
-def write_srt(dialogue: list[dict[str, Any]], destination: Path, language: str) -> None:
+def write_srt(dialogue: list[dict[str, Any]], subtitle_lines: list[dict[str, Any]], destination: Path, language: str) -> None:
     def stamp(seconds: float) -> str:
         ms=max(0,round(seconds*1000)); h,ms=divmod(ms,3600000); m,ms=divmod(ms,60000); s,ms=divmod(ms,1000)
         return f"{h:02}:{m:02}:{s:02},{ms:03}"
     blocks=[]
-    entries = list(dialogue) + list(plan.get("subtitle_lines") or [])
+    entries = list(dialogue) + list(subtitle_lines)
     for item in entries:
         lang=str(item.get("language","ar")).lower()
         text=str(item.get("arabic") if language=="ar" and item.get("arabic") else item.get("english") if language=="en" and item.get("english") else item.get("text","")).strip()
@@ -99,7 +99,7 @@ def postprocess(video: Path, output: Path, plan_path: Path) -> dict[str,Any]:
         if plan.get("subtitles",True):
             for lang in ("ar","en"):
                 srt=output.with_name(output.stem+f".{lang}.srt")
-                write_srt(plan.get("dialogue") or [],srt,lang)
+                write_srt(plan.get("dialogue") or [],plan.get("subtitle_lines") or [],srt,lang)
                 if srt.stat().st_size: sidecars.append(str(srt))
                 else: srt.unlink(missing_ok=True)
         return {"output":str(output),"audio_tracks":len(speech)+sum(bool(plan.get(k)) for k in ("ambience","music"))+len(plan.get("sfx") or []),"speech_segments":len(speech),"final_fps":final_fps,"interpolation":bool(plan.get("interpolate",True)),"subtitle_files":sidecars,"limitations":"Edge TTS needs internet; sound assets must be supplied. FFmpeg interpolation is not RIFE; no AI upscaling or lip-sync is claimed."}
