@@ -118,8 +118,10 @@ def postprocess(video: Path, output: Path, plan_path: Path) -> dict[str,Any]:
         musetalk_home=os.getenv("ELLA_MUSETALK_HOME","").strip()
         if plan.get("lip_sync",True):
             if musetalk_home and dialogue_audio:
+                lip_input=work/"musetalk_input_25fps.mp4"
+                run_checked(["ffmpeg","-y","-i",str(video),"-vf","minterpolate=fps=25:mi_mode=mci:mc_mode=aobmc:vsbmc=1","-an","-c:v","libx264","-preset","veryfast","-crf","18",str(lip_input)],"MuseTalk 25 FPS preparation")
                 lip_video=work/"musetalk_lipsynced.mp4"
-                lip_sync_info=apply_musetalk(video,dialogue_audio,lip_video,Path(musetalk_home))
+                lip_sync_info=apply_musetalk(lip_input,dialogue_audio,lip_video,Path(musetalk_home))
                 video_for_mix=lip_video
             else:
                 lip_sync_info={"enabled":False,"reason":"MuseTalk model bundle not configured or no dialogue audio"}
