@@ -143,7 +143,6 @@ def postprocess(video: Path, output: Path, plan_path: Path) -> dict[str,Any]:
             filters.append(f"minterpolate=fps={final_fps}:mi_mode=mci:mc_mode=aobmc:vsbmc=1")
         elif final_fps!=source_fps: filters.append(f"fps={final_fps}")
         cmd=["ffmpeg","-y","-i",str(mixed)]
-        if filters: cmd += ["-vf",",".join(filters)]
         sidecars=[]
         if alternate_audio:
             cmd += ["-i",str(alternate_audio)]
@@ -155,6 +154,7 @@ def postprocess(video: Path, output: Path, plan_path: Path) -> dict[str,Any]:
                 else: srt.unlink(missing_ok=True)
         for lang,srt in sidecars:
             cmd += ["-i",str(srt)]
+        if filters: cmd += ["-vf",",".join(filters)]
         cmd += ["-map","0:v:0","-map","0:a?"]
         if alternate_audio:
             cmd += ["-map",f"{1}:a:0"]
