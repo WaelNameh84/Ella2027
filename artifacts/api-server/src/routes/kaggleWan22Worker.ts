@@ -8,7 +8,7 @@ const LEASE_MS = 5 * 60 * 1000;
 const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
 
 function workerAuthorized(req: Request, res: Response, next: NextFunction) {
-  const expected = (process.env.KAGGLE_WAN22_WORKER_TOKEN?.trim() || process.env.KAGGLE_LTX_WORKER_TOKEN?.trim() || "");
+  const expected = (process.env.KAGGLE_LTX_WORKER_TOKEN?.trim() || "");
   const supplied = (req.headers.authorization ?? "").replace(/^Bearer\s+/i, "").trim();
   if (!expected || !supplied) {
     res.status(503).json({ error: "Ella Wan 2.2 worker authentication is not configured." });
