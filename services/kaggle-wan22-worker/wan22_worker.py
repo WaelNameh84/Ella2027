@@ -89,20 +89,31 @@ def _load_runner(path: Path):
     return module
 
 
+def duration_chunks(seconds: int, chunk_seconds: int = 5) -> list[int]:
+    """Split an exact requested duration into T4-safe continuation chunks."""
+    if seconds < 1 or seconds > 600:
+        raise ValueError("Scene duration must be between 1 and 600 seconds.")
+    size = max(1, min(int(chunk_seconds), 5))
+    chunks: list[int] = []
+    remaining = seconds
+    while remaining > 0:
+        current = min(size, remaining)
+        chunks.append(current)
+        remaining -= current
+    return chunks
+
+
 def _generate(job: dict[str, Any], runner_path: Path, model_dir: Path,
               sd_cli: Path, output_root: Path, max_scene_seconds: int) -> Path:
     runner = _load_runner(runner_path)
     duration = int(job.get("durationSeconds") or 5)
-    if duration < 1 or duration > 600:
-        raise ValueError("Scene duration must be between 1 and 600 seconds.")
+    chunks = duration_chunks(duration, max_scene_seconds)
 
     width, height = dimensions_for_ratio(str(job.get("aspectRatio") or "16:9"))
     job_id = str(job["id"])
     job_dir = output_root / job_id
     job_dir.mkdir(parents=True, exist_ok=True)
     output = job_dir / "ella_scene.mp4"
-    chunk_seconds = max(1, min(int(max_scene_seconds), 5))
-    remaining = duration
     segment_paths: list[Path] = []
     previous_frame: Path | None = None
 
@@ -122,9 +133,7 @@ def _generate(job: dict[str, Any], runner_path: Path, model_dir: Path,
                 raise ValueError("Image-to-video job has no reference image.")
             initial_image = download_reference(image_url, job_dir / "reference.png")
 
-    chunk_index = 0
-    while remaining > 0:
-        chunk_duration = min(chunk_seconds, remaining)
+    for chunk_index, chunk_duration in enumerate(chunks):
         segment = job_dir / f"segment_{chunk_index:03d}.mp4"
         args = runner.parser().parse_args([
             "--prompt", str(job.get("prompt") or ""),
@@ -144,12 +153,11 @@ def _generate(job: dict[str, Any], runner_path: Path, model_dir: Path,
         args.image = previous_frame or (initial_image if chunk_index == 0 else None)
 
         result = runner.run(args)
-        print("[ELLA][WAN CHUNK]", chunk_index + 1, "/", (duration + chunk_seconds - 1) // chunk_seconds,
+        print("[ELLA][WAN CHUNK]", chunk_index + 1, "/", len(chunks),
               json.dumps(result, ensure_ascii=False), flush=True)
         segment_paths.append(segment)
-        remaining -= chunk_duration
 
-        if remaining > 0:
+        if chunk_index + 1 < len(chunks):
             previous_frame = job_dir / f"continuation_{chunk_index:03d}.png"
             extracted = subprocess.run([
                 "ffmpeg", "-y", "-sseof", "-0.05", "-i", str(segment),
@@ -157,8 +165,6 @@ def _generate(job: dict[str, Any], runner_path: Path, model_dir: Path,
             ], text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             if extracted.returncode or not previous_frame.is_file() or previous_frame.stat().st_size == 0:
                 raise RuntimeError("Could not extract the last frame for the next continuation chunk: " + extracted.stdout[-1200:])
-
-        chunk_index += 1
 
     if len(segment_paths) == 1:
         segment_paths[0].replace(output)
