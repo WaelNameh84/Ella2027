@@ -161,7 +161,7 @@ def postprocess(video: Path, output: Path, plan_path: Path) -> dict[str,Any]:
         subtitle_input_start=2 if alternate_audio else 1
         for idx,_ in enumerate(sidecars):
             cmd += ["-map",f"{subtitle_input_start+idx}:0"]
-        cmd += ["-c:v","libx264","-preset",str(plan.get("preset","veryfast")),"-crf",str(int(plan.get("crf",18))),"-pix_fmt","yuv420p","-c:a","copy"]
+        cmd += ["-c:v","libx264","-preset",str(plan.get("preset","veryfast")),"-crf",str(int(plan.get("crf",18))),"-pix_fmt","yuv420p","-c:a","aac","-b:a","192k"]
         if alternate_audio:
             cmd += ["-metadata:s:a:1",f"language={('eng' if source_language.startswith('ar') else 'ara')}"]
         if sidecars:
