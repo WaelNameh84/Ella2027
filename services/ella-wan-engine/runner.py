@@ -39,7 +39,7 @@ def build_command(args: argparse.Namespace) -> list[str]:
         "--sampling-method", "euler",
         "--flow-shift", str(args.flow_shift),
         "--seed", str(args.seed), "--rng", "cpu",
-        "--fa", "--vae-conv-direct", "--vae-tiling", "--offload-to-cpu",
+        "--flash-attn", "on", "--conv-direct", "auto,vae=on", "--vae-tiling", "--offload-to-cpu",
         "-t", str(args.threads),
         "-o", str(args.frame_dir / "frame_%03d.png"),
     ]
@@ -151,7 +151,7 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--fps", type=int, default=8)
     p.add_argument("--width", type=int, default=832)
     p.add_argument("--height", type=int, default=480)
-    p.add_argument("--steps", type=int, default=8)
+    p.add_argument("--steps", type=int, default=20)
     p.add_argument("--cfg-scale", type=float, default=6.0)
     p.add_argument("--flow-shift", type=float, default=3.0)
     p.add_argument("--seed", type=int, default=42)
