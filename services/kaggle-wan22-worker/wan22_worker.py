@@ -215,6 +215,7 @@ def _generate(job: dict[str, Any], runner_path: Path, model_dir: Path,
         if isinstance(subtitle, dict) and str(subtitle.get("text") or "").strip():
             plan["subtitle_lines"] = [{
                 "text": str(subtitle["text"]),
+                "language": str(subtitle.get("language") or plan.get("language") or "ar"),
                 "start": float(subtitle.get("start", 0)),
                 "end": float(subtitle.get("end", duration)),
             }]
