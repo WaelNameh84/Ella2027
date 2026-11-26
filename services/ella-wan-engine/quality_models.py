@@ -2,8 +2,8 @@ from __future__ import annotations
 import os, shutil, subprocess, sys, tempfile
 from pathlib import Path
 
-def _run(command: list[str], label: str) -> str:
-    result=subprocess.run(command,text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+def _run(command: list[str], label: str, cwd: Path | None = None) -> str:
+    result=subprocess.run(command,cwd=str(cwd) if cwd else None,text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
     if result.returncode:
         raise RuntimeError(f"{label} failed: {result.stdout[-3000:]}")
     return result.stdout
@@ -50,7 +50,7 @@ def apply_musetalk(video: Path, audio: Path, output: Path, home: Path) -> dict:
             "--unet_config",str(config),"--version","v15","--use_float16",
             "--ffmpeg_path",shutil.which("ffmpeg") or "ffmpeg",
         ]
-        _run(command,"MuseTalk lip synchronization")
+        _run(command,"MuseTalk lip synchronization",cwd=home)
         candidates=sorted(result_dir.rglob("*.mp4"),key=lambda p:p.stat().st_mtime,reverse=True)
         if not candidates: raise RuntimeError("MuseTalk finished without an MP4 result.")
         shutil.copy2(candidates[0],output)
