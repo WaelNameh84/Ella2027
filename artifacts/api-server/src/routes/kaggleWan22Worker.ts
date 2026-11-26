@@ -96,13 +96,21 @@ router.post("/claim", async (_req, res): Promise<void> => {
     const languageText = String(project.language || "ar").toLowerCase();
     const speechLanguage = /english|^en|англ/.test(languageText) ? "en" : "ar";
     const voiceFallback = speechLanguage === "en" ? "en-US-GuyNeural" : "ar-SA-HamedNeural";
+    const voiceForCharacter = (characterId: string) => {
+      const character = (project.characters ?? []).find((item) => item.id === characterId);
+      const description = String(character?.voiceDescription ?? "").toLowerCase();
+      const feminine = /female|woman|girl|feminine|أنثى|امرأة|نسائي/.test(description);
+      return speechLanguage === "en"
+        ? (feminine ? "en-US-AriaNeural" : "en-US-GuyNeural")
+        : (feminine ? "ar-SA-ZariyahNeural" : "ar-SA-HamedNeural");
+    };
     const dialogue = dialogueRows.length
       ? dialogueRows.filter((line) => line.text.trim()).map((line) => ({
           language: speechLanguage,
           text: line.text.trim(),
           start: line.startSeconds,
           end: line.endSeconds ?? undefined,
-          voice: line.voiceId && /^[a-z]{2}-[A-Z]{2}-[A-Za-z]+Neural$/.test(line.voiceId.trim()) ? line.voiceId.trim() : voiceFallback,
+          voice: line.voiceId && /^[a-z]{2}-[A-Z]{2}-[A-Za-z]+Neural$/.test(line.voiceId.trim()) ? line.voiceId.trim() : voiceForCharacter(line.characterId),
           characterId: line.characterId,
         }))
       : scene.narration.trim()
