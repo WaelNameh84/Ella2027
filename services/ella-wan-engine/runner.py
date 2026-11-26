@@ -77,9 +77,9 @@ def run(args: argparse.Namespace) -> dict:
     # to disk immediately. This preserves diagnostics even if Kaggle interrupts
     # the cell or sd-cli crashes before video encoding begins.
     with log_path.open("w", encoding="utf-8", buffering=1) as log:
-        log.write("[ELLA] Generation started\\n")
-        log.write(f"[ELLA] Command: {subprocess.list2cmdline(command)}\\n")
-        log.write(f"[ELLA] Started at: {time.strftime('%Y-%m-%d %H:%M:%S')}\\n")
+        log.write("[ELLA] Generation started\n")
+        log.write(f"[ELLA] Command: {subprocess.list2cmdline(command)}\n")
+        log.write(f"[ELLA] Started at: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
         log.flush()
         proc = subprocess.Popen(
             command, text=True, stdout=subprocess.PIPE,
@@ -92,12 +92,12 @@ def run(args: argparse.Namespace) -> dict:
         proc.stdout.close()
         return_code = proc.wait()
         elapsed = round(time.time() - started, 2)
-        log.write(f"\\n[ELLA] Process exit code: {return_code}\\n")
-        log.write(f"[ELLA] Generation elapsed seconds: {elapsed}\\n")
+        log.write(f"\n[ELLA] Process exit code: {return_code}\n")
+        log.write(f"[ELLA] Generation elapsed seconds: {elapsed}\n")
         log.flush()
 
     if return_code:
-        raise RuntimeError(f"sd-cli exited with {proc.returncode}; see {log_path}")
+        raise RuntimeError(f"sd-cli exited with {return_code}; see {log_path}")
 
     frames = sorted(args.frame_dir.glob("frame_*.png"))
     if len(frames) < 5:
