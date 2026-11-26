@@ -116,6 +116,25 @@ def run(args: argparse.Namespace) -> dict:
                                 stderr=subprocess.STDOUT)
     if converted.returncode or not args.output.is_file():
         raise RuntimeError("ffmpeg conversion failed: " + converted.stdout[-1500:])
+    postproduction = None
+    if args.audio_plan:
+        if not args.audio_plan.is_file():
+            raise FileNotFoundError(f"Audio plan not found: {args.audio_plan}")
+        finishing_script = Path(__file__).with_name("audio_postprocess.py")
+        if not finishing_script.is_file():
+            raise FileNotFoundError(f"ELLA audio postprocessor not found: {finishing_script}")
+        finished_output = args.output.with_name(args.output.stem + ".finished.mp4")
+        finish = subprocess.run([
+            sys.executable, str(finishing_script),
+            "--video", str(args.output),
+            "--output", str(finished_output),
+            "--plan", str(args.audio_plan),
+        ], text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        print(finish.stdout, flush=True)
+        if finish.returncode or not finished_output.is_file():
+            raise RuntimeError("ELLA audio/video finishing failed; original silent MP4 was preserved.")
+        finished_output.replace(args.output)
+        postproduction = json.loads(finish.stdout[finish.stdout.find("{"):])
     metadata = {
         "engine": "ELLA VIDEO ENGINE",
         "model": "Wan 2.2 TI2V 5B GGUF Q4_K_S",
@@ -130,6 +149,7 @@ def run(args: argparse.Namespace) -> dict:
         "generation_seconds": elapsed,
         "output": str(args.output),
         "log": str(log_path),
+        "postproduction": postproduction,
     }
     args.output.with_suffix(".json").write_text(
         json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -156,6 +176,7 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--flow-shift", type=float, default=3.0)
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--threads", type=int, default=4)
+    p.add_argument("--audio-plan", type=Path, default=None, help="Optional bilingual audio and finishing plan JSON")
     return p
 
 
