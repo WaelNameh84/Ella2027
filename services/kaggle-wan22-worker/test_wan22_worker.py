@@ -9,6 +9,6 @@ def test_api_url_uses_existing_ella_queue():
 
 
 def test_supported_aspect_ratios():
-    assert dimensions_for_ratio("16:9") == (1280, 704)
-    assert dimensions_for_ratio("9:16") == (704, 1280)
-    assert dimensions_for_ratio("1:1") == (704, 704)
+    assert dimensions_for_ratio("16:9") == (832, 480)
+    assert dimensions_for_ratio("9:16") == (480, 832)
+    assert dimensions_for_ratio("1:1") == (640, 640)
