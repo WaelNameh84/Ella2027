@@ -18,7 +18,10 @@ test("ELLA Wan 2.2 has an isolated queue and Kaggle worker endpoint", async () =
   assert.match(route, /KAGGLE_LTX_WORKER_TOKEN/);
   assert.match(route, /ella-wan22-\$\{jobId\}/);
   assert.match(route, /input\?\.worker !== "kaggle-wan22"/);
+  assert.match(route, /referenceImageBase64/);
   assert.match(worker, /API_PREFIX = "\/api\/kaggle-wan22-worker"/);
   assert.match(worker, /runner\.run\(args\)/);
+  assert.match(worker, /chunk_seconds/);
+  assert.match(worker, /continuation_/);
   assert.match(worker, /\/complete/);
 });
