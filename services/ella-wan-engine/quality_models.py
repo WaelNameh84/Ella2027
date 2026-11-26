@@ -43,8 +43,9 @@ def apply_musetalk(video: Path, audio: Path, output: Path, home: Path) -> dict:
     with tempfile.TemporaryDirectory(prefix="ella_musetalk_") as tmp:
         tmp=Path(tmp); cfg=tmp/"inference.yaml"; result_dir=tmp/"results"
         cfg.write_text(yaml.safe_dump({"task_0":{"video_path":str(video),"audio_path":str(audio),"bbox_shift":-7}},sort_keys=False),encoding="utf-8")
+        musetalk_python=os.getenv("ELLA_MUSETALK_PYTHON",sys.executable)
         command=[
-            sys.executable,"-m","scripts.inference","--inference_config",str(cfg),
+            musetalk_python,"-m","scripts.inference","--inference_config",str(cfg),
             "--result_dir",str(result_dir),"--unet_model_path",str(model),
             "--unet_config",str(config),"--version","v15","--use_float16",
             "--ffmpeg_path",shutil.which("ffmpeg") or "ffmpeg",
@@ -65,8 +66,9 @@ def apply_realesrgan(video: Path, output: Path, fps: int, home: Path, scale: int
         tmp=Path(tmp); frames=tmp/"frames"; restored=tmp/"restored"
         frames.mkdir(); restored.mkdir()
         _run(["ffmpeg","-y","-i",str(video),"-vsync","0",str(frames/"frame_%06d.png")],"video frame extraction")
+        realesrgan_python=os.getenv("ELLA_REALESRGAN_PYTHON",sys.executable)
         _run([
-            sys.executable,str(inference),"-n","RealESRGAN_x4plus","-i",str(frames),
+            realesrgan_python,str(inference),"-n","RealESRGAN_x4plus","-i",str(frames),
             "-o",str(restored),"--outscale",str(scale),"--tile","256","--fp16",
             "--model_path",str(weights),
         ],"Real-ESRGAN upscaling")
