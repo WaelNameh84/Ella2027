@@ -28,8 +28,14 @@ def api_url(base_url: str, path: str) -> str:
 
 def dimensions_for_ratio(aspect_ratio: str) -> tuple[int, int]:
     # Wan 2.2 TI2V 5B reference profile, sized for a 16 GB Kaggle T4.
-    if aspect_ratio in ("9:16", "3:4", "2:3", "4:5"):
+    if aspect_ratio == "9:16":
         return 480, 832
+    if aspect_ratio == "3:4":
+        return 576, 768
+    if aspect_ratio == "2:3":
+        return 512, 768
+    if aspect_ratio == "4:5":
+        return 512, 640
     if aspect_ratio == "1:1":
         return 640, 640
     if aspect_ratio in ("4:3",):
