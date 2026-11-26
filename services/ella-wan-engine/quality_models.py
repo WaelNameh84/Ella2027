@@ -53,7 +53,9 @@ def apply_musetalk(video: Path, audio: Path, output: Path, home: Path) -> dict:
         _run(command,"MuseTalk lip synchronization",cwd=home)
         candidates=sorted(result_dir.rglob("*.mp4"),key=lambda p:p.stat().st_mtime,reverse=True)
         if not candidates: raise RuntimeError("MuseTalk finished without an MP4 result.")
-        shutil.copy2(candidates[0],output)
+        # MuseTalk writes its driving audio into the result; ELLA remixes dialogue,
+        # music and ambience itself, so keep only the synchronized video stream.
+        _run(["ffmpeg","-y","-i",str(candidates[0]),"-map","0:v:0","-an","-c:v","copy","-movflags","+faststart",str(output)],"MuseTalk silent video export")
     return {"model":"MuseTalk 1.5","output":str(output)}
 
 def apply_realesrgan(video: Path, output: Path, fps: int, home: Path, scale: int=2) -> dict:
