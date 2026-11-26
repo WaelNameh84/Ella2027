@@ -39,7 +39,7 @@ def build_command(args: argparse.Namespace) -> list[str]:
         "--sampling-method", "euler",
         "--flow-shift", str(args.flow_shift),
         "--seed", str(args.seed), "--rng", "cpu",
-        "--fa", "--vae-conv-direct", "--vae-tiling",
+        "--fa", "--vae-conv-direct", "--vae-tiling", "--offload-to-cpu",
         "-t", str(args.threads),
         "-o", str(args.frame_dir / "frame_%03d.png"),
     ]
@@ -59,6 +59,10 @@ def run(args: argparse.Namespace) -> dict:
         raise FileNotFoundError(f"reference image not found: {args.image}")
     if args.width % 32 or args.height % 32:
         raise ValueError("width and height must be multiples of 32")
+    if args.width > 832 or args.height > 832:
+        raise ValueError("T4-safe ELLA profile is limited to 832 pixels per dimension; use 832x480 or 480x832.")
+    if args.fps < 1 or args.fps > 24:
+        raise ValueError("fps must be between 1 and 24")
     if args.steps < 1 or args.steps > 100:
         raise ValueError("steps must be between 1 and 100")
     if not shutil.which("ffmpeg"):
@@ -104,7 +108,7 @@ def run(args: argparse.Namespace) -> dict:
         raise RuntimeError(f"sd-cli produced only {len(frames)} frames; see {log_path}")
     ffmpeg = [
         "ffmpeg", "-y", "-framerate", str(args.fps),
-        "-i", str(args.frame_dir / "frame_%03d.png"),
+        "-i", str(args.frame_dir / "frame_%03d.png"), "-t", str(args.duration),
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
         "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(args.output),
     ]
@@ -145,11 +149,11 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--frame-dir", type=Path, default=Path("/kaggle/working/ella_frames"))
     p.add_argument("--duration", type=float, default=5.0)
     p.add_argument("--fps", type=int, default=8)
-    p.add_argument("--width", type=int, default=1280)
-    p.add_argument("--height", type=int, default=704)
-    p.add_argument("--steps", type=int, default=20)
-    p.add_argument("--cfg-scale", type=float, default=5.0)
-    p.add_argument("--flow-shift", type=float, default=5.0)
+    p.add_argument("--width", type=int, default=832)
+    p.add_argument("--height", type=int, default=480)
+    p.add_argument("--steps", type=int, default=8)
+    p.add_argument("--cfg-scale", type=float, default=6.0)
+    p.add_argument("--flow-shift", type=float, default=3.0)
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--threads", type=int, default=4)
     return p
