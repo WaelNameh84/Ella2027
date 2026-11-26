@@ -4,6 +4,9 @@ from __future__ import annotations
 import argparse, json, shutil, subprocess, sys, tempfile
 from pathlib import Path
 from typing import Any
+import os
+from translation import make_dialogue_bilingual
+from quality_models import make_dialogue_audio, apply_musetalk, apply_realesrgan
 
 VOICE_BY_LANGUAGE = {"ar": "ar-SA-HamedNeural", "en": "en-US-GuyNeural"}
 
@@ -89,11 +92,39 @@ def postprocess(video: Path, output: Path, plan_path: Path) -> dict[str,Any]:
     require_ffmpeg()
     plan=json.loads(plan_path.read_text(encoding="utf-8"))
     if not isinstance(plan,dict): raise ValueError("Audio plan must be a JSON object.")
+    source_language=str(plan.get("language","ar")).lower()
+    translation_warnings=[]
+    if plan.get("auto_translate",True):
+        plan["dialogue"],translation_warnings=make_dialogue_bilingual(
+            plan.get("dialogue") or [],source_language,required=bool(plan.get("translation_required",False)))
     output.parent.mkdir(parents=True,exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="ella_post_") as tmp:
-        work=Path(tmp); speech=synthesize_dialogue(plan,work); mixed=work/"mixed.mp4"
-        build_audio_mix(video,mixed,plan,speech)
+        work=Path(tmp); speech=synthesize_dialogue(plan,work)
+        duration=probe_duration(video)
+        dialogue_audio=make_dialogue_audio(speech,duration,work/"dialogue_timeline.wav")
+        video_for_mix=video
+        lip_sync_info={"enabled":False,"reason":"disabled"}
+        musetalk_home=os.getenv("ELLA_MUSETALK_HOME","").strip()
+        if plan.get("lip_sync",True):
+            if musetalk_home and dialogue_audio:
+                lip_video=work/"musetalk_lipsynced.mp4"
+                lip_sync_info=apply_musetalk(video,dialogue_audio,lip_video,Path(musetalk_home))
+                video_for_mix=lip_video
+            else:
+                lip_sync_info={"enabled":False,"reason":"MuseTalk model bundle not configured or no dialogue audio"}
+        mixed=work/"mixed.mp4"
+        mix_speech=[(dialogue_audio,0.0)] if video_for_mix != video and dialogue_audio else speech
+        build_audio_mix(video_for_mix,mixed,plan,mix_speech)
         source_fps=int(plan.get("source_fps",8)); final_fps=int(plan.get("final_fps",24))
+        upscale_info={"enabled":False,"reason":"disabled"}
+        realesrgan_home=os.getenv("ELLA_REALESRGAN_HOME","").strip()
+        if plan.get("upscale",True):
+            if realesrgan_home:
+                upscaled=work/"upscaled.mp4"
+                upscale_info=apply_realesrgan(mixed,upscaled,source_fps,Path(realesrgan_home),int(plan.get("upscale_factor",2)))
+                mixed=upscaled
+            else:
+                upscale_info={"enabled":False,"reason":"Real-ESRGAN model bundle not configured"}
         if final_fps not in (8,12,16,24,30): raise ValueError("final_fps must be 8, 12, 16, 24 or 30.")
         filters=[]
         if plan.get("cinematic_color",True): filters.append("eq=contrast=1.04:saturation=1.04:brightness=0.005")
@@ -121,7 +152,7 @@ def postprocess(video: Path, output: Path, plan_path: Path) -> dict[str,Any]:
                 cmd += [f"-metadata:s:s:{idx}",f"language={('ara' if lang=='ar' else 'eng')}"]
         cmd += ["-movflags","+faststart",str(output)]
         run_checked(cmd,"video finishing")
-        return {"output":str(output),"audio_tracks":len(speech)+sum(bool(plan.get(k)) for k in ("ambience","music"))+len(plan.get("sfx") or []),"speech_segments":len(speech),"final_fps":final_fps,"interpolation":bool(plan.get("interpolate",True)),"subtitle_files":[str(p) for _,p in sidecars],"subtitle_tracks_embedded":len(sidecars),"limitations":"Edge TTS needs internet; sound assets must be supplied. FFmpeg interpolation is not RIFE; no AI upscaling or lip-sync is claimed."}
+        return {"output":str(output),"audio_tracks":len(speech)+sum(bool(plan.get(k)) for k in ("ambience","music"))+len(plan.get("sfx") or []),"speech_segments":len(speech),"final_fps":final_fps,"interpolation":bool(plan.get("interpolate",True)),"subtitle_files":[str(p) for _,p in sidecars],"subtitle_tracks_embedded":len(sidecars),"translation_warnings":translation_warnings,"lip_sync":lip_sync_info,"upscaling":upscale_info,"limitations":"Translation requires internet; MuseTalk and Real-ESRGAN require their separate model bundles. FFmpeg interpolation can show artifacts."}
 
 def main():
     p=argparse.ArgumentParser(description="ELLA bilingual audio/video finishing")
