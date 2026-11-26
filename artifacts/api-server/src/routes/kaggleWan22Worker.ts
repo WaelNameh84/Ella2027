@@ -123,6 +123,8 @@ router.post("/claim", async (_req, res): Promise<void> => {
       interpolate: true,
       cinematic_color: true,
       subtitles: true,
+      music_volume: Math.max(0, Math.min(100, project.musicVolume)) / 100,
+      ambience_volume: Math.max(0, Math.min(100, project.soundEffectsVolume)) / 100,
       dialogue,
     };
     if (project.musicUrl?.startsWith("https://res.cloudinary.com/")) audioPlan.musicUrl = project.musicUrl;
