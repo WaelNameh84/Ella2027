@@ -71,12 +71,32 @@ def run(args: argparse.Namespace) -> dict:
 
     command = build_command(args)
     started = time.time()
-    proc = subprocess.run(command, text=True, stdout=subprocess.PIPE,
-                          stderr=subprocess.STDOUT)
-    elapsed = round(time.time() - started, 2)
     log_path = args.output.with_suffix(".log")
-    log_path.write_text(proc.stdout, encoding="utf-8")
-    if proc.returncode:
+
+    # Create the log before launching the model, then stream every output line
+    # to disk immediately. This preserves diagnostics even if Kaggle interrupts
+    # the cell or sd-cli crashes before video encoding begins.
+    with log_path.open("w", encoding="utf-8", buffering=1) as log:
+        log.write("[ELLA] Generation started\\n")
+        log.write(f"[ELLA] Command: {subprocess.list2cmdline(command)}\\n")
+        log.write(f"[ELLA] Started at: {time.strftime('%Y-%m-%d %H:%M:%S')}\\n")
+        log.flush()
+        proc = subprocess.Popen(
+            command, text=True, stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT, bufsize=1,
+        )
+        assert proc.stdout is not None
+        for line in proc.stdout:
+            log.write(line)
+            print(line, end="", flush=True)
+        proc.stdout.close()
+        return_code = proc.wait()
+        elapsed = round(time.time() - started, 2)
+        log.write(f"\\n[ELLA] Process exit code: {return_code}\\n")
+        log.write(f"[ELLA] Generation elapsed seconds: {elapsed}\\n")
+        log.flush()
+
+    if return_code:
         raise RuntimeError(f"sd-cli exited with {proc.returncode}; see {log_path}")
 
     frames = sorted(args.frame_dir.glob("frame_*.png"))
