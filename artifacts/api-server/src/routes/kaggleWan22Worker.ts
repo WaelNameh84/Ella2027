@@ -102,7 +102,7 @@ router.post("/claim", async (_req, res): Promise<void> => {
           text: line.text.trim(),
           start: line.startSeconds,
           end: line.endSeconds ?? undefined,
-          voice: line.voiceId?.trim() || voiceFallback,
+          voice: line.voiceId && /^[a-z]{2}-[A-Z]{2}-[A-Za-z]+Neural$/.test(line.voiceId.trim()) ? line.voiceId.trim() : voiceFallback,
           characterId: line.characterId,
         }))
       : scene.narration.trim()
@@ -120,6 +120,7 @@ router.post("/claim", async (_req, res): Promise<void> => {
     if (project.musicUrl?.startsWith("https://")) audioPlan.musicUrl = project.musicUrl;
     if (project.soundEffectsUrl?.startsWith("https://")) audioPlan.ambienceUrl = project.soundEffectsUrl;
     if (scene.subtitleText?.trim()) audioPlan.subtitleText = {
+      language: speechLanguage,
       text: scene.subtitleText.trim(),
       start: scene.subtitleStartSeconds,
       end: scene.subtitleEndSeconds ?? scene.durationSeconds,
