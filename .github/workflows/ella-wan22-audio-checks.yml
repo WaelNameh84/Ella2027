@@ -1,0 +1,33 @@
+name: ELLA Wan22 audio checks
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "services/ella-wan-engine/**"
+      - "services/kaggle-wan22-worker/**"
+      - "artifacts/api-server/src/routes/kaggleWan22Worker.ts"
+      - ".github/workflows/ella-wan22-audio-checks.yml"
+  push:
+    branches: [feature/ella-wan22-engine]
+    paths:
+      - "services/ella-wan-engine/**"
+      - "services/kaggle-wan22-worker/**"
+      - "artifacts/api-server/src/routes/kaggleWan22Worker.ts"
+      - ".github/workflows/ella-wan22-audio-checks.yml"
+
+jobs:
+  python-audio-worker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile ELLA Python modules
+        run: |
+          python -m py_compile services/ella-wan-engine/runner.py
+          python -m py_compile services/ella-wan-engine/audio_postprocess.py
+          python -m py_compile services/kaggle-wan22-worker/wan22_worker.py
+      - name: Test bilingual subtitle generation
+        run: python -m unittest discover -s services/ella-wan-engine -p 'test_*.py' -v
