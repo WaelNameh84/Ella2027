@@ -1,7 +1,7 @@
 import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import { and, asc, eq, lt, or } from "drizzle-orm";
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
-import { db, projectsTable, providerKeysTable, scenesTable, studioJobsTable } from "@workspace/db";
+import { db, dialogueLinesTable, projectsTable, providerKeysTable, scenesTable, studioJobsTable } from "@workspace/db";
 import { readGeneratedAsset } from "../lib/studioAssets";
 import { downloadPublicHttps } from "../lib/mediaGeneration";
 
@@ -88,6 +88,42 @@ router.post("/claim", async (_req, res): Promise<void> => {
       }
     }
     const upload = cloudinaryUploadDetails(project.id, scene.id, claimed.id);
+    const dialogueRows = await db.select().from(dialogueLinesTable).where(and(
+      eq(dialogueLinesTable.sceneId, scene.id),
+      eq(dialogueLinesTable.projectId, project.id),
+      eq(dialogueLinesTable.userId, claimed.userId),
+    )).orderBy(asc(dialogueLinesTable.sortOrder));
+    const languageText = String(project.language || "ar").toLowerCase();
+    const speechLanguage = /english|^en|англ/.test(languageText) ? "en" : "ar";
+    const voiceFallback = speechLanguage === "en" ? "en-US-GuyNeural" : "ar-SA-HamedNeural";
+    const dialogue = dialogueRows.length
+      ? dialogueRows.filter((line) => line.text.trim()).map((line) => ({
+          language: speechLanguage,
+          text: line.text.trim(),
+          start: line.startSeconds,
+          end: line.endSeconds ?? undefined,
+          voice: line.voiceId?.trim() || voiceFallback,
+          characterId: line.characterId,
+        }))
+      : scene.narration.trim()
+        ? [{ language: speechLanguage, text: scene.narration.trim(), start: 0, end: Math.max(1, scene.durationSeconds), voice: voiceFallback }]
+        : [];
+    const audioPlan: Record<string, unknown> = {
+      language: speechLanguage,
+      source_fps: 8,
+      final_fps: 24,
+      interpolate: true,
+      cinematic_color: true,
+      subtitles: true,
+      dialogue,
+    };
+    if (project.musicUrl?.startsWith("https://")) audioPlan.musicUrl = project.musicUrl;
+    if (project.soundEffectsUrl?.startsWith("https://")) audioPlan.ambienceUrl = project.soundEffectsUrl;
+    if (scene.subtitleText?.trim()) audioPlan.subtitleText = {
+      text: scene.subtitleText.trim(),
+      start: scene.subtitleStartSeconds,
+      end: scene.subtitleEndSeconds ?? scene.durationSeconds,
+    };
     res.json({
       job: {
         id: claimed.id, leaseToken: input.kaggleLeaseToken,
@@ -105,6 +141,7 @@ router.post("/claim", async (_req, res): Promise<void> => {
         mode: input.mode === "image" ? "image" : "text",
         referenceImageUrl,
         referenceImageBase64,
+        audioPlan,
         upload,
       },
     });
