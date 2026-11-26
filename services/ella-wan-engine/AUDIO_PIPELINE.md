@@ -38,7 +38,7 @@ python services/ella-wan-engine/audio_postprocess.py --video input.mp4 --output 
 No speech or sound is fabricated when no dialogue/assets are supplied. FFmpeg minterpolate is motion-compensated interpolation, not a learned RIFE model; fast motion can show artifacts and requires visual review. This stage does not claim AI upscaling or automatic lip-sync. Lip-sync needs a separate validated model.
 
 ## Automatic Arabic/English dialogue
-When `auto_translate` is enabled (default), the pipeline attempts to translate each dialogue line to the other language using the no-key `deep-translator` Google integration. Internet is required and the upstream translation endpoint may rate-limit. The final MP4 can contain two selectable dialogue audio tracks (original language and translated language) when translation succeeds, plus selectable subtitle tracks. No translated line is fabricated when translation fails; the pipeline reports a warning.
+When `auto_translate` is enabled (default), the pipeline attempts to translate each dialogue line to the other language using the local Argos Translate models. The model package is downloaded once when first needed; dialogue text stays on the Kaggle worker and is not sent to a translation API. The final MP4 can contain two selectable dialogue audio tracks (original language and translated language) when translation succeeds, plus selectable subtitle tracks. No translated line is fabricated when translation fails; the pipeline reports a warning.
 
 ## AI lip-sync and upscaling
 The pipeline now includes adapters for:
