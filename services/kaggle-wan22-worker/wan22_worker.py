@@ -9,6 +9,7 @@ import importlib.util
 import json
 import os
 import subprocess
+import sys
 import threading
 import time
 from pathlib import Path
@@ -220,12 +221,6 @@ def _generate(job: dict[str, Any], runner_path: Path, model_dir: Path,
         plan_path = job_dir / "audio_plan.json"
         plan_path.write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
         finished = job_dir / "ella_scene_finished.mp4"
-        args = runner.parser().parse_args(["--prompt", str(job.get("prompt") or ""), "--audio-plan", str(plan_path)])
-        args.sd_cli = sd_cli
-        args.diffusion_model = model_dir / "Wan2.2-TI2V-5B-Q4_K_S.gguf"
-        args.vae = model_dir / "wan2.2_vae.safetensors"
-        args.text_encoder = model_dir / "umt5-xxl-encoder-Q4_K_M.gguf"
-        args.output = output
         # The runner's post-production path is intentionally invoked through its CLI
         # helper so this stage does not trigger a second Wan generation.
         finishing_script = runner_path.with_name("audio_postprocess.py")
