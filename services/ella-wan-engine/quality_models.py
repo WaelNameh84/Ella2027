@@ -71,7 +71,7 @@ def apply_realesrgan(video: Path, output: Path, fps: int, home: Path, scale: int
         realesrgan_python=os.getenv("ELLA_REALESRGAN_PYTHON",sys.executable)
         _run([
             realesrgan_python,str(inference),"-n","RealESRGAN_x4plus","-i",str(frames),
-            "-o",str(restored),"--outscale",str(scale),"--tile","256","--fp16",
+            "-o",str(restored),"--outscale",str(scale),"--tile","256",
             "--model_path",str(weights),
         ],"Real-ESRGAN upscaling")
         first=restored/"frame_000001_out.png"
