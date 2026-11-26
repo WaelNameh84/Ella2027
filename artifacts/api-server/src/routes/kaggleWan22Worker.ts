@@ -2,6 +2,8 @@ import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import { and, asc, eq, lt, or } from "drizzle-orm";
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import { db, projectsTable, providerKeysTable, scenesTable, studioJobsTable } from "@workspace/db";
+import { readGeneratedAsset } from "../lib/studioAssets";
+import { downloadPublicHttps } from "../lib/mediaGeneration";
 
 const router: IRouter = Router();
 const LEASE_MS = 5 * 60 * 1000;
@@ -70,6 +72,21 @@ router.post("/claim", async (_req, res): Promise<void> => {
     const [project] = await db.select().from(projectsTable).where(and(eq(projectsTable.id, claimed.projectId), eq(projectsTable.userId, claimed.userId))).limit(1);
     const [scene] = await db.select().from(scenesTable).where(and(eq(scenesTable.id, sceneId), eq(scenesTable.projectId, claimed.projectId), eq(scenesTable.userId, claimed.userId))).limit(1);
     if (!project || !scene) throw new Error("The project or scene for this job no longer exists.");
+    let referenceImageUrl: string | null = null;
+    let referenceImageBase64: string | null = null;
+    if (input.mode === "image") {
+      const source = typeof scene.assetUrl === "string" ? scene.assetUrl.trim() : "";
+      if (!source) throw new Error("The selected scene has no reference image.");
+      if (source.startsWith("https://")) {
+        const host = new URL(source).hostname.toLowerCase();
+        if (host === "res.cloudinary.com") referenceImageUrl = source;
+        else referenceImageBase64 = (await downloadPublicHttps(source, 20 * 1024 * 1024)).toString("base64");
+      } else {
+        const bytes = await readGeneratedAsset(source, project.id, scene.id);
+        if (!bytes) throw new Error("The saved reference image is missing or unavailable.");
+        referenceImageBase64 = bytes.toString("base64");
+      }
+    }
     const upload = cloudinaryUploadDetails(project.id, scene.id, claimed.id);
     res.json({
       job: {
@@ -86,7 +103,8 @@ router.post("/claim", async (_req, res): Promise<void> => {
         durationSeconds: scene.durationSeconds, aspectRatio: project.aspectRatio,
         fps: 24, resolution: 768,
         mode: input.mode === "image" ? "image" : "text",
-        referenceImageUrl: input.mode === "image" ? scene.assetUrl : null,
+        referenceImageUrl,
+        referenceImageBase64,
         upload,
       },
     });
