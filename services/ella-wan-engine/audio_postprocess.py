@@ -29,7 +29,13 @@ def write_srt(dialogue: list[dict[str, Any]], subtitle_lines: list[dict[str, Any
     entries = list(dialogue) + list(subtitle_lines)
     for item in entries:
         lang=str(item.get("language","ar")).lower()
-        text=str(item.get("arabic") if language=="ar" and item.get("arabic") else item.get("english") if language=="en" and item.get("english") else item.get("text","")).strip()
+        translated=item.get("arabic") if language=="ar" else item.get("english")
+        if translated:
+            text=str(translated).strip()
+        elif lang==language:
+            text=str(item.get("text","")).strip()
+        else:
+            continue
         if not text: continue
         start=float(item.get("start",0)); end=float(item.get("end",start+3))
         if end<=start: raise ValueError("Subtitle end must be after start.")
@@ -93,16 +99,26 @@ def postprocess(video: Path, output: Path, plan_path: Path) -> dict[str,Any]:
         elif final_fps!=source_fps: filters.append(f"fps={final_fps}")
         cmd=["ffmpeg","-y","-i",str(mixed)]
         if filters: cmd += ["-vf",",".join(filters)]
-        cmd += ["-c:v","libx264","-preset",str(plan.get("preset","veryfast")),"-crf",str(int(plan.get("crf",18))),"-pix_fmt","yuv420p","-c:a","copy","-movflags","+faststart",str(output)]
-        run_checked(cmd,"video finishing")
         sidecars=[]
         if plan.get("subtitles",True):
             for lang in ("ar","en"):
                 srt=output.with_name(output.stem+f".{lang}.srt")
                 write_srt(plan.get("dialogue") or [],plan.get("subtitle_lines") or [],srt,lang)
-                if srt.stat().st_size: sidecars.append(str(srt))
+                if srt.stat().st_size: sidecars.append((lang,srt))
                 else: srt.unlink(missing_ok=True)
-        return {"output":str(output),"audio_tracks":len(speech)+sum(bool(plan.get(k)) for k in ("ambience","music"))+len(plan.get("sfx") or []),"speech_segments":len(speech),"final_fps":final_fps,"interpolation":bool(plan.get("interpolate",True)),"subtitle_files":sidecars,"limitations":"Edge TTS needs internet; sound assets must be supplied. FFmpeg interpolation is not RIFE; no AI upscaling or lip-sync is claimed."}
+        for lang,srt in sidecars:
+            cmd += ["-i",str(srt)]
+        cmd += ["-map","0:v:0","-map","0:a?"]
+        for idx,_ in enumerate(sidecars,1):
+            cmd += ["-map",f"{idx}:0"]
+        cmd += ["-c:v","libx264","-preset",str(plan.get("preset","veryfast")),"-crf",str(int(plan.get("crf",18))),"-pix_fmt","yuv420p","-c:a","copy"]
+        if sidecars:
+            cmd += ["-c:s","mov_text"]
+            for idx,(lang,_) in enumerate(sidecars):
+                cmd += [f"-metadata:s:s:{idx}",f"language={('ara' if lang=='ar' else 'eng')}"]
+        cmd += ["-movflags","+faststart",str(output)]
+        run_checked(cmd,"video finishing")
+        return {"output":str(output),"audio_tracks":len(speech)+sum(bool(plan.get(k)) for k in ("ambience","music"))+len(plan.get("sfx") or []),"speech_segments":len(speech),"final_fps":final_fps,"interpolation":bool(plan.get("interpolate",True)),"subtitle_files":[str(p) for _,p in sidecars],"subtitle_tracks_embedded":len(sidecars),"limitations":"Edge TTS needs internet; sound assets must be supplied. FFmpeg interpolation is not RIFE; no AI upscaling or lip-sync is claimed."}
 
 def main():
     p=argparse.ArgumentParser(description="ELLA bilingual audio/video finishing")
