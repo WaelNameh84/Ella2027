@@ -57,8 +57,8 @@ def synthesize_dialogue(plan: dict[str, Any], work: Path) -> tuple[list[tuple[Pa
     for i,item in enumerate(dialogue):
         original=str(item.get("text") or "").strip()
         if not original: continue
-        source_text=str(item.get("arabic") if source=="ar" else item.get("english") or original).strip()
-        target_text=str(item.get("english") if source=="ar" else item.get("arabic") or "").strip()
+        source_text=str((item.get("arabic") if source=="ar" else item.get("english")) or original).strip()
+        target_text=str((item.get("english") if source=="ar" else item.get("arabic")) or "").strip()
         start=max(0.0,float(item.get("start",0)))
         source_voice=str(item.get("voice") or VOICE_BY_LANGUAGE[source])
         source_path=work/f"dialogue_{i:03d}_{source}.mp3"
