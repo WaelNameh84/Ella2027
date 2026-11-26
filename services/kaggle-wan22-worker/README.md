@@ -3,14 +3,14 @@
 This worker connects the Wan 2.2 inference runner to Ella2027's existing leased scene queue.
 
 ## Compatibility
-The current production API uses the dedicated `/api/kaggle-wan22-worker` claim, heartbeat, complete and fail endpoints. Jobs use their own `wan22_waiting` / `wan22_generating` stages, so they cannot be claimed by the older LTX worker.
+The feature-branch API uses the dedicated `/api/kaggle-wan22-worker` claim, heartbeat, complete and fail endpoints. Jobs use their own `wan22_waiting` / `wan22_generating` stages, so they cannot be claimed by the older LTX worker.
 
 ## Runtime
-- Downloads/model files are prepared by `notebooks/ELLA_WAN_ENGINE_KAGGLE.ipynb`.
+- Downloads/model files are prepared by `notebooks/ELLA_WAN_ENGINE_KAGGLE_FRESH.ipynb`.
 - Wan 2.2 TI2V 5B GGUF Q4_K_S + matching Wan 2.2 VAE + UMT5 Q4 encoder.
 - Jobs run one at a time in queue order.
 - T4-safe profile: 832×480 landscape / 480×832 portrait, 8 FPS, Q4, 8 steps. Long scenes are generated as sequential five-second continuation chunks and joined into the requested duration.
-- Image-to-video downloads the scene's Cloudinary reference image and passes it as the initial frame.
+- Image-to-video accepts saved project images and public HTTPS images; the worker passes the initial frame and uses each previous chunk's last frame to continue long scenes.
 - Completed MP4 is uploaded to the signed Cloudinary target and reported to Ella.
 - Heartbeats renew the five-minute lease during inference.
 
