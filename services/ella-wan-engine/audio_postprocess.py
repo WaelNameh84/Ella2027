@@ -121,7 +121,7 @@ def postprocess(video: Path, output: Path, plan_path: Path) -> dict[str,Any]:
                 lip_input=work/"musetalk_input_25fps.mp4"
                 run_checked(["ffmpeg","-y","-i",str(video),"-vf","minterpolate=fps=25:mi_mode=mci:mc_mode=aobmc:vsbmc=1","-an","-c:v","libx264","-preset","veryfast","-crf","18",str(lip_input)],"MuseTalk 25 FPS preparation")
                 lip_video=work/"musetalk_lipsynced.mp4"
-                lip_sync_info=apply_musetalk(lip_input,dialogue_audio,lip_video,Path(musetalk_home))
+                lip_sync_info={"enabled":True,**apply_musetalk(lip_input,dialogue_audio,lip_video,Path(musetalk_home))}
                 video_for_mix=lip_video
             else:
                 lip_sync_info={"enabled":False,"reason":"MuseTalk model bundle not configured or no dialogue audio"}
@@ -134,7 +134,8 @@ def postprocess(video: Path, output: Path, plan_path: Path) -> dict[str,Any]:
         if plan.get("upscale",True):
             if realesrgan_home:
                 upscaled=work/"upscaled.mp4"
-                upscale_info=apply_realesrgan(mixed,upscaled,source_fps,Path(realesrgan_home),int(plan.get("upscale_factor",2)))
+                upscale_fps=25 if lip_sync_info.get("enabled") else source_fps
+                upscale_info={"enabled":True,**apply_realesrgan(mixed,upscaled,upscale_fps,Path(realesrgan_home),int(plan.get("upscale_factor",2)))}
                 mixed=upscaled
             else:
                 upscale_info={"enabled":False,"reason":"Real-ESRGAN model bundle not configured"}
