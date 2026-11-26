@@ -59,24 +59,27 @@ def synthesize_dialogue(plan: dict[str, Any], work: Path) -> list[tuple[Path,flo
     return tracks
 
 def build_audio_mix(video: Path, output: Path, plan: dict[str,Any], speech: list[tuple[Path,float]]) -> None:
-    tracks=list(speech)
-    for key in ("ambience","music"):
+    tracks: list[tuple[Path,float,float]] = [(path,start,1.0) for path,start in speech]
+    for key, volume_key in (("ambience","ambience_volume"),("music","music_volume")):
         if plan.get(key):
-            p=Path(str(plan[key]))
-            if not p.is_file(): raise FileNotFoundError(f"Configured {key} asset not found: {p}")
-            tracks.append((p,0.0))
+            path=Path(str(plan[key]))
+            if not path.is_file(): raise FileNotFoundError(f"Configured {key} asset not found: {path}")
+            volume=max(0.0,min(1.0,float(plan.get(volume_key,1.0))))
+            tracks.append((path,0.0,volume))
     for item in plan.get("sfx") or []:
-        p=Path(str(item.get("path") or ""))
-        if not p.is_file(): raise FileNotFoundError(f"Configured sound effect not found: {p}")
-        tracks.append((p,max(0.0,float(item.get("start",0)))))
+        path=Path(str(item.get("path") or ""))
+        if not path.is_file(): raise FileNotFoundError(f"Configured sound effect not found: {path}")
+        volume=max(0.0,min(1.0,float(item.get("volume",plan.get("ambience_volume",1.0)))))
+        tracks.append((path,max(0.0,float(item.get("start",0))),volume))
     if not tracks:
         shutil.copy2(video,output); return
     cmd=["ffmpeg","-y","-i",str(video)]
-    for p,_ in tracks: cmd += ["-i",str(p)]
+    for path,_,_ in tracks: cmd += ["-i",str(path)]
     filters=[]; labels=[]
-    for idx,(_,start) in enumerate(tracks,1):
+    for idx,(_,start,volume) in enumerate(tracks,1):
         label=f"a{idx}"; delay=round(start*1000)
-        filters.append(f"[{idx}:a]adelay={delay}|{delay},aresample=48000,apad[{label}]"); labels.append(f"[{label}]")
+        filters.append(f"[{idx}:a]volume={volume:.3f},adelay={delay}|{delay},aresample=48000,apad[{label}]")
+        labels.append(f"[{label}]")
     duration=probe_duration(video)
     filters.append("".join(labels)+f"amix=inputs={len(labels)}:duration=longest:dropout_transition=2,atrim=0:{duration:.3f},loudnorm=I=-16:TP=-1.5:LRA=11[aout]")
     cmd += ["-filter_complex",";".join(filters),"-map","0:v:0","-map","[aout]","-c:v","copy","-c:a","aac","-b:a","192k","-shortest","-movflags","+faststart",str(output)]
