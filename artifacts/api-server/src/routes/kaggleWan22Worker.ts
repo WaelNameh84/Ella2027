@@ -101,7 +101,7 @@ router.post("/claim", async (_req, res): Promise<void> => {
           ...(project.characters ?? []).filter((character) => (scene.characterIds ?? []).includes(character.id)).map((character) => `${character.name}, appearance: ${character.description}, clothing: ${character.costume}.`)
         ].join("\n").split(/\s+/).slice(0, 320).join(" "),
         durationSeconds: scene.durationSeconds, aspectRatio: project.aspectRatio,
-        fps: 24, resolution: 768,
+        fps: 8, resolution: 832,
         mode: input.mode === "image" ? "image" : "text",
         referenceImageUrl,
         referenceImageBase64,
