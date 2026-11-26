@@ -28,6 +28,8 @@ jobs:
         run: |
           python -m py_compile services/ella-wan-engine/runner.py
           python -m py_compile services/ella-wan-engine/audio_postprocess.py
+          python -m py_compile services/ella-wan-engine/translation.py
+          python -m py_compile services/ella-wan-engine/quality_models.py
           python -m py_compile services/kaggle-wan22-worker/wan22_worker.py
-      - name: Test bilingual subtitle generation
+      - name: Test bilingual translation and subtitle generation
         run: python -m unittest discover -s services/ella-wan-engine -p 'test_*.py' -v
