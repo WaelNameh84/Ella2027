@@ -11,14 +11,14 @@
 
 ## التوكن
 أنشئ قيمة عشوائية طويلة واحدة وضعها في:
-- Render API: `KAGGLE_WAN22_WORKER_TOKEN`
-- Kaggle Secrets: `ELLA_KAGGLE_WAN22_WORKER_TOKEN`
+- Render API: `KAGGLE_LTX_WORKER_TOKEN`
+- Kaggle Secrets: `ELLA_KAGGLE_WORKER_TOKEN`
 - إعدادات Ella > Video > مزود **ELLA VIDEO ENGINE — Wan 2.2** (مفتاح المزود نفسه)
 
-إذا كان لديك التوكن القديم بالفعل، يقبل الخادم مؤقتاً `KAGGLE_LTX_WORKER_TOKEN` كبديل، والدفتر يجرب السر القديم `ELLA_KAGGLE_WORKER_TOKEN` إذا لم يجد الجديد.
+نستخدم أسماء التوكنات الحالية فقط: `KAGGLE_LTX_WORKER_TOKEN` على Render و`ELLA_KAGGLE_WORKER_TOKEN` في Kaggle. ضع القيمة نفسها أيضاً في مفتاح مزود ELLA داخل إعدادات التطبيق.
 
 ## تشغيل Kaggle
-1. استورد `notebooks/ELLA_WAN_ENGINE_KAGGLE.ipynb`.
+1. استورد `notebooks/ELLA_WAN_ENGINE_KAGGLE_FRESH.ipynb`.
 2. فعّل GPU وInternet.
 3. شغّل الخلايا حتى ينتج الاختبار اليدوي `ella_output.mp4`.
 4. بعد نجاح الاختبار فقط، شغّل الخلية الأخيرة. ستبقي العامل متصلاً بطابور Ella.
@@ -26,9 +26,9 @@
 
 ## حدود أول اختبار
 - Wan 2.2 TI2V 5B Q4_K_S.
-- 8 FPS و20 خطوة.
-- الحد الأولي للمشهد 5 ثوانٍ.
-- Landscape 1280×704، Portrait 704×1280.
+- 8 FPS و8 خطوات في ملف T4 السريع.
+- طول المشهد لا يُفرض عليه حد 5 ثوانٍ؛ تُقسّم المشاهد الطويلة تلقائياً إلى مقاطع استمرار GPU-safe مدتها 5 ثوانٍ ثم تُجمع في MP4 واحد.
+- Landscape 832×480، Portrait 480×832، Square 640×640 لتناسب ذاكرة Kaggle T4.
 - لا نعد بثبات وجه 100% أو بسرعة محددة قبل الاختبار الفعلي على GPU.
 - لا تدريب من الصفر: نحن نبني محرك التشغيل والتكامل، ونستخدم أوزان النموذج المنشورة.
 
