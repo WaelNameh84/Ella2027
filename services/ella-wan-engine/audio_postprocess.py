@@ -45,21 +45,31 @@ def write_srt(dialogue: list[dict[str, Any]], subtitle_lines: list[dict[str, Any
         blocks.append(f"{len(blocks)+1}\n{stamp(start)} --> {stamp(end)}\n{text}\n")
     destination.write_text("\n".join(blocks),encoding="utf-8")
 
-def synthesize_dialogue(plan: dict[str, Any], work: Path) -> list[tuple[Path,float]]:
+def synthesize_dialogue(plan: dict[str, Any], work: Path) -> tuple[list[tuple[Path,float]],list[tuple[Path,float]]]:
     dialogue=plan.get("dialogue") or []
-    if not dialogue: return []
+    if not dialogue: return [],[]
     if not shutil.which("edge-tts"):
         raise RuntimeError("Dialogue requested but edge-tts is not installed. Install requirements-audio.txt.")
-    tracks=[]
+    source=str(plan.get("language","ar")).lower()
+    source="en" if source.startswith("en") or "english" in source else "ar"
+    target="en" if source=="ar" else "ar"
+    source_tracks=[]; translated_tracks=[]
     for i,item in enumerate(dialogue):
-        text=str(item.get("text") or "").strip()
-        if not text: continue
-        language=str(item.get("language") or plan.get("language") or "ar").lower()
-        voice=str(item.get("voice") or VOICE_BY_LANGUAGE.get(language,VOICE_BY_LANGUAGE["en"]))
-        target=work/f"dialogue_{i:03d}.mp3"
-        run_checked(["edge-tts","--voice",voice,"--text",text,"--write-media",str(target)],f"speech synthesis item {i+1}")
-        tracks.append((target,max(0.0,float(item.get("start",0)))))
-    return tracks
+        original=str(item.get("text") or "").strip()
+        if not original: continue
+        source_text=str(item.get("arabic") if source=="ar" else item.get("english") or original).strip()
+        target_text=str(item.get("english") if source=="ar" else item.get("arabic") or "").strip()
+        start=max(0.0,float(item.get("start",0)))
+        source_voice=str(item.get("voice") or VOICE_BY_LANGUAGE[source])
+        source_path=work/f"dialogue_{i:03d}_{source}.mp3"
+        run_checked(["edge-tts","--voice",source_voice,"--text",source_text,"--write-media",str(source_path)],f"{source} speech synthesis item {i+1}")
+        source_tracks.append((source_path,start))
+        if target_text:
+            target_voice=VOICE_BY_LANGUAGE[target]
+            target_path=work/f"dialogue_{i:03d}_{target}.mp3"
+            run_checked(["edge-tts","--voice",target_voice,"--text",target_text,"--write-media",str(target_path)],f"{target} speech synthesis item {i+1}")
+            translated_tracks.append((target_path,start))
+    return source_tracks,translated_tracks
 
 def build_audio_mix(video: Path, output: Path, plan: dict[str,Any], speech: list[tuple[Path,float]]) -> None:
     tracks: list[tuple[Path,float,float]] = [(path,start,1.0) for path,start in speech]
@@ -99,9 +109,10 @@ def postprocess(video: Path, output: Path, plan_path: Path) -> dict[str,Any]:
             plan.get("dialogue") or [],source_language,required=bool(plan.get("translation_required",False)))
     output.parent.mkdir(parents=True,exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="ella_post_") as tmp:
-        work=Path(tmp); speech=synthesize_dialogue(plan,work)
+        work=Path(tmp); speech,alternate_speech=synthesize_dialogue(plan,work)
         duration=probe_duration(video)
         dialogue_audio=make_dialogue_audio(speech,duration,work/"dialogue_timeline.wav")
+        alternate_audio=make_dialogue_audio(alternate_speech,duration,work/"dialogue_alternate_timeline.wav")
         video_for_mix=video
         lip_sync_info={"enabled":False,"reason":"disabled"}
         musetalk_home=os.getenv("ELLA_MUSETALK_HOME","").strip()
@@ -134,6 +145,8 @@ def postprocess(video: Path, output: Path, plan_path: Path) -> dict[str,Any]:
         cmd=["ffmpeg","-y","-i",str(mixed)]
         if filters: cmd += ["-vf",",".join(filters)]
         sidecars=[]
+        if alternate_audio:
+            cmd += ["-i",str(alternate_audio)]
         if plan.get("subtitles",True):
             for lang in ("ar","en"):
                 srt=output.with_name(output.stem+f".{lang}.srt")
@@ -143,16 +156,21 @@ def postprocess(video: Path, output: Path, plan_path: Path) -> dict[str,Any]:
         for lang,srt in sidecars:
             cmd += ["-i",str(srt)]
         cmd += ["-map","0:v:0","-map","0:a?"]
-        for idx,_ in enumerate(sidecars,1):
-            cmd += ["-map",f"{idx}:0"]
+        if alternate_audio:
+            cmd += ["-map",f"{1}:a:0"]
+        subtitle_input_start=2 if alternate_audio else 1
+        for idx,_ in enumerate(sidecars):
+            cmd += ["-map",f"{subtitle_input_start+idx}:0"]
         cmd += ["-c:v","libx264","-preset",str(plan.get("preset","veryfast")),"-crf",str(int(plan.get("crf",18))),"-pix_fmt","yuv420p","-c:a","copy"]
+        if alternate_audio:
+            cmd += ["-metadata:s:a:1",f"language={('eng' if source_language.startswith('ar') else 'ara')}"]
         if sidecars:
             cmd += ["-c:s","mov_text"]
             for idx,(lang,_) in enumerate(sidecars):
                 cmd += [f"-metadata:s:s:{idx}",f"language={('ara' if lang=='ar' else 'eng')}"]
         cmd += ["-movflags","+faststart",str(output)]
         run_checked(cmd,"video finishing")
-        return {"output":str(output),"audio_tracks":len(speech)+sum(bool(plan.get(k)) for k in ("ambience","music"))+len(plan.get("sfx") or []),"speech_segments":len(speech),"final_fps":final_fps,"interpolation":bool(plan.get("interpolate",True)),"subtitle_files":[str(p) for _,p in sidecars],"subtitle_tracks_embedded":len(sidecars),"translation_warnings":translation_warnings,"lip_sync":lip_sync_info,"upscaling":upscale_info,"limitations":"Translation requires internet; MuseTalk and Real-ESRGAN require their separate model bundles. FFmpeg interpolation can show artifacts."}
+        return {"output":str(output),"audio_tracks":len(speech)+len(alternate_speech)+sum(bool(plan.get(k)) for k in ("ambience","music"))+len(plan.get("sfx") or []),"speech_segments":len(speech),"alternate_language_segments":len(alternate_speech),"dual_language_audio":bool(alternate_audio),"final_fps":final_fps,"interpolation":bool(plan.get("interpolate",True)),"subtitle_files":[str(p) for _,p in sidecars],"subtitle_tracks_embedded":len(sidecars),"translation_warnings":translation_warnings,"lip_sync":lip_sync_info,"upscaling":upscale_info,"limitations":"Translation requires internet; MuseTalk and Real-ESRGAN require their separate model bundles. FFmpeg interpolation can show artifacts."}
 
 def main():
     p=argparse.ArgumentParser(description="ELLA bilingual audio/video finishing")
