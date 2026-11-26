@@ -8,6 +8,7 @@ import argparse
 import importlib.util
 import json
 import os
+import subprocess
 import threading
 import time
 from pathlib import Path
@@ -26,11 +27,16 @@ def api_url(base_url: str, path: str) -> str:
 
 
 def dimensions_for_ratio(aspect_ratio: str) -> tuple[int, int]:
-    if aspect_ratio in ("9:16", "3:4", "2:3"):
-        return 704, 1280
-    if aspect_ratio in ("1:1", "4:5"):
-        return 704, 704
-    return 1280, 704
+    # Wan 2.2 TI2V 5B reference profile, sized for a 16 GB Kaggle T4.
+    if aspect_ratio in ("9:16", "3:4", "2:3", "4:5"):
+        return 480, 832
+    if aspect_ratio == "1:1":
+        return 640, 640
+    if aspect_ratio in ("4:3",):
+        return 640, 480
+    if aspect_ratio in ("3:2",):
+        return 768, 512
+    return 832, 480
 
 
 def download_reference(url: str, target: Path) -> Path:
@@ -81,40 +87,93 @@ def _generate(job: dict[str, Any], runner_path: Path, model_dir: Path,
               sd_cli: Path, output_root: Path, max_scene_seconds: int) -> Path:
     runner = _load_runner(runner_path)
     duration = int(job.get("durationSeconds") or 5)
-    if duration < 1 or duration > max_scene_seconds:
-        raise ValueError(
-            f"Scene duration {duration}s exceeds the initial ELLA Kaggle limit "
-            f"of {max_scene_seconds}s. Shorten this scene for the first T4 profile."
-        )
+    if duration < 1 or duration > 600:
+        raise ValueError("Scene duration must be between 1 and 600 seconds.")
+
     width, height = dimensions_for_ratio(str(job.get("aspectRatio") or "16:9"))
     job_id = str(job["id"])
     job_dir = output_root / job_id
+    job_dir.mkdir(parents=True, exist_ok=True)
     output = job_dir / "ella_scene.mp4"
-    frame_dir = job_dir / "frames"
-    args = runner.parser().parse_args([
-        "--prompt", str(job.get("prompt") or ""),
-        "--duration", str(duration),
-        "--fps", str(DEFAULT_FPS),
-        "--width", str(width),
-        "--height", str(height),
-        "--steps", os.getenv("ELLA_WAN_STEPS", "20"),
-        "--seed", str(int(time.time()) % 2_000_000_000),
-        "--output", str(output),
-        "--frame-dir", str(frame_dir),
-    ])
-    args.sd_cli = sd_cli
-    args.diffusion_model = model_dir / "Wan2.2-TI2V-5B-Q4_K_S.gguf"
-    args.vae = model_dir / "wan2.2_vae.safetensors"
-    args.text_encoder = model_dir / "umt5-xxl-encoder-Q4_K_M.gguf"
-    if str(job.get("mode") or "text") == "image":
-        image_url = str(job.get("referenceImageUrl") or "")
-        if not image_url:
-            raise ValueError("Image-to-video job has no reference image URL.")
-        args.image = download_reference(image_url, job_dir / "reference.png")
-    result = runner.run(args)
-    print("[ELLA][WAN RESULT]", json.dumps(result, ensure_ascii=False), flush=True)
-    return output
+    chunk_seconds = max(1, min(int(max_scene_seconds), 5))
+    remaining = duration
+    segment_paths: list[Path] = []
+    previous_frame: Path | None = None
 
+    initial_image: Path | None = None
+    if str(job.get("mode") or "text") == "image":
+        image_b64 = str(job.get("referenceImageBase64") or "")
+        if image_b64:
+            import base64
+            raw = base64.b64decode(image_b64, validate=True)
+            if not raw or len(raw) > 20 * 1024 * 1024:
+                raise ValueError("Reference image is empty or exceeds 20 MiB.")
+            initial_image = job_dir / "reference.png"
+            initial_image.write_bytes(raw)
+        else:
+            image_url = str(job.get("referenceImageUrl") or "")
+            if not image_url:
+                raise ValueError("Image-to-video job has no reference image.")
+            initial_image = download_reference(image_url, job_dir / "reference.png")
+
+    chunk_index = 0
+    while remaining > 0:
+        chunk_duration = min(chunk_seconds, remaining)
+        segment = job_dir / f"segment_{chunk_index:03d}.mp4"
+        args = runner.parser().parse_args([
+            "--prompt", str(job.get("prompt") or ""),
+            "--duration", str(chunk_duration),
+            "--fps", str(DEFAULT_FPS),
+            "--width", str(width),
+            "--height", str(height),
+            "--steps", os.getenv("ELLA_WAN_STEPS", "8"),
+            "--seed", str((int(time.time() * 1000) + chunk_index * 7919) % 2_000_000_000),
+            "--output", str(segment),
+            "--frame-dir", str(job_dir / f"frames_{chunk_index:03d}"),
+        ])
+        args.sd_cli = sd_cli
+        args.diffusion_model = model_dir / "Wan2.2-TI2V-5B-Q4_K_S.gguf"
+        args.vae = model_dir / "wan2.2_vae.safetensors"
+        args.text_encoder = model_dir / "umt5-xxl-encoder-Q4_K_M.gguf"
+        args.image = previous_frame or (initial_image if chunk_index == 0 else None)
+
+        result = runner.run(args)
+        print("[ELLA][WAN CHUNK]", chunk_index + 1, "/", (duration + chunk_seconds - 1) // chunk_seconds,
+              json.dumps(result, ensure_ascii=False), flush=True)
+        segment_paths.append(segment)
+        remaining -= chunk_duration
+
+        if remaining > 0:
+            previous_frame = job_dir / f"continuation_{chunk_index:03d}.png"
+            extracted = subprocess.run([
+                "ffmpeg", "-y", "-sseof", "-0.05", "-i", str(segment),
+                "-frames:v", "1", "-update", "1", str(previous_frame),
+            ], text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            if extracted.returncode or not previous_frame.is_file() or previous_frame.stat().st_size == 0:
+                raise RuntimeError("Could not extract the last frame for the next continuation chunk: " + extracted.stdout[-1200:])
+
+        chunk_index += 1
+
+    if len(segment_paths) == 1:
+        segment_paths[0].replace(output)
+    else:
+        concat_file = job_dir / "segments.txt"
+        concat_file.write_text(
+            "".join(f"file '{path.as_posix()}'\n" for path in segment_paths),
+            encoding="utf-8",
+        )
+        joined = subprocess.run([
+            "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(concat_file),
+            "-t", str(duration), "-c:v", "libx264", "-preset", "veryfast",
+            "-crf", "18", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+            str(output),
+        ], text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        if joined.returncode or not output.is_file():
+            raise RuntimeError("Could not join ELLA continuation chunks: " + joined.stdout[-1600:])
+
+    if not output.is_file() or output.stat().st_size == 0:
+        raise RuntimeError("ELLA did not produce a final MP4 file.")
+    return output
 
 def process_one(base_url: str, token: str, runner_path: Path, model_dir: Path,
                 sd_cli: Path, output_root: Path, max_scene_seconds: int) -> bool:
@@ -187,7 +246,7 @@ def process_one(base_url: str, token: str, runner_path: Path, model_dir: Path,
 
 
 def run_forever(base_url: str, token: str, runner_path: Path, model_dir: Path,
-                sd_cli: Path, output_root: Path, max_scene_seconds: int = 5,
+                sd_cli: Path, output_root: Path, max_scene_seconds: int = 5,  # maximum GPU-safe chunk length; longer scenes are continued automatically
                 idle_seconds: int = 12, max_jobs: int | None = None) -> None:
     if not base_url.startswith("https://"):
         raise ValueError("Ella API URL must use HTTPS.")
@@ -223,7 +282,7 @@ def main():
     p.add_argument("--model-dir", type=Path, default=Path("/kaggle/working/ella_models"))
     p.add_argument("--sd-cli", type=Path, default=Path("/kaggle/working/stable-diffusion.cpp/build/bin/sd-cli"))
     p.add_argument("--output-root", type=Path, default=Path("/kaggle/working/ella_jobs"))
-    p.add_argument("--max-scene-seconds", type=int, default=5)
+    p.add_argument("--max-scene-seconds", type=int, default=5, help="GPU-safe chunk size; requested scene duration is preserved by continuation chunks")
     p.add_argument("--max-jobs", type=int, default=None)
     args = p.parse_args()
     run_forever(args.base_url, args.token, args.runner, args.model_dir, args.sd_cli,
