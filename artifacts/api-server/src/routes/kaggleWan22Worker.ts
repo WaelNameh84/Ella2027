@@ -125,8 +125,8 @@ router.post("/claim", async (_req, res): Promise<void> => {
       subtitles: true,
       dialogue,
     };
-    if (project.musicUrl?.startsWith("https://")) audioPlan.musicUrl = project.musicUrl;
-    if (project.soundEffectsUrl?.startsWith("https://")) audioPlan.ambienceUrl = project.soundEffectsUrl;
+    if (project.musicUrl?.startsWith("https://res.cloudinary.com/")) audioPlan.musicUrl = project.musicUrl;
+    if (project.soundEffectsUrl?.startsWith("https://res.cloudinary.com/")) audioPlan.ambienceUrl = project.soundEffectsUrl;
     if (scene.subtitleText?.trim()) audioPlan.subtitleText = {
       language: speechLanguage,
       text: scene.subtitleText.trim(),
