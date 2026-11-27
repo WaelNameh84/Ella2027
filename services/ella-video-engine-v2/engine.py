@@ -166,7 +166,7 @@ def verify_mp4(path: Path, expected_seconds: int, expected_fps: int = DEFAULT_FP
     if len(images) < 2:
         raise RuntimeError("Motion check failed: fewer than two output frames could be decoded.")
     from PIL import ImageChops, ImageStat
-    difference = max(ImageStat.Stat(ImageChops.difference(images[0], img)).mean[0] for img in images[1:])
+    difference = max(sum(ImageStat.Stat(ImageChops.difference(images[0], img)).mean) / 3.0 for img in images[1:])
     if difference < 0.25:
         raise RuntimeError("Motion check failed: decoded frames appear static. No success MP4 was accepted.")
     return {"path": str(path), "bytes": path.stat().st_size, "duration_seconds": duration,
