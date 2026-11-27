@@ -943,13 +943,21 @@ router.post("/jobs/:jobId/retry", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Confirm possible provider charges before retrying script generation." });
     return;
   }
-  const retryInput = job.jobType === "script"
-    ? { ...job.input, approvePotentialCharges: true }
-    : job.input;
+  const retryInput = job.input && typeof job.input === "object" && !Array.isArray(job.input)
+    ? { ...(job.input as Record<string, unknown>) }
+    : {};
+  delete retryInput.kaggleLeaseToken;
+  delete retryInput.kaggleLeaseExpiresAt;
+  if (job.jobType === "script") retryInput.approvePotentialCharges = true;
+  const retryStage = job.jobType === "script" && !job.result
+    ? "starting"
+    : job.jobType === "video" && retryInput.worker === "kaggle-wan22"
+      ? "wan22_waiting"
+      : job.stage;
   const [updated] = await db.update(studioJobsTable).set({
     input: retryInput,
     status: "queued",
-    stage: job.jobType === "script" && !job.result ? "starting" : job.stage,
+    stage: retryStage,
     progress: 0,
     message: "Waiting in the queue.",
     error: null,

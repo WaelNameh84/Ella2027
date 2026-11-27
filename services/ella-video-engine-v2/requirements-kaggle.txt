@@ -1,0 +1,15 @@
+# PyTorch is deliberately not listed here: keep Kaggle's CUDA-enabled torch build.
+# The notebook checks CUDA/torch before installing these remaining inference deps.
+numpy<2
+Pillow
+accelerate>=0.25.0
+safetensors
+diffusers>=0.30.1,<1
+transformers>=4.46.2,<5
+sentencepiece
+einops
+timm
+opencv-python-headless<4.12
+imageio[ffmpeg]
+ftfy
+huggingface_hub>=0.24

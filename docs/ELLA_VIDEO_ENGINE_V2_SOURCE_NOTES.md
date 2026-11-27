@@ -1,0 +1,21 @@
+# ELLA VIDEO ENGINE V2 — Source Notes
+
+These are design inputs, not execution results. None of the cited model paths has yet been run on a live Kaggle Tesla T4 as part of this task.
+
+## Model suitability
+
+- **Wan 2.2 TI2V 5B official card**: Apache-2.0; supports text-to-video and image-to-video and advertises 720p/24fps. Its published single-GPU example uses 1280×704 and explicitly says at least 24 GB VRAM (e.g. RTX 4090). That does not establish suitability for a 16 GB T4. Source: [Wan-AI/Wan2.2-TI2V-5B](https://huggingface.co/Wan-AI/Wan2.2-TI2V-5B).
+- **Wan 2.2 GGUF mirror**: lists Q4_K_S at 2.90 GiB and companion VAE at 1.31 GiB; valid video sizes are stated as 1280×704 or 704×1280 and frame counts 4k+1. The smaller quantized weights do not by themselves prove runtime VRAM requirements. Source: [unsloth/Wan2.2-TI2V-5B-GGUF](https://huggingface.co/unsloth/Wan2.2-TI2V-5B-GGUF).
+- **stable-diffusion.cpp discussion**: a community report says Wan 2.2 TI2V Q8 VAE compute exceeded 20 GB in that user's setup, `--vae-tiling` appeared ineffective, and VAE-on-CPU was needed on a 16 GB card. This is anecdotal evidence, not an official benchmark or proof that the current worker works on T4. Source: [stable-diffusion.cpp issue #864](https://github.com/leejet/stable-diffusion.cpp/issues/864).
+- **CogVideoX-2B official card**: Apache-2.0; the card reports Diffusers inference starting at 4 GB VRAM with its optimizations and 3.6 GB with INT8, and describes 6-second/8-fps/720×480 output. It also says memory tests were on A100/H100 and discusses adapting optimizations to Ampere and newer; T4 is Turing, so those claims still do not prove T4 success. The card says quantized/optimized inference can run on free T4 Colab. Source: [zai-org/CogVideoX-2b](https://huggingface.co/zai-org/CogVideoX-2b).
+- **CogVideoX-Fun V1.1 2B InP candidate**: the checkpoint repository supports text-to-video and image-to-video; its model card advertises 1–49 frames at around 8 fps, multiple sizes, and says the 2B checkpoint is about 9.7 GB compressed/13 GB extracted. The project reports tested Linux GPUs including V100 16 GB and RTX 3060 12 GB, but does not explicitly document Tesla T4 testing. The card states Apache-2.0 for the CogVideoX-2B weights and code. The Kaggle notebook pins `alibaba-pai/CogVideoX-Fun-V1.1-2b-InP` to align the 49-frame window with the model revision. This remains a more memory-conscious candidate, not a T4-validated result. Sources: [CogVideoX-Fun V1.1 2B InP model card](https://huggingface.co/alibaba-pai/CogVideoX-Fun-V1.1-2b-InP) and [VideoX-Fun repository](https://github.com/aigc-apps/VideoX-Fun).
+- **CogVideoX-5B-I2V official card**: supports I2V with sequential CPU offload, VAE tiling/slicing and describes low-memory/INT8 paths, but memory evaluations were not performed on T4 and the 5B variant uses the separate CogVideoX license. Source: [zai-org/CogVideoX-5b-I2V](https://huggingface.co/zai-org/CogVideoX-5b-I2V).
+- **LTX-Video**: 2B distilled variants are documented as lower-VRAM, but the open-weights license has special terms for entities with annual revenue at/above USD 10 million and additional use restrictions. This is not the default candidate without the user checking applicability. Sources: [Lightricks/LTX-Video](https://huggingface.co/Lightricks/LTX-Video) and [LTX Open Weights License](https://huggingface.co/Lightricks/LTX-Video/blob/main/LTX-Video-Open-Weights-License-0.X.txt).
+
+## Kaggle runtime facts
+
+Kaggle's official notebook documentation lists selectable GPU accelerators, including T4 x2 in its hardware table, a 12-hour execution limit, and 20 GB of auto-saved `/kaggle/working` disk. Actual accelerator availability and quotas depend on the account/session, and the notebook must inspect the assigned device rather than assuming it is T4. Source: [Kaggle Notebooks documentation](https://www.kaggle.com/docs/notebooks).
+
+## Implementation implication
+
+Keep the existing Wan-based engine and its backup intact until a real MP4 has been generated and checked. Build V2 independently, select/test an explicitly documented low-memory candidate on Kaggle, record GPU/model/runtime metrics, and do not label any T4 profile as verified until a live run produces a decodable, visibly moving MP4. At present the user intends to run Kaggle themselves after receiving the GitHub branch/Notebook link.
