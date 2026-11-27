@@ -27,6 +27,21 @@ def api_url(base_url: str, path: str) -> str:
     return base_url.rstrip("/") + API_PREFIX + path
 
 
+def check_api_response(response: requests.Response) -> None:
+    if response.status_code == 401:
+        raise PermissionError(
+            "HTTP 401 from Ella API: set Kaggle Secret ELLA_KAGGLE_WORKER_TOKEN "
+            "to the exact same value as API server KAGGLE_LTX_WORKER_TOKEN or "
+            "ELLA_KAGGLE_WORKER_TOKEN. Token changes must be applied manually on both sides."
+        )
+    if response.status_code == 503:
+        raise PermissionError(
+            "HTTP 503 from Ella API: worker authentication is not configured on the API server. "
+            "Set KAGGLE_LTX_WORKER_TOKEN or ELLA_KAGGLE_WORKER_TOKEN there."
+        )
+    response.raise_for_status()
+
+
 def dimensions_for_ratio(aspect_ratio: str) -> tuple[int, int]:
     # Wan 2.2 TI2V 5B reference profile, sized for a 16 GB Kaggle T4.
     if aspect_ratio == "9:16":
@@ -85,13 +100,19 @@ def _heartbeat_loop(base_url: str, token: str, job_id: str, lease: str,
         try:
             response = requests.post(
                 api_url(base_url, f"/{job_id}/heartbeat"),
-                headers=headers, json={"leaseToken": lease}, timeout=25,
+                headers=headers,
+                json={"leaseToken": lease, **({"progress": state["progress"]} if isinstance(state.get("progress"), int) else {})},
+                timeout=25,
             )
             if response.status_code == 409:
                 state["lost"] = True
                 print(f"[ELLA][LEASE LOST] {job_id}", flush=True)
                 return
-            response.raise_for_status()
+            check_api_response(response)
+        except PermissionError as exc:
+            state["auth_error"] = str(exc)
+            print(f"[ELLA][AUTH ERROR] {exc}", flush=True)
+            return
         except Exception as exc:
             state["heartbeat_error"] = str(exc)
             print(f"[ELLA][HEARTBEAT WARNING] {exc}", flush=True)
@@ -121,7 +142,8 @@ def duration_chunks(seconds: int, chunk_seconds: int = 5) -> list[int]:
 
 
 def _generate(job: dict[str, Any], runner_path: Path, model_dir: Path,
-              sd_cli: Path, output_root: Path, max_scene_seconds: int) -> Path:
+              sd_cli: Path, output_root: Path, max_scene_seconds: int,
+              state: dict[str, Any] | None = None) -> Path:
     runner = _load_runner(runner_path)
     duration = int(job.get("durationSeconds") or 5)
     chunks = duration_chunks(duration, max_scene_seconds)
@@ -173,6 +195,8 @@ def _generate(job: dict[str, Any], runner_path: Path, model_dir: Path,
         print("[ELLA][WAN CHUNK]", chunk_index + 1, "/", len(chunks),
               json.dumps(result, ensure_ascii=False), flush=True)
         segment_paths.append(segment)
+        if state is not None:
+            state["progress"] = min(95, 5 + int(90 * (chunk_index + 1) / len(chunks)))
 
         if chunk_index + 1 < len(chunks):
             previous_frame = job_dir / f"continuation_{chunk_index:03d}.png"
@@ -250,7 +274,7 @@ def process_one(base_url: str, token: str, runner_path: Path, model_dir: Path,
     headers = {"Authorization": f"Bearer {token}"}
     response = requests.post(api_url(base_url, "/claim"), headers=headers,
                              json={}, timeout=40)
-    response.raise_for_status()
+    check_api_response(response)
     job = response.json().get("job")
     if not job:
         return False
@@ -265,7 +289,9 @@ def process_one(base_url: str, token: str, runner_path: Path, model_dir: Path,
     )
     heartbeat.start()
     try:
-        video_path = _generate(job, runner_path, model_dir, sd_cli, output_root, max_scene_seconds)
+        video_path = _generate(job, runner_path, model_dir, sd_cli, output_root, max_scene_seconds, state)
+        if state.get("auth_error"):
+            raise PermissionError(str(state["auth_error"]))
         if state["lost"]:
             raise RuntimeError("Lease was replaced while ELLA was generating; refusing stale upload.")
         size = video_path.stat().st_size
@@ -295,18 +321,21 @@ def process_one(base_url: str, token: str, runner_path: Path, model_dir: Path,
             json={"leaseToken": lease, "videoUrl": secure_url, "bytes": size},
             timeout=60,
         )
-        complete.raise_for_status()
+        check_api_response(complete)
         print(f"[ELLA][COMPLETED] {job_id} -> {secure_url}", flush=True)
         return True
     except Exception as exc:
         print(f"[ELLA][FAILED] {job_id}: {exc}", flush=True)
+        if state.get("auth_error"):
+            raise PermissionError(str(state["auth_error"])) from exc
         try:
-            requests.post(
+            failed = requests.post(
                 api_url(base_url, f"/{job_id}/fail"),
                 headers=headers,
                 json={"leaseToken": lease, "error": str(exc)[:800]},
                 timeout=30,
             )
+            check_api_response(failed)
         except Exception as report_error:
             print(f"[ELLA][FAIL REPORT ERROR] {report_error}", flush=True)
         raise
@@ -339,6 +368,9 @@ def run_forever(base_url: str, token: str, runner_path: Path, model_dir: Path,
             else:
                 time.sleep(max(5, idle_seconds))
         except Exception as exc:
+            if isinstance(exc, PermissionError):
+                print(f"[ELLA][AUTH ERROR] {exc}", flush=True)
+                raise
             # A failed scene is reported to Ella by process_one; keep the worker alive.
             print(f"[ELLA][JOB ERROR] {exc}", flush=True)
             time.sleep(max(5, idle_seconds))

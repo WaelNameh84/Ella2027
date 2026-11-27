@@ -10,16 +10,18 @@ const LEASE_MS = 5 * 60 * 1000;
 const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
 
 function workerAuthorized(req: Request, res: Response, next: NextFunction) {
-  const expected = (process.env.KAGGLE_LTX_WORKER_TOKEN?.trim() || "");
+  const expected = process.env.KAGGLE_LTX_WORKER_TOKEN?.trim()
+    || process.env.ELLA_KAGGLE_WORKER_TOKEN?.trim()
+    || "";
   const supplied = (req.headers.authorization ?? "").replace(/^Bearer\s+/i, "").trim();
   if (!expected || !supplied) {
-    res.status(503).json({ error: "Ella Wan 2.2 worker authentication is not configured." });
+    res.status(503).json({ error: "Worker authentication is not configured. Set KAGGLE_LTX_WORKER_TOKEN or ELLA_KAGGLE_WORKER_TOKEN on the API server and ELLA_KAGGLE_WORKER_TOKEN in Kaggle Secrets." });
     return;
   }
   const a = Buffer.from(expected);
   const b = Buffer.from(supplied);
   if (a.length !== b.length || !timingSafeEqual(a, b)) {
-    res.status(401).json({ error: "Invalid worker token." });
+    res.status(401).json({ error: "Invalid worker token. The Kaggle ELLA_KAGGLE_WORKER_TOKEN must exactly match the API server token; rotate/update both manually if changed." });
     return;
   }
   next();
@@ -169,10 +171,21 @@ router.post("/claim", async (_req, res): Promise<void> => {
 router.post("/:jobId/heartbeat", async (req, res): Promise<void> => {
   const { jobId } = req.params;
   const leaseToken = typeof req.body?.leaseToken === "string" ? req.body.leaseToken : "";
+  const reportedProgress = req.body?.progress;
+  if (reportedProgress !== undefined && (!Number.isInteger(reportedProgress) || reportedProgress < 5 || reportedProgress > 95)) {
+    res.status(400).json({ error: "Heartbeat progress must be an integer from 5 through 95." });
+    return;
+  }
   const [job] = await db.select().from(studioJobsTable).where(and(eq(studioJobsTable.id, jobId), eq(studioJobsTable.jobType, "video"), eq(studioJobsTable.status, "running"))).limit(1);
   const input = job?.input as Record<string, unknown> | undefined;
   if (!job || input?.worker !== "kaggle-wan22" || input.kaggleLeaseToken !== leaseToken) { res.status(409).json({ error: "Job lease is no longer valid." }); return; }
-  await db.update(studioJobsTable).set({ updatedAt: new Date(), message: "An ELLA Wan 2.2 worker is generating the video." }).where(eq(studioJobsTable.id, jobId));
+  await db.update(studioJobsTable).set({
+    updatedAt: new Date(),
+    message: reportedProgress === undefined
+      ? "An ELLA Wan 2.2 worker is generating the video."
+      : `An ELLA Wan 2.2 worker completed video segments (${reportedProgress}%).`,
+    ...(reportedProgress === undefined ? {} : { progress: reportedProgress }),
+  }).where(eq(studioJobsTable.id, jobId));
   res.json({ ok: true, leaseExpiresAt: new Date(Date.now() + LEASE_MS).toISOString() });
 });
 

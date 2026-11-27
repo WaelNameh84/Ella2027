@@ -15,7 +15,9 @@ The feature-branch API uses the dedicated `/api/kaggle-wan22-worker` claim, hear
 - Heartbeats renew the five-minute lease during inference.
 
 ## Required Kaggle secret
-`ELLA_KAGGLE_WORKER_TOKEN` must match the existing Render environment variable `KAGGLE_LTX_WORKER_TOKEN` and the ELLA provider key saved in Settings. Do not rename either secret. Never put the token in this repository or notebook source.
+Kaggle Secret `ELLA_KAGGLE_WORKER_TOKEN` must exactly match either API-server environment variable `KAGGLE_LTX_WORKER_TOKEN` (existing deployments) or `ELLA_KAGGLE_WORKER_TOKEN` (alias). If a token changes, update both sides manually; the worker does not refresh credentials automatically. A 401 message explains this mismatch, while a 503 indicates the API server has no worker token configured. Never put the token in this repository or notebook source.
+
+Heartbeat progress is reported from completed generation chunks; percentage is not advanced just because time elapsed.
 
 ## Important
 This queue adapter is code-complete but has not yet been exercised against a live Kaggle GPU. Run the manual one-scene generation first. Do not queue long scenes until the T4 profile is measured. Scenes longer than five seconds are automatically split into continuation chunks, then joined into one MP4 with the requested duration.

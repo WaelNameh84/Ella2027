@@ -1,7 +1,29 @@
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
-from wan22_worker import api_url, dimensions_for_ratio, duration_chunks
+from wan22_worker import api_url, check_api_response, dimensions_for_ratio, duration_chunks
+
+
+class FakeResponse:
+    def __init__(self, status_code):
+        self.status_code = status_code
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise RuntimeError(f"HTTP {self.status_code}")
+
+
+def test_authentication_errors_explain_manual_token_setup():
+    for status, message in (
+        (401, "exact same value as"),
+        (503, "not configured on the API server"),
+    ):
+        try:
+            check_api_response(FakeResponse(status))
+        except PermissionError as error:
+            assert message in str(error)
+        else:
+            raise AssertionError(f"Expected authentication failure for HTTP {status}")
 
 
 def test_api_url_uses_existing_ella_queue():
