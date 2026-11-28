@@ -262,6 +262,7 @@ test("provider catalog does not advertise providers without a wired adapter", ()
     assert.equal(ids.includes(unsupported), false, unsupported);
   }
   assert.equal(ids.includes("local-video-worker"), true);
+  assert.equal(ids.includes("ella-kaggle-studio"), true);
   assert.equal(ids.includes("azure-speech"), true);
   assert.equal(ids.includes("google-speech"), true);
   assert.equal(ids.includes("google-tts"), true);
