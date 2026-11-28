@@ -9,7 +9,7 @@ function safeShareUrl(value: unknown): string | null {
     const url = new URL(value.trim());
     if (url.protocol !== "https:" || url.username || url.password || url.port || url.search || url.hash) return null;
     const host = url.hostname.toLowerCase();
-    if (!(host.endsWith(".gradio.live") || host.endsWith(".gradio.app"))) return null;
+    if (!(host.endsWith(".gradio.live") || host.endsWith(".gradio.app") || host.endsWith(".trycloudflare.com"))) return null;
     return url.toString().replace(/\/$/, "");
   } catch {
     return null;
