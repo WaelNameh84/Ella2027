@@ -40,7 +40,7 @@ function userIdOf(res: Response): string {
 
 function supportedProvider(provider: string, jobType: JobKind): boolean {
   if (jobType === "image") return ["openai", "stability", "replicate", "huggingface", "ai-horde"].includes(provider);
-  if (jobType === "video") return ["replicate", "fal", "agnes", "magic-hour", "local-video-worker"].includes(provider);
+  if (jobType === "video") return ["replicate", "fal", "agnes", "magic-hour", "local-video-worker", "ella-kaggle-studio"].includes(provider);
   return ["elevenlabs", "openai", "openai-audio", "google-tts", "azure-speech"].includes(provider);
 }
 
@@ -189,7 +189,7 @@ router.post("/projects/:projectId/scenes/:sceneId/jobs/video", async (req, res):
         eq(providerKeysTable.enabled, true),
       )).limit(1))[0]
     : undefined;
-  const isLocalGpuWorker = selectedVideoKey?.provider === "local-video-worker";
+  const isLocalGpuWorker = ["local-video-worker", "ella-kaggle-studio"].includes(selectedVideoKey?.provider ?? "");
   if (await isZeroSpendMode(userId) && !isLocalGpuWorker) {
     res.status(403).json({ error: ZERO_SPEND_ERROR });
     return;
