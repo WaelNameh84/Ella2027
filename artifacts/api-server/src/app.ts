@@ -6,6 +6,7 @@ import { clerkMiddleware } from "@clerk/express";
 import { publishableKeyFromHost } from "@clerk/shared/keys";
 import router from "./routes";
 import { logger } from "./lib/logger";
+import { registerEllaKaggleUrl, ellaKaggleHealth } from "./lib/ellaKaggleStudio";
 import {
   CLERK_PROXY_PATH,
   clerkProxyMiddleware,
@@ -42,6 +43,17 @@ app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 app.use(cors({ credentials: true, origin: true }));
 app.use(express.json({ limit: "12mb" }));
 app.use(express.urlencoded({ extended: true }));
+
+// Kaggle notebook publishes its current Gradio share URL to this authenticated bridge.
+app.post("/set-kaggle-url", (req, res) => {
+  const token = typeof req.header("X-Worker-Token") === "string" ? req.header("X-Worker-Token")! : "";
+  if (!registerEllaKaggleUrl(req.body?.url, token)) {
+    res.status(401).json({ error: "Invalid worker token or Gradio share URL." });
+    return;
+  }
+  res.json({ ok: true, ...ellaKaggleHealth() });
+});
+app.get("/kaggle-studio/health", (_req, res) => res.json(ellaKaggleHealth()));
 // Reference-image uploads use the same durable generated-artifacts storage as provider outputs.
 // Keep this parser scoped to supported image content types and bounded to prevent oversized bodies.
 app.use("/api", express.raw({ type: ["image/png", "image/jpeg", "image/webp", "image/svg+xml"], limit: "20mb" }));
