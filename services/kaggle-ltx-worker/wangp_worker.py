@@ -7,6 +7,7 @@ the resulting MP4 to the signed Cloudinary target, and completes the job.
 from __future__ import annotations
 
 import os
+import sys
 import shutil
 import subprocess
 import json
@@ -48,7 +49,7 @@ TOKEN = os.environ.get("ELLA_KAGGLE_WORKER_TOKEN", "").strip()
 WANGP_ROOT = Path("/kaggle/working/WanGP")
 OUTPUT_DIR = Path("/kaggle/working/ella2027-output")
 MODEL_TYPE = os.environ.get("ELLA_WANGP_MODEL_TYPE", "ltx2_25_22B_distilled")
-MODEL_MAX_SECONDS = 10
+MODEL_MAX_SECONDS = 5
 MAX_UPLOAD_BYTES = 100 * 1024 * 1024
 FPS = 24
 IDLE_SECONDS = 12
@@ -87,10 +88,10 @@ def _resolution(aspect_ratio: str) -> str:
     """
     value = (aspect_ratio or "16:9").strip()
     if value in ("9:16", "portrait"):
-        return "576x1024"
+        return "448x768"
     if value in ("1:1", "square"):
-        return "768x768"
-    return "1024x576"
+        return "640x640"
+    return "768x448"
 
 
 def _make_settings(session, task: dict[str, Any], output_dir: Path) -> dict[str, Any]:
@@ -114,7 +115,6 @@ def _make_settings(session, task: dict[str, Any], output_dir: Path) -> dict[str,
         "video_length": f"{duration}s",
         "duration_seconds": duration,
         "force_fps": FPS,
-        "audio_prompt_type": "",
     })
     if not settings["prompt"]:
         raise RuntimeError("Ella2027 supplied an empty video prompt.")
