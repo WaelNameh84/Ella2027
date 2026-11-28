@@ -325,7 +325,7 @@ router.post("/ai-team/projects/:projectId/submit-storyboard", async (req, res): 
       eq(providerKeysTable.serviceType, "video"),
       eq(providerKeysTable.enabled, true),
     )).limit(1);
-    const supported = ["replicate", "fal", "agnes", "magic-hour", "local-video-worker"];
+    const supported = ["replicate", "fal", "agnes", "magic-hour", "local-video-worker", "ella-kaggle-studio"];
     if (!found || !supported.includes(found.provider)
       || !providerCredentialUsable(found.provider, found.status as ProviderStatus)
       || (found.cooldownUntil && found.cooldownUntil.getTime() > Date.now())) {
