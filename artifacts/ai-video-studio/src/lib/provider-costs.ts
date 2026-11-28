@@ -5,6 +5,7 @@ export const providerCostRanges: Record<string, Record<CostService, [number, num
   'ai-horde': { image: [0, 0], video: [0, 0], voice: [0, 0] },
   'piper-local': { image: [0, 0], video: [0, 0], voice: [0, 0] },
   'local-video-worker': { image: [0, 0], video: [0, 0], voice: [0, 0] },
+  'ella-kaggle-studio': { image: [0, 0], video: [0, 0], voice: [0, 0] },
   openai: { image: [0.02, 0.12], video: [0.05, 2], voice: [0.01, 0.3] },
   stability: { image: [0.02, 0.08], video: [0.05, 2], voice: [0.01, 0.3] },
   replicate: { image: [0.01, 0.2], video: [0.08, 3], voice: [0.01, 0.3] },
@@ -18,7 +19,7 @@ export const providerCostRanges: Record<string, Record<CostService, [number, num
 export function estimateCostText(provider: string | undefined, service: CostService, units: number, lang: 'ar' | 'en') {
   const range = providerCostRanges[provider || '']?.[service];
   if (provider === 'piper-local') return lang === 'ar' ? 'مجاني — صوت عربي محلي على الخادم' : 'Free — local Arabic voice on the app server';
-  if (provider === 'local-video-worker') return lang === 'ar' ? 'لا توجد رسوم API؛ تُطبّق حدود جلسة وحصة GPU في Kaggle.' : 'No video API fee; Kaggle GPU session and quota limits still apply.';
+  if (provider === 'local-video-worker' || provider === 'ella-kaggle-studio') return lang === 'ar' ? 'لا توجد رسوم API؛ تُطبّق حدود جلسة وحصة GPU في Kaggle.' : 'No video API fee; Kaggle GPU session and quota limits still apply.';
   if (provider === 'ai-horde') return lang === 'ar' ? 'مجاني — استخدام مجهول، أولوية منخفضة' : 'Free — anonymous use, low priority';
   if (provider === 'free-test') return lang === 'ar' ? 'مجاني — اختبار محلي' : 'Free — local test';
   if (provider === 'puter') return lang === 'ar' ? 'السعر يحدده نموذج Puter وحسابك؛ اختبار الاتصال مجاني ولا يستهلك رصيد توليد' : 'Price depends on the Puter model and your account; connection test is free and uses no generation credits';
@@ -31,6 +32,7 @@ export function defaultVideoModel(provider: string | undefined, mode: 'text' | '
   if (provider === 'agnes') return 'agnes-video-2.5';
   if (provider === 'magic-hour') return 'ltx-2.5';
   if (provider === 'local-video-worker') return 'ltx2_25_22B_distilled';
+  if (provider === 'ella-kaggle-studio') return 'ella-studio';
   if (provider === 'replicate') return 'minimax/video-01';
   return '';
 }
