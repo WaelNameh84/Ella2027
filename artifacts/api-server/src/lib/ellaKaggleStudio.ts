@@ -17,7 +17,7 @@ function safeShareUrl(value: unknown): string | null {
 }
 
 function secretMatches(candidate: string): boolean {
-  const expected = process.env.ELLA_KAGGLE_WORKER_TOKEN ?? "";
+  const expected = process.env.ELLA_KAGGLE_WORKER_TOKEN ?? process.env.KAGGLE_LTX_WORKER_TOKEN ?? "";
   if (!expected || !candidate) return false;
   const a = Buffer.from(expected);
   const b = Buffer.from(candidate);
