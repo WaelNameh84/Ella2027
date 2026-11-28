@@ -193,7 +193,7 @@ function providerSupports(provider: string, service: string) {
   if (provider === 'free-test') return ['image', 'voice'].includes(service);
   if (service === 'text') return ['openai','gemini','anthropic','groq','cloudflare','openrouter','llama-free','huggingface','colab-t5','mistral','cerebras','together','sambanova','deepseek','nvidia','cohere'].includes(provider);
   if (service === 'image') return ['openai','stability','replicate','huggingface','ai-horde','puter'].includes(provider);
-  if (service === 'video') return ['replicate','fal','agnes','magic-hour','local-video-worker'].includes(provider);
+  if (service === 'video') return ['replicate','fal','agnes','magic-hour','local-video-worker','ella-kaggle-studio'].includes(provider);
   if (service === 'voice') return ['elevenlabs','openai','openai-audio','google-tts','azure-speech','piper-local'].includes(provider);
   if (service === 'transcription') return ['openai','whisper','huggingface','deepgram','assemblyai','google-speech','azure-speech'].includes(provider);
   if (service === 'media') return ['pexels','pixabay','unsplash'].includes(provider);
@@ -265,6 +265,12 @@ function providerServicePurpose(service: string, lang: Lang, provider = '') {
     return {
       label: tx(lang, 'توليد الفيديو عبر Agnes AI', 'Video generation through Agnes AI'),
       description: tx(lang, 'يُنشئ مهمة فيديو غير متزامنة ثم ينتظر اكتمالها عبر Agnes AI.', 'Creates an asynchronous video task and waits for completion through Agnes AI.'),
+    };
+  }
+  if (service === 'video' && provider === 'ella-kaggle-studio') {
+    return {
+      label: tx(lang, 'توليد الفيديو عبر ELLA Kaggle Studio', 'Video generation through ELLA Kaggle Studio'),
+      description: tx(lang, 'يرسل المشاهد إلى محرك ELLA العامل على Kaggle عبر اتصال Render المسجّل، ثم يحفظ الفيديو الناتج داخل التطبيق.', 'Sends scenes to the ELLA engine running on Kaggle through the registered Render connection, then saves the generated video in the app.'),
     };
   }
   if (service === 'video' && provider === 'magic-hour') {
