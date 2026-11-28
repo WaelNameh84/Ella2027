@@ -155,7 +155,7 @@ function safeJobError(error: unknown): string {
 
 function supportsJob(provider: string, jobType: JobKind): boolean {
   if (jobType === "image") return ["openai", "stability", "replicate", "huggingface"].includes(provider);
-  if (jobType === "video") return ["replicate", "fal", "agnes", "magic-hour", "local-video-worker"].includes(provider);
+  if (jobType === "video") return ["replicate", "fal", "agnes", "magic-hour", "local-video-worker", "ella-kaggle-studio"].includes(provider);
   if (jobType === "voice") return ["elevenlabs", "openai", "openai-audio", "google-tts", "azure-speech", "piper-local"].includes(provider);
   return false;
 }
@@ -948,6 +948,8 @@ async function processVideoJob(job: typeof studioJobsTable.$inferSelect): Promis
             ? (requestedModel || "ltx-2.5")
             : provider === "local-video-worker"
               ? (requestedModel || "wan2.2")
+              : provider === "ella-kaggle-studio"
+                ? (requestedModel || "ella-studio")
           : (segments === 2 ? requestedModel : "minimax/video-01");
       return generateVideo(
         provider,
