@@ -8,7 +8,9 @@ test("local video worker integration is documented and wired to the provider reg
   const jobs = await fs.readFile(new URL("../src/lib/studioJobs.ts", import.meta.url), "utf8");
   const routes = await fs.readFile(new URL("../src/routes/generation.ts", import.meta.url), "utf8");
   assert.match(registry, /"local-video-worker"/);
+  assert.match(registry, /"ella-kaggle-studio"/);
   assert.match(media, /localVideoWorkerPrediction/);
+  assert.match(media, /generateWithEllaKaggleStudio/);
   assert.match(jobs, /"local-video-worker"/);
   assert.match(routes, /"local-video-worker"/);
   assert.match(routes, /isLocalGpuWorker/);
