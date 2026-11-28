@@ -49,7 +49,7 @@ export async function testEllaKaggleCredential(token: string): Promise<{ status:
     const response = await fetch(`${base}/config`, { signal: AbortSignal.timeout(12_000), redirect: "error" });
     if (!response.ok) return { status: "unavailable", message: `Gradio returned HTTP ${response.status}.` };
     const config = await response.json() as { dependencies?: Array<{ api_name?: string }> };
-    if (!config.dependencies?.some((item) => String(item.api_name ?? "").replace(/^\\//, "") === "run_studio")) {
+    if (!config.dependencies?.some((item) => String(item.api_name ?? "").replace(/^\//, "") === "run_studio")) {
       return { status: "unavailable", message: "Gradio is online, but the /run_studio API endpoint was not found." };
     }
     return { status: "valid", message: "ELLA Kaggle Gradio is connected and /run_studio is available." };
@@ -140,7 +140,7 @@ export async function generateWithEllaKaggleStudio(token: string, prompt: string
   const configResponse = await fetch(`${base}/config`, { signal: AbortSignal.timeout(15_000), redirect: "error" });
   if (!configResponse.ok) throw new Error(`Gradio config returned HTTP ${configResponse.status}.`);
   const config = await configResponse.json() as { components?: GradioComponent[]; dependencies?: GradioDependency[] };
-  const dependency = config.dependencies?.find((item) => String(item.api_name ?? "").replace(/^\\//, "") === "run_studio");
+  const dependency = config.dependencies?.find((item) => String(item.api_name ?? "").replace(/^\//, "") === "run_studio");
   if (!dependency || !Array.isArray(dependency.inputs)) throw new Error("The connected Gradio app does not expose /run_studio.");
   const components = new Map((config.components ?? []).map((component) => [component.id, component]));
   const ratio = aspectRatio === "9:16" ? [480, 832] : aspectRatio === "1:1" ? [640, 640] : [832, 480];
