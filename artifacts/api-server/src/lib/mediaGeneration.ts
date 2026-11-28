@@ -1,6 +1,7 @@
 import { lookup } from "node:dns/promises";
 import { spawn } from "node:child_process";
 import { isIP } from "node:net";
+import { generateWithEllaKaggleStudio } from "./ellaKaggleStudio";
 
 export class ProviderCallError extends Error {
   readonly providerStatus: number;
@@ -753,6 +754,9 @@ export async function generateVideo(
   durationSeconds = 5,
   aspectRatio = "16:9",
 ): Promise<Buffer> {
+  if (provider === "ella-kaggle-studio") {
+    return generateWithEllaKaggleStudio(key, prompt, durationSeconds, aspectRatio, referenceImage);
+  }
   if (provider === "local-video-worker") {
     return localVideoWorkerPrediction(key, model || "wan2.2", prompt, referenceImage, durationSeconds, aspectRatio);
   }
