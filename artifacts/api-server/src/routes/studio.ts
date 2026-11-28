@@ -807,7 +807,7 @@ router.post("/projects/:projectId/jobs/script", async (req, res): Promise<void> 
       eq(providerKeysTable.serviceType, "video"),
       eq(providerKeysTable.enabled, true),
     )).limit(1);
-    const supportedVideoProviders = ["replicate", "fal", "agnes", "magic-hour", "local-video-worker"];
+    const supportedVideoProviders = ["replicate", "fal", "agnes", "magic-hour", "local-video-worker", "ella-kaggle-studio"];
     if (!videoKey || !supportedVideoProviders.includes(videoKey.provider)
       || !providerCredentialUsable(videoKey.provider, videoKey.status as ProviderStatus)
       || (videoKey.cooldownUntil && videoKey.cooldownUntil.getTime() > Date.now())) {
