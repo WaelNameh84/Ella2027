@@ -1083,11 +1083,11 @@ async function processNextJob(): Promise<void> {
     const jobProviderKeyId = String((job.input as JobInput).providerKeyId ?? "");
     const localFreeVoice = job.jobType === "voice"
       && [FREE_TEST_PROVIDER_KEY, PIPER_LOCAL_PROVIDER_KEY].includes(jobProviderKeyId);
-    const localFreeVideo = job.jobType === "video" && Boolean(jobProviderKeyId) && (await db.select({ provider: providerKeysTable.provider }).from(providerKeysTable).where(and(
+    const localFreeVideo = job.jobType === "video" && Boolean(jobProviderKeyId) && ["local-video-worker", "ella-kaggle-studio"].includes((await db.select({ provider: providerKeysTable.provider }).from(providerKeysTable).where(and(
       eq(providerKeysTable.id, jobProviderKeyId),
       eq(providerKeysTable.userId, job.userId),
       eq(providerKeysTable.serviceType, "video"),
-    )).limit(1))[0]?.provider === "local-video-worker";
+    )).limit(1))[0]?.provider ?? "");
     if (job.jobType !== "export" && !localFreeVoice && !localFreeVideo && await isZeroSpendMode(job.userId)) {
       throw new Error(ZERO_SPEND_ERROR);
     }
