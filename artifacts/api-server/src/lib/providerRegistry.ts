@@ -191,6 +191,10 @@ export const providerDefinitions: Record<string, ProviderDefinition> = {
     testUrl: () => "https://api.magichour.ai/v1/account",
     testHeaders: (key) => ({ Authorization: `Bearer ${key}` }),
   },
+  "ella-kaggle-studio": {
+    label: "ELLA Kaggle GPU",
+    officialUrl: "https://github.com/WaelNameh84/Ella2027",
+  },
   "local-video-worker": {
     label: "Ella Local GPU Worker",
     officialUrl: "https://github.com/Wan-Video/Wan2.2",
@@ -283,7 +287,7 @@ export function getAllowedColabBaseUrl(value: string): string | null {
 
 const providersRequiringSuccessfulTest = new Set([
   "huggingface", "colab-t5", "cloudflare", "stability", "groq", "llama-free",
-  "assemblyai", "deepgram", "agnes", "magic-hour", "local-video-worker",
+  "assemblyai", "deepgram", "agnes", "magic-hour", "local-video-worker", "ella-kaggle-studio",
   "google-tts", "azure-speech",
 ]);
 export function providerRequiresSuccessfulTest(provider: string): boolean {
@@ -357,6 +361,10 @@ export async function testProviderCredential(
   provider: string,
   key: string,
 ): Promise<{ status: ProviderStatus; message: string }> {
+  if (provider === "ella-kaggle-studio") {
+    const result = await (await import("./ellaKaggleStudio")).testEllaKaggleCredential(key);
+    return result;
+  }
   const definition = providerDefinitions[provider];
   if (provider === "cloudflare" && !/^[a-f0-9]{32}$/i.test(process.env.CLOUDFLARE_ACCOUNT_ID ?? "")) {
     return { status: "untested", message: "Set the 32-character CLOUDFLARE_ACCOUNT_ID server setting before testing Workers AI access." };
